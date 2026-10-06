@@ -17,6 +17,7 @@ Toda a engenharia, modelagem e planejamento do sistema foram documentados e vers
 | 📋 **[03. Requisitos & Módulos Funcionais](docs/03_REQUISITOS_E_MODULOS.md)** | Especificação detalhada dos 7 módulos: PDV Balcão, Mesas QR Code, KDS Cozinha, Delivery, Caixa, Estoque e EloBot IA. |
 | 🗄️ **[04. Modelagem do Banco de Dados](docs/04_MODELAGEM_BANCO_DE_DADOS.md)** | Diagrama ER e scripts DDL (SQL) das tabelas relacionais multi-tenant. |
 | 🗺️ **[05. Roadmap de Desenvolvimento](docs/05_ROADMAP_DE_DESENVOLVIMENTO.md)** | Fases práticas de implementação organizadas em sprints graduais. |
+| 📘 **[06. Guia Técnico & Linguagens](docs/06_GUIA_TECNICO_E_LINGUAGEM.md)** | Detalhamento profundo do TypeScript, React 19, Vite, Tailwind, Zustand e boas práticas. |
 
 ---
 
