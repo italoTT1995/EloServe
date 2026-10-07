@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Guia Passo a Passo: Como Clonar e Rodar o EloServe</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    @page {
+      size: A4;
+      margin: 12mm 15mm 12mm 15mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #ffffff;
+      color: #0f172a;
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+      padding: 22px 28px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 4px solid #10b981;
+    }
+
+    .header-title h1 {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-title p {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    .badge-top {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin: 18px 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+    }
+
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 12px;
+      page-break-inside: avoid;
+    }
+
+    .card-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #10b981;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-content h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      color: #475569;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .code-box {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin-top: 6px;
+      border: 1px solid #1e293b;
+      position: relative;
+    }
+
+    .code-comment {
+      color: #64748b;
+    }
+
+    .highlight-link {
+      color: #0284c7;
+      font-weight: 600;
+      text-decoration: underline;
+    }
+
+    .alert-box {
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      color: #1e40af;
+      margin-top: 8px;
+    }
+
+    .alert-warning {
+      background: #fffbeb;
+      border-left-color: #f59e0b;
+      color: #92400e;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    .footer {
+      margin-top: 24px;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      color: #64748b;
+      font-size: 10.5px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">
+      <h1>⚡ EloServe PDV & Gestão</h1>
+      <p>Manual Oficial de Configuração de Ambiente para Desenvolvedor Parceiro</p>
+    </div>
+    <div class="badge-top">Guia de Onboarding</div>
+  </div>
+
+  <!-- PARTE 1 -->
+  <div class="section-title">
+    <span>Passo 1: Liberar Acesso no Repositório (Dono do Projeto)</span>
+  </div>
+
+  <div class="card">
+    <div class="card-step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <h3>Adicionar o Desenvolvedor como Colaborador</h3>
+        <p>Como o repositório é <strong>privado</strong>, o parceiro só consegue baixar após ser adicionado pelo dono (italoTT1995):</p>
+        <p>1. Acesse: <span class="highlight-link">https://github.com/italoTT1995/EloServe/settings/access</span><br>
+           2. Clique em <strong>"Add people"</strong> e insira o usuário do GitHub ou e-mail do parceiro.<br>
+           3. O parceiro receberá um e-mail de convite com o link para <strong>aceitar (Accept invitation)</strong>.</p>
+        <div class="alert-box alert-warning">
+          <strong>Atenção:</strong> O parceiro precisa aceitar o convite antes de tentar rodar o git clone, caso contrário receberá erro de repositório inexistente ou permissão negada.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARTE 2 -->
+  <div class="section-title">
+    <span>Passo 2: Configuração no Computador do Parceiro</span>
+  </div>
+
+  <div class="card">
+    <div class="card-step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <h3>Pré-requisitos Obrigatórios na Máquina do Parceiro</h3>
+        <p>O parceiro precisa ter instalado no computador:</p>
+        <ul style="margin-left: 20px; font-size: 12px; color: #475569;">
+          <li><strong>Git</strong> instalado (<a class="highlight-link" href="https://git-scm.com">git-scm.com</a>)</li>
+          <li><strong>Node.js</strong> versão 18 ou superior (<a class="highlight-link" href="https://nodejs.org">nodejs.org</a>)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <h3>Clonar o Repositório do EloServe</h3>
+        <p>No terminal (PowerShell, CMD ou Git Bash), navegue até a pasta de projetos e execute:</p>
+        <div class="code-box">
+          <span class="code-comment"># Clonar o repositório via HTTPS</span><br>
+          git clone https://github.com/italoTT1995/EloServe.git<br><br>
+          <span class="code-comment"># Entrar na pasta do projeto</span><br>
+          cd EloServe
+        </div>
+        <div class="alert-box">
+          <strong>Nota de Autenticação:</strong> Se for a primeira vez clonando um repositório privado no Git, abrirá uma janela no navegador para ele fazer login na conta do GitHub dele.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <h3>Instalar Dependências e Iniciar o Sistema</h3>
+        <p>Dentro da pasta <strong>EloServe</strong>, rode os seguintes comandos no terminal:</p>
+        <div class="code-box">
+          <span class="code-comment"># 1. Instalar todos os pacotes (React 19, TypeScript, Tailwind, Zustand)</span><br>
+          npm install<br><br>
+          <span class="code-comment"># 2. Iniciar o servidor local de desenvolvimento</span><br>
+          npm run dev
+        </div>
+        <p style="margin-top: 8px;">O terminal exibirá a URL local. Basta abrir no navegador:</p>
+        <div class="code-box" style="color: #4ade80;">
+          ➜ Local: http://localhost:5174/
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARTE 3 -->
+  <div class="section-title">
+    <span>Passo 3: Rotina de Trabalho e Sincronização Diária</span>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">Como ele envia alterações (Push):</h3>
+      <p style="font-size: 11.5px; color: #475569; margin-bottom: 6px;">Ao terminar de codar uma nova funcionalidade:</p>
+      <div class="code-box" style="font-size: 11px;">
+        git add .<br>
+        git commit -m "feat: minha alteracao"<br>
+        git push origin main
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">Como você puxa o código dele (Pull):</h3>
+      <p style="font-size: 11.5px; color: #475569; margin-bottom: 6px;">Antes de começar a programar no seu dia:</p>
+      <div class="code-box" style="font-size: 11px;">
+        git pull origin main
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Repositório: github.com/italoTT1995/EloServe</span>
+    <span>EloServe PDV &bull; Stack: React 19 + TypeScript + Vite + TailwindCSS</span>
+    <span>Gerado para italoTT1995</span>
+  </div>
+
+</body>
+</html>
