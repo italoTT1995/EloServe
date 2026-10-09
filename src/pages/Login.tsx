@@ -35,7 +35,13 @@ export default function Login() {
       const res = login(email, senha);
       setCarregando(false);
       if (res.sucesso) {
-        navigate('/');
+        if (res.usuario?.cargo === 'super_admin') {
+          navigate('/saas');
+        } else if (res.usuario?.cargo === 'cozinha') {
+          navigate('/kds');
+        } else {
+          navigate('/');
+        }
       } else {
         setErro(res.mensagem || 'Credenciais inválidas.');
       }
@@ -43,8 +49,14 @@ export default function Login() {
   }
 
   function handleLoginRapido(cargo: CargoUsuario) {
-    loginRapidoPorCargo(cargo);
-    navigate('/');
+    const usuario = loginRapidoPorCargo(cargo);
+    if (usuario.cargo === 'super_admin') {
+      navigate('/saas');
+    } else if (usuario.cargo === 'cozinha') {
+      navigate('/kds');
+    } else {
+      navigate('/');
+    }
   }
 
   return (

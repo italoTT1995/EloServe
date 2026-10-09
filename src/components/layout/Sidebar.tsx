@@ -88,8 +88,49 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Nav Menu */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {/* Se o usuário for Super Admin, a Seção SaaS Master fica no TOPO em destaque */}
+        {usuarioLogado?.cargo === 'super_admin' && (
+          <div className="mb-4 pb-3 border-b border-purple-500/30">
+            <p className="px-3 text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Crown className="w-3.5 h-3.5" />
+              <span>Administração Geral (SaaS)</span>
+            </p>
+
+            <NavLink
+              to="/saas"
+              onClick={() => {
+                if (window.innerWidth < 1024) onClose();
+              }}
+              className={({ isActive }) =>
+                `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 ${
+                  isActive
+                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                    : 'bg-purple-950/40 border border-purple-500/30 text-purple-200 hover:bg-purple-900/50'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <div className="flex items-center gap-2.5">
+                    <Crown className={`w-4 h-4 ${isActive ? 'text-white' : 'text-purple-400'}`} />
+                    <span>Painel SaaS Master</span>
+                  </div>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${
+                    isActive ? 'bg-purple-700 text-white' : 'bg-purple-900 text-purple-300'
+                  }`}>
+                    Principal
+                  </span>
+                </>
+              )}
+            </NavLink>
+          </div>
+        )}
+
+        {/* Módulos Operacionais */}
         <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-          Operação do Restaurante
+          {usuarioLogado?.cargo === 'super_admin'
+            ? 'Módulos da Loja (Modo Suporte)'
+            : 'Operação do Restaurante'}
         </p>
 
         {menuItemsOperacao
@@ -141,62 +182,42 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             );
           })}
 
-        {/* Seção SaaS (apenas se tiver permissão) */}
-        {menuItemsSaaS.some((item) => temPermissao(item.cargos)) && (
-          <div className="pt-3 mt-3 border-t border-slate-800/80">
-            <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-              Assinatura & Multi-Lojas
-            </p>
+        {/* Seção Minha Assinatura para Restaurantes (não exibida duplicada para super admin) */}
+        {usuarioLogado?.cargo !== 'super_admin' &&
+          menuItemsSaaS.some((item) => temPermissao(item.cargos)) && (
+            <div className="pt-3 mt-3 border-t border-slate-800/80">
+              <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                Minha Assinatura
+              </p>
 
-            {menuItemsSaaS
-              .filter((item) => temPermissao(item.cargos))
-              .map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => {
-                      if (window.innerWidth < 1024) onClose();
-                    }}
-                    className={({ isActive }) =>
-                      `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
-                        isActive
-                          ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25 font-bold'
-                          : item.adminDestaque
-                          ? 'text-purple-300 bg-purple-950/20 border border-purple-500/20 hover:bg-purple-950/40'
-                          : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
-                      }`
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <div className="flex items-center gap-3">
-                          <Icon
-                            className={`w-4 h-4 ${
-                              isActive ? 'text-white' : item.adminDestaque ? 'text-purple-400' : 'text-slate-400'
-                            }`}
-                          />
-                          <span>{item.label}</span>
-                        </div>
-                        {item.badge && (
-                          <span
-                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                              isActive
-                                ? 'bg-purple-700 text-white'
-                                : 'bg-purple-950 text-purple-300 border border-purple-500/30'
-                            }`}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </NavLink>
-                );
-              })}
-          </div>
-        )}
+              {menuItemsSaaS
+                .filter((item) => item.path === '/minha-assinatura')
+                .map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => {
+                        if (window.innerWidth < 1024) onClose();
+                      }}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                          isActive
+                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25 font-bold'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                        }`
+                      }
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon className="w-4 h-4 text-purple-400" />
+                        <span>{item.label}</span>
+                      </div>
+                    </NavLink>
+                  );
+                })}
+            </div>
+          )}
       </nav>
 
       {/* Bottom Info: Usuário Logado & Logout */}

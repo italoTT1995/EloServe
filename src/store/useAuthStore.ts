@@ -53,8 +53,8 @@ interface AuthState {
   usuarioLogado: Usuario | null;
   isAuthenticated: boolean;
   usuarios: Usuario[];
-  login: (email: string, senhaOuPin: string) => { sucesso: boolean; mensagem?: string };
-  loginRapidoPorCargo: (cargo: CargoUsuario) => void;
+  login: (email: string, senhaOuPin: string) => { sucesso: boolean; usuario?: Usuario; mensagem?: string };
+  loginRapidoPorCargo: (cargo: CargoUsuario) => Usuario;
   logout: () => void;
   temPermissao: (cargosPermitidos: CargoUsuario[]) => boolean;
   getDescricaoCargo: (cargo?: CargoUsuario) => { titulo: string; nivel: string; cor: string; icone: string };
@@ -99,7 +99,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(usuario));
     set({ usuarioLogado: usuario, isAuthenticated: true });
-    return { sucesso: true };
+    return { sucesso: true, usuario };
   },
 
   loginRapidoPorCargo: (cargo) => {
@@ -107,6 +107,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const usuario = usuarios.find((u) => u.cargo === cargo) || usuarios[0];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(usuario));
     set({ usuarioLogado: usuario, isAuthenticated: true });
+    return usuario;
   },
 
   logout: () => {
