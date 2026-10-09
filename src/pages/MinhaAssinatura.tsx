@@ -117,6 +117,24 @@ export default function MinhaAssinatura() {
             </div>
           </div>
         </div>
+
+        {/* Regras e Cláusulas Operacionais do Plano */}
+        {planoAtual.regrasTexto && planoAtual.regrasTexto.length > 0 && (
+          <div className="pt-3 border-t border-slate-800 space-y-2">
+            <p className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <span>Regras & Termos de Uso Vigentes do Seu Plano:</span>
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {planoAtual.regrasTexto.map((regra, idx) => (
+                <div key={idx} className="flex items-start gap-2 p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80 text-slate-300">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                  <span>{regra}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Grid de Comparativo & Upgrade de Planos */}

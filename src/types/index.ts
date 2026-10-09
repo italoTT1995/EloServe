@@ -111,15 +111,27 @@ export interface LimitesPlano {
   whatsappIAIncluso: boolean;
   relatoriosAvancados: boolean;
   suportePrioritario: boolean;
+  cardapioQrCodeIncluso?: boolean;
+  garcomMobileIncluso?: boolean;
+  impressaoTermicaInclusa?: boolean;
+  controleEstoqueIncluso?: boolean;
+  maxUsuarios?: number;
+  maxItensCardapio?: number;
+  maxPedidosMes?: number;
+  diasTrialPadrao?: number;
+  diasToleranciaAtraso?: number;
+  taxaAdesao?: number;
 }
 
 export interface PlanoAssinatura {
   id: TipoPlanoSaaS;
   nome: string;
   precoMensal: number;
+  precoAnual?: number;
   descricao: string;
   limites: LimitesPlano;
   destaque?: boolean;
+  regrasTexto?: string[];
 }
 
 export interface TenantRestaurante {

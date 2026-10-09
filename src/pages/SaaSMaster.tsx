@@ -36,6 +36,10 @@ import {
   Check,
   RotateCcw,
   ChefHat,
+  Smartphone,
+  Printer,
+  Package,
+  FileText,
 } from 'lucide-react';
 import { useSaaSStore, AbaMasterSaaS } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
@@ -314,6 +318,123 @@ export default function SaaSMaster() {
     setTimeout(() => setToastMigracao(null), 4000);
   }
 
+  // Estados para a Aba: Modificar Planos & Regras SaaS
+  const [planoIdRegrasEmEdicao, setPlanoIdRegrasEmEdicao] = useState<TipoPlanoSaaS>('pro');
+  const planoAtivoParaEdicao = planos.find((p) => p.id === planoIdRegrasEmEdicao) || planos[1] || planos[0];
+
+  const [formRegrasPlano, setFormRegrasPlano] = useState({
+    nome: planoAtivoParaEdicao?.nome || 'EloServe Pro',
+    precoMensal: planoAtivoParaEdicao?.precoMensal || 199,
+    precoAnual: planoAtivoParaEdicao?.precoAnual || 1990,
+    taxaAdesao: planoAtivoParaEdicao?.limites.taxaAdesao ?? 0,
+    descricao: planoAtivoParaEdicao?.descricao || '',
+    destaque: !!planoAtivoParaEdicao?.destaque,
+    maxMesas: planoAtivoParaEdicao?.limites.maxMesas ?? 999,
+    maxCaixasSimultaneos: planoAtivoParaEdicao?.limites.maxCaixasSimultaneos ?? 5,
+    maxUsuarios: planoAtivoParaEdicao?.limites.maxUsuarios ?? 10,
+    maxItensCardapio: planoAtivoParaEdicao?.limites.maxItensCardapio ?? 999,
+    maxPedidosMes: planoAtivoParaEdicao?.limites.maxPedidosMes ?? 9999,
+    diasTrialPadrao: planoAtivoParaEdicao?.limites.diasTrialPadrao ?? 7,
+    diasToleranciaAtraso: planoAtivoParaEdicao?.limites.diasToleranciaAtraso ?? 5,
+    kdsIncluso: planoAtivoParaEdicao?.limites.kdsIncluso ?? true,
+    whatsappIAIncluso: planoAtivoParaEdicao?.limites.whatsappIAIncluso ?? false,
+    cardapioQrCodeIncluso: planoAtivoParaEdicao?.limites.cardapioQrCodeIncluso ?? true,
+    garcomMobileIncluso: planoAtivoParaEdicao?.limites.garcomMobileIncluso ?? true,
+    impressaoTermicaInclusa: planoAtivoParaEdicao?.limites.impressaoTermicaInclusa ?? true,
+    controleEstoqueIncluso: planoAtivoParaEdicao?.limites.controleEstoqueIncluso ?? true,
+    relatoriosAvancados: planoAtivoParaEdicao?.limites.relatoriosAvancados ?? true,
+    suportePrioritario: planoAtivoParaEdicao?.limites.suportePrioritario ?? true,
+    regrasTexto: planoAtivoParaEdicao?.regrasTexto || [],
+    atualizarAssinantes: false,
+  });
+
+  const [novaRegraInput, setNovaRegraInput] = useState('');
+  const [sucessoSalvarRegras, setSucessoSalvarRegras] = useState<string | null>(null);
+
+  useEffect(() => {
+    const p = planos.find((item) => item.id === planoIdRegrasEmEdicao);
+    if (p) {
+      setFormRegrasPlano({
+        nome: p.nome,
+        precoMensal: p.precoMensal,
+        precoAnual: p.precoAnual || p.precoMensal * 10,
+        taxaAdesao: p.limites.taxaAdesao ?? 0,
+        descricao: p.descricao,
+        destaque: !!p.destaque,
+        maxMesas: p.limites.maxMesas,
+        maxCaixasSimultaneos: p.limites.maxCaixasSimultaneos,
+        maxUsuarios: p.limites.maxUsuarios ?? (p.id === 'starter' ? 3 : p.id === 'pro' ? 10 : 999),
+        maxItensCardapio: p.limites.maxItensCardapio ?? (p.id === 'starter' ? 50 : 999),
+        maxPedidosMes: p.limites.maxPedidosMes ?? (p.id === 'starter' ? 500 : p.id === 'pro' ? 9999 : 99999),
+        diasTrialPadrao: p.limites.diasTrialPadrao ?? (p.id === 'enterprise' ? 14 : 7),
+        diasToleranciaAtraso: p.limites.diasToleranciaAtraso ?? (p.id === 'starter' ? 3 : p.id === 'pro' ? 5 : 7),
+        kdsIncluso: p.limites.kdsIncluso,
+        whatsappIAIncluso: p.limites.whatsappIAIncluso,
+        cardapioQrCodeIncluso: p.limites.cardapioQrCodeIncluso ?? true,
+        garcomMobileIncluso: p.limites.garcomMobileIncluso ?? (p.id !== 'starter'),
+        impressaoTermicaInclusa: p.limites.impressaoTermicaInclusa ?? true,
+        controleEstoqueIncluso: p.limites.controleEstoqueIncluso ?? (p.id !== 'starter'),
+        relatoriosAvancados: p.limites.relatoriosAvancados,
+        suportePrioritario: p.limites.suportePrioritario,
+        regrasTexto: p.regrasTexto || [],
+        atualizarAssinantes: false,
+      });
+    }
+  }, [planoIdRegrasEmEdicao, planos]);
+
+  function handleAdicionarRegraTexto() {
+    if (!novaRegraInput.trim()) return;
+    setFormRegrasPlano((prev) => ({
+      ...prev,
+      regrasTexto: [...prev.regrasTexto, novaRegraInput.trim()],
+    }));
+    setNovaRegraInput('');
+  }
+
+  function handleRemoverRegraTexto(indexRemover: number) {
+    setFormRegrasPlano((prev) => ({
+      ...prev,
+      regrasTexto: prev.regrasTexto.filter((_, idx) => idx !== indexRemover),
+    }));
+  }
+
+  function handleSalvarRegrasPlano(e: React.FormEvent) {
+    e.preventDefault();
+    atualizarPlano(
+      planoIdRegrasEmEdicao,
+      {
+        nome: formRegrasPlano.nome,
+        precoMensal: Number(formRegrasPlano.precoMensal),
+        precoAnual: Number(formRegrasPlano.precoAnual),
+        descricao: formRegrasPlano.descricao,
+        destaque: formRegrasPlano.destaque,
+        regrasTexto: formRegrasPlano.regrasTexto,
+        limites: {
+          maxMesas: Number(formRegrasPlano.maxMesas),
+          maxCaixasSimultaneos: Number(formRegrasPlano.maxCaixasSimultaneos),
+          maxUsuarios: Number(formRegrasPlano.maxUsuarios),
+          maxItensCardapio: Number(formRegrasPlano.maxItensCardapio),
+          maxPedidosMes: Number(formRegrasPlano.maxPedidosMes),
+          diasTrialPadrao: Number(formRegrasPlano.diasTrialPadrao),
+          diasToleranciaAtraso: Number(formRegrasPlano.diasToleranciaAtraso),
+          taxaAdesao: Number(formRegrasPlano.taxaAdesao),
+          kdsIncluso: formRegrasPlano.kdsIncluso,
+          whatsappIAIncluso: formRegrasPlano.whatsappIAIncluso,
+          cardapioQrCodeIncluso: formRegrasPlano.cardapioQrCodeIncluso,
+          garcomMobileIncluso: formRegrasPlano.garcomMobileIncluso,
+          impressaoTermicaInclusa: formRegrasPlano.impressaoTermicaInclusa,
+          controleEstoqueIncluso: formRegrasPlano.controleEstoqueIncluso,
+          relatoriosAvancados: formRegrasPlano.relatoriosAvancados,
+          suportePrioritario: formRegrasPlano.suportePrioritario,
+        },
+      },
+      formRegrasPlano.atualizarAssinantes
+    );
+
+    setSucessoSalvarRegras(`Regras, limites e termos do plano "${formRegrasPlano.nome}" gravados com sucesso!`);
+    setTimeout(() => setSucessoSalvarRegras(null), 4000);
+  }
+
   // Form novo restaurante
   const [form, setForm] = useState({
     nomeFantasia: '',
@@ -534,7 +655,22 @@ export default function SaaSMaster() {
           }`}
         >
           <Layers className="w-4 h-4" />
-          <span>Planos & Limites ({planos.length})</span>
+          <span>Planos & Assinantes ({planos.length})</span>
+        </button>
+
+        <button
+          onClick={() => handleMudarAba('regras_planos')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            abaAtiva === 'regras_planos'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'
+              : 'bg-slate-900 text-purple-300 hover:text-white border border-purple-500/30'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 text-purple-400" />
+          <span>Modificar Planos & Regras</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/30 uppercase font-black">
+            Regras SaaS
+          </span>
         </button>
 
         <button
@@ -1395,6 +1531,29 @@ export default function SaaSMaster() {
             </div>
           </div>
 
+          {/* Banner de atalho direto para a aba de Regras */}
+          <div className="p-4 rounded-3xl bg-gradient-to-r from-purple-950/60 to-slate-900 border border-purple-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-purple-900/60 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+                <ShieldCheck className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-extrabold text-white">Deseja editar detalhadamente as regras de negócio de cada plano?</h4>
+                <p className="text-xs text-slate-300">
+                  Defina tolerância a atrasos, dias de trial, módulos liberados (KDS, IA, QR Code, Garçom Mobile) e cláusulas de uso em uma aba dedicada.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleMudarAba('regras_planos')}
+              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 transition-all shrink-0"
+            >
+              <ShieldCheck className="w-4 h-4 text-purple-200" />
+              <span>Abrir Aba de Regras dos Planos</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
           {/* Cards dos Planos */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {planos.map((p) => {
@@ -1760,6 +1919,616 @@ export default function SaaSMaster() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* CONTEÚDO DA ABA DEDICADA: MODIFICAR PLANOS & REGRAS */}
+      {abaAtiva === 'regras_planos' && (
+        <div className="space-y-6">
+          {/* Header da aba */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-purple-950/80 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-black text-white">
+                    Modificar Planos & Regras Operacionais SaaS
+                  </h3>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                    Controle Franqueador
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Defina os preços, limites de mesas/caixas, módulos tecnológicos habilitados, regras de tolerância de atraso e cláusulas contratuais de cada plano.
+                </p>
+              </div>
+            </div>
+
+            {/* Ação rápida / status */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-medium">
+                {tenants.length} Restaurantes Assinantes
+              </span>
+            </div>
+          </div>
+
+          {/* Feedback de sucesso */}
+          {sucessoSalvarRegras && (
+            <div className="p-4 rounded-2xl bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2.5 shadow-xl animate-in fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <span>{sucessoSalvarRegras}</span>
+            </div>
+          )}
+
+          {/* SELETOR DO PLANO PARA EDIÇÃO (Cards Superiores) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {planos.map((p) => {
+              const isSelected = planoIdRegrasEmEdicao === p.id;
+              const totalLojasNestePlano = tenants.filter((t) => t.planoId === p.id).length;
+              return (
+                <button
+                  type="button"
+                  key={p.id}
+                  onClick={() => setPlanoIdRegrasEmEdicao(p.id)}
+                  className={`p-5 rounded-3xl border text-left transition-all cursor-pointer relative ${
+                    isSelected
+                      ? 'bg-gradient-to-b from-purple-950/60 to-slate-900 border-purple-500 shadow-2xl shadow-purple-500/20 ring-2 ring-purple-500/40'
+                      : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                      Plano {p.id}
+                    </span>
+                    {p.destaque && (
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                        Mais Vendido
+                      </span>
+                    )}
+                  </div>
+
+                  <h4 className="text-base font-black text-white mt-1">{p.nome}</h4>
+                  <div className="flex items-baseline gap-1 mt-2">
+                    <span className="text-2xl font-black text-emerald-400 font-mono">
+                      R$ {p.precoMensal.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-slate-400">/mês</span>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400 font-medium">Assinantes Ativos:</span>
+                    <span className="font-bold text-white font-mono bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
+                      {totalLojasNestePlano} restaurantes
+                    </span>
+                  </div>
+
+                  {isSelected && (
+                    <div className="mt-3 flex items-center gap-1.5 text-xs text-purple-400 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
+                      <span>Editando Regras Deste Plano</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* FORMULÁRIO COMPLETO DE MODIFICAÇÃO DO PLANO & REGRAS */}
+          <form onSubmit={handleSalvarRegrasPlano} className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* COLUNA ESQUERDA & CENTRO: CONFIGURAÇÕES E REGRAS */}
+              <div className="lg:col-span-2 space-y-6">
+                
+                {/* BLOCO 1: DADOS COMERCIAIS & PREÇIFICAÇÃO */}
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-emerald-400" />
+                      <span>Valores & Identificação Comercial do Plano</span>
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-mono">ID: {planoIdRegrasEmEdicao}</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Nome Comercial do Plano *</label>
+                      <input
+                        type="text"
+                        required
+                        value={formRegrasPlano.nome}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, nome: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Preço Mensal (R$/mês) *</label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-400 font-mono font-bold">R$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={formRegrasPlano.precoMensal}
+                          onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, precoMensal: parseFloat(e.target.value) || 0 })}
+                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-sm focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Preço Anual com Desconto (R$/ano)</label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">R$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formRegrasPlano.precoAnual}
+                          onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, precoAnual: parseFloat(e.target.value) || 0 })}
+                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-bold focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Taxa de Adesão / Implantação (R$)</label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">R$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formRegrasPlano.taxaAdesao}
+                          onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, taxaAdesao: parseFloat(e.target.value) || 0 })}
+                          placeholder="0.00 = Grátis"
+                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-bold focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-bold block mb-1 text-xs">Descrição Comercial / Proposta de Valor</label>
+                    <textarea
+                      rows={2}
+                      value={formRegrasPlano.descricao}
+                      onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, descricao: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs resize-none focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <span className="text-xs text-white font-bold block">Marcar como "Mais Vendido" / "Recomendado"</span>
+                      <span className="text-[11px] text-slate-400">Destaca o card do plano para novos clientes</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formRegrasPlano.destaque}
+                      onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, destaque: e.target.checked })}
+                      className="w-5 h-5 accent-purple-600 rounded cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* BLOCO 2: REGRAS OPERACIONAIS DE CAPACIDADE & LIMITES */}
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+                  <div className="pb-3 border-b border-slate-800">
+                    <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-purple-400" />
+                      <span>Regras de Capacidade & Limites Operacionais</span>
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Controle exatamente até onde o restaurante assinante pode expandir suas operações com este plano.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                      <label className="text-slate-300 font-bold block">Máximo de Mesas no Salão</label>
+                      <input
+                        type="number"
+                        value={formRegrasPlano.maxMesas}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, maxMesas: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold"
+                      />
+                      <span className="text-[10px] text-slate-500 block">Acima de 100 = Ilimitadas</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                      <label className="text-slate-300 font-bold block">Caixas PDV Simultâneos</label>
+                      <input
+                        type="number"
+                        value={formRegrasPlano.maxCaixasSimultaneos}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, maxCaixasSimultaneos: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold"
+                      />
+                      <span className="text-[10px] text-slate-500 block">Acima de 10 = Ilimitados</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                      <label className="text-slate-300 font-bold block">Usuários / Garçons</label>
+                      <input
+                        type="number"
+                        value={formRegrasPlano.maxUsuarios}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, maxUsuarios: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold"
+                      />
+                      <span className="text-[10px] text-slate-500 block">Acima de 50 = Ilimitados</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                      <label className="text-slate-300 font-bold block">Máximo de Itens no Cardápio</label>
+                      <input
+                        type="number"
+                        value={formRegrasPlano.maxItensCardapio}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, maxItensCardapio: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold"
+                      />
+                      <span className="text-[10px] text-slate-500 block">Acima de 300 = Ilimitados</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                      <label className="text-slate-300 font-bold block">Pedidos / Mês Inclusos</label>
+                      <input
+                        type="number"
+                        value={formRegrasPlano.maxPedidosMes}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, maxPedidosMes: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold"
+                      />
+                      <span className="text-[10px] text-slate-500 block">Acima de 5.000 = Ilimitados</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                      <label className="text-slate-300 font-bold block">Tolerância Bloqueio Atraso</label>
+                      <input
+                        type="number"
+                        value={formRegrasPlano.diasToleranciaAtraso}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, diasToleranciaAtraso: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold"
+                      />
+                      <span className="text-[10px] text-slate-500 block">Dias após o vencimento</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* BLOCO 3: REGRAS DE MÓDULOS TECNOLÓGICOS (FEATURE FLAGS) */}
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+                  <div className="pb-3 border-b border-slate-800">
+                    <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>Regras de Módulos & Recursos Tecnológicos Liberados</span>
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Ative ou bloqueie funcionalidades exclusivas que agregam valor ao plano.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <label className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                      formRegrasPlano.kdsIncluso
+                        ? 'bg-emerald-950/30 border-emerald-500/50 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    }`}>
+                      <div className="space-y-0.5 pr-2">
+                        <span className="font-bold block text-white flex items-center gap-1.5">
+                          <ChefHat className="w-4 h-4 text-emerald-400" />
+                          <span>Painel Cozinha & KDS em Tempo Real</span>
+                        </span>
+                        <p className="text-[10px] text-slate-400">Comandas digitais na tela da cozinha e bar</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formRegrasPlano.kdsIncluso}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, kdsIncluso: e.target.checked })}
+                        className="w-5 h-5 accent-emerald-500 rounded cursor-pointer shrink-0"
+                      />
+                    </label>
+
+                    <label className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                      formRegrasPlano.whatsappIAIncluso
+                        ? 'bg-purple-950/40 border-purple-500/50 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    }`}>
+                      <div className="space-y-0.5 pr-2">
+                        <span className="font-bold block text-white flex items-center gap-1.5">
+                          <Bot className="w-4 h-4 text-purple-400" />
+                          <span>EloBot IA WhatsApp 24h</span>
+                        </span>
+                        <p className="text-[10px] text-slate-400">Atendimento e cardápio automático com IA</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formRegrasPlano.whatsappIAIncluso}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, whatsappIAIncluso: e.target.checked })}
+                        className="w-5 h-5 accent-purple-500 rounded cursor-pointer shrink-0"
+                      />
+                    </label>
+
+                    <label className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                      formRegrasPlano.cardapioQrCodeIncluso
+                        ? 'bg-emerald-950/30 border-emerald-500/50 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    }`}>
+                      <div className="space-y-0.5 pr-2">
+                        <span className="font-bold block text-white flex items-center gap-1.5">
+                          <QrCode className="w-4 h-4 text-blue-400" />
+                          <span>Cardápio Digital QR Code nas Mesas</span>
+                        </span>
+                        <p className="text-[10px] text-slate-400">Clientes visualizam e pedem pelo celular</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formRegrasPlano.cardapioQrCodeIncluso}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, cardapioQrCodeIncluso: e.target.checked })}
+                        className="w-5 h-5 accent-emerald-500 rounded cursor-pointer shrink-0"
+                      />
+                    </label>
+
+                    <label className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                      formRegrasPlano.garcomMobileIncluso
+                        ? 'bg-emerald-950/30 border-emerald-500/50 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    }`}>
+                      <div className="space-y-0.5 pr-2">
+                        <span className="font-bold block text-white flex items-center gap-1.5">
+                          <Smartphone className="w-4 h-4 text-indigo-400" />
+                          <span>Comanda Garçom Mobile</span>
+                        </span>
+                        <p className="text-[10px] text-slate-400">Lançamento de pedidos direto na mesa</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formRegrasPlano.garcomMobileIncluso}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, garcomMobileIncluso: e.target.checked })}
+                        className="w-5 h-5 accent-emerald-500 rounded cursor-pointer shrink-0"
+                      />
+                    </label>
+
+                    <label className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                      formRegrasPlano.impressaoTermicaInclusa
+                        ? 'bg-emerald-950/30 border-emerald-500/50 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    }`}>
+                      <div className="space-y-0.5 pr-2">
+                        <span className="font-bold block text-white flex items-center gap-1.5">
+                          <Printer className="w-4 h-4 text-amber-400" />
+                          <span>Impressão Automática Térmica (ESC/POS)</span>
+                        </span>
+                        <p className="text-[10px] text-slate-400">Cupom de fechamento e vias de produção</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formRegrasPlano.impressaoTermicaInclusa}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, impressaoTermicaInclusa: e.target.checked })}
+                        className="w-5 h-5 accent-emerald-500 rounded cursor-pointer shrink-0"
+                      />
+                    </label>
+
+                    <label className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                      formRegrasPlano.controleEstoqueIncluso
+                        ? 'bg-emerald-950/30 border-emerald-500/50 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    }`}>
+                      <div className="space-y-0.5 pr-2">
+                        <span className="font-bold block text-white flex items-center gap-1.5">
+                          <Package className="w-4 h-4 text-teal-400" />
+                          <span>Controle de Estoque & Ficha Técnica</span>
+                        </span>
+                        <p className="text-[10px] text-slate-400">Baixa automática de ingredientes nos pratos</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formRegrasPlano.controleEstoqueIncluso}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, controleEstoqueIncluso: e.target.checked })}
+                        className="w-5 h-5 accent-emerald-500 rounded cursor-pointer shrink-0"
+                      />
+                    </label>
+
+                    <label className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                      formRegrasPlano.relatoriosAvancados
+                        ? 'bg-emerald-950/30 border-emerald-500/50 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    }`}>
+                      <div className="space-y-0.5 pr-2">
+                        <span className="font-bold block text-white flex items-center gap-1.5">
+                          <TrendingUp className="w-4 h-4 text-emerald-400" />
+                          <span>Relatórios Financeiros Avançados & DRE</span>
+                        </span>
+                        <p className="text-[10px] text-slate-400">Análise de CMV, lucratividade e ticket médio</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formRegrasPlano.relatoriosAvancados}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, relatoriosAvancados: e.target.checked })}
+                        className="w-5 h-5 accent-emerald-500 rounded cursor-pointer shrink-0"
+                      />
+                    </label>
+
+                    <label className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                      formRegrasPlano.suportePrioritario
+                        ? 'bg-purple-950/30 border-purple-500/50 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                    }`}>
+                      <div className="space-y-0.5 pr-2">
+                        <span className="font-bold block text-white flex items-center gap-1.5">
+                          <Crown className="w-4 h-4 text-purple-400" />
+                          <span>Suporte Prioritário Franqueador 24/7</span>
+                        </span>
+                        <p className="text-[10px] text-slate-400">Canal direto WhatsApp com tempo de resposta VIP</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formRegrasPlano.suportePrioritario}
+                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, suportePrioritario: e.target.checked })}
+                        className="w-5 h-5 accent-purple-500 rounded cursor-pointer shrink-0"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* BLOCO 4: REGRAS & TERMOS DE USO DO PLANO (CLÁUSULAS TEXTUAIS) */}
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div>
+                      <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-purple-400" />
+                        <span>Cláusulas & Regras de Uso Visíveis para o Restaurante</span>
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Essas regras são exibidas para os restaurantes no painel "Minha Assinatura" e na proposta contratual.
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-slate-400">
+                      {formRegrasPlano.regrasTexto.length} regras cadastradas
+                    </span>
+                  </div>
+
+                  {/* Input para adicionar nova regra */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={novaRegraInput}
+                      onChange={(e) => setNovaRegraInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAdicionarRegraTexto();
+                        }
+                      }}
+                      placeholder="Ex: Treinamento remoto de garçons incluso; Cancelamento sem multa..."
+                      className="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAdicionarRegraTexto}
+                      className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/30 flex items-center gap-1.5 cursor-pointer shrink-0"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Adicionar Regra</span>
+                    </button>
+                  </div>
+
+                  {/* Lista de regras cadastradas com exclusão */}
+                  <div className="space-y-2 pt-1">
+                    {formRegrasPlano.regrasTexto.map((regra, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-950 border border-slate-800/80 text-xs hover:border-slate-700 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 text-slate-200">
+                          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>{regra}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoverRegraTexto(idx)}
+                          title="Remover esta regra"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-colors shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* COLUNA DIREITA: PREVIEW AO VIVO DO PLANO & SALVAMENTO */}
+              <div className="space-y-6">
+                
+                {/* Card de Ação Principal: Salvar */}
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4 sticky top-4">
+                  <div className="pb-3 border-b border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-purple-400 block tracking-wider">
+                      Aplicar Modificações
+                    </span>
+                    <h4 className="text-base font-black text-white mt-0.5">
+                      Gravar Regras do {formRegrasPlano.nome}
+                    </h4>
+                  </div>
+
+                  {/* Opção de propagação imediata para clientes ativos */}
+                  <div className="p-3.5 rounded-2xl bg-purple-950/30 border border-purple-500/30 flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="checkPropagar"
+                      checked={formRegrasPlano.atualizarAssinantes}
+                      onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, atualizarAssinantes: e.target.checked })}
+                      className="w-5 h-5 accent-purple-600 rounded cursor-pointer mt-0.5 shrink-0"
+                    />
+                    <label htmlFor="checkPropagar" className="text-xs text-slate-300 cursor-pointer">
+                      <strong className="text-white block font-bold">Atualizar Assinantes Ativos</strong>
+                      Aplica os novos valores e regras imediatamente a todos os {tenants.filter((t) => t.planoId === planoIdRegrasEmEdicao).length} restaurantes cadastrados neste plano.
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-black text-sm shadow-xl shadow-purple-600/35 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <Save className="w-5 h-5" />
+                    <span>Salvar Regras do Plano</span>
+                  </button>
+
+                  {/* PREVIEW DO CARD COMO O RESTAURANTE ENXERGA */}
+                  <div className="pt-4 border-t border-slate-800 space-y-3">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                      Preview Ao Vivo para o Cliente:
+                    </span>
+
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-white">{formRegrasPlano.nome}</span>
+                        {formRegrasPlano.destaque && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                            Recomendado
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="text-xl font-black text-emerald-400 font-mono">
+                          R$ {formRegrasPlano.precoMensal.toFixed(2)}
+                          <span className="text-xs text-slate-400 font-normal"> / mês</span>
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-1">{formRegrasPlano.descricao}</p>
+                      </div>
+
+                      <div className="space-y-1 text-[11px] text-slate-300 border-t border-slate-800 pt-2">
+                        <p className="flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>{formRegrasPlano.maxMesas > 100 ? 'Mesas Ilimitadas' : `Até ${formRegrasPlano.maxMesas} mesas`}</span>
+                        </p>
+                        <p className="flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>{formRegrasPlano.maxCaixasSimultaneos > 10 ? 'Caixas PDV Ilimitados' : `Até ${formRegrasPlano.maxCaixasSimultaneos} caixa(s)`}</span>
+                        </p>
+                        {formRegrasPlano.kdsIncluso && (
+                          <p className="flex items-center gap-1.5 text-emerald-400">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Painel KDS de Cozinha Ativo</span>
+                          </p>
+                        )}
+                        {formRegrasPlano.whatsappIAIncluso && (
+                          <p className="flex items-center gap-1.5 text-purple-400 font-bold">
+                            <Bot className="w-3.5 h-3.5" />
+                            <span>EloBot Inteligência Artificial 24h</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+          </form>
         </div>
       )}
 
