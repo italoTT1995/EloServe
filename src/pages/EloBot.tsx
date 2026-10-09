@@ -58,9 +58,16 @@ export default function EloBot() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-mono">+55 (11) 99887-6655</span>
-        </div>
+        <a
+          href="https://wa.me/5531971826083"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Abrir no WhatsApp Web"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-950/70 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 hover:border-emerald-500/60 transition-all shadow-sm"
+        >
+          <Phone className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="text-xs font-mono font-bold">+55 (31) 97182-6083</span>
+        </a>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -143,6 +150,15 @@ export default function EloBot() {
                   type="text"
                   defaultValue="Simpático, ágil e acolhedor"
                   className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">WhatsApp Conectado:</label>
+                <input
+                  type="text"
+                  defaultValue="+55 (31) 97182-6083"
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono text-xs font-semibold"
                 />
               </div>
 
