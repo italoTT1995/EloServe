@@ -47,12 +47,19 @@ export const PLANOS_DISPONIVEIS: PlanoAssinatura[] = [
   },
 ];
 
+export type AbaMasterSaaS = 'restaurantes' | 'financeiro' | 'editor_loja' | 'planos' | 'whatsapp' | 'config';
+
 interface SaaSState {
   planos: PlanoAssinatura[];
   tenants: TenantRestaurante[];
   tenantAtivoId: string;
+  abaAtivaMaster: AbaMasterSaaS;
+  tenantEmEdicaoId: string | null;
+  setAbaAtivaMaster: (aba: AbaMasterSaaS) => void;
+  setTenantEmEdicaoId: (id: string | null) => void;
   selecionarTenant: (tenantId: string) => void;
   adicionarTenant: (novo: Omit<TenantRestaurante, 'id' | 'criadoEm'>) => void;
+  atualizarDadosTenant: (tenantId: string, dados: Partial<TenantRestaurante>) => void;
   atualizarStatusAssinatura: (tenantId: string, status: StatusAssinatura) => void;
   mudarPlanoTenant: (tenantId: string, planoId: TipoPlanoSaaS) => void;
   getTenantAtivo: () => TenantRestaurante;
@@ -155,6 +162,11 @@ export const useSaaSStore = create<SaaSState>((set, get) => ({
   planos: PLANOS_DISPONIVEIS,
   tenants: TENANTS_INICIAIS,
   tenantAtivoId: 'tenant-01',
+  abaAtivaMaster: 'restaurantes',
+  tenantEmEdicaoId: 'tenant-01',
+
+  setAbaAtivaMaster: (aba) => set({ abaAtivaMaster: aba }),
+  setTenantEmEdicaoId: (id) => set({ tenantEmEdicaoId: id }),
 
   selecionarTenant: (tenantId: string) => {
     set({ tenantAtivoId: tenantId });
@@ -170,6 +182,14 @@ export const useSaaSStore = create<SaaSState>((set, get) => ({
     };
     set((state) => ({
       tenants: [tenantCompleto, ...state.tenants],
+    }));
+  },
+
+  atualizarDadosTenant: (tenantId, dados) => {
+    set((state) => ({
+      tenants: state.tenants.map((t) =>
+        t.id === tenantId ? { ...t, ...dados } : t
+      ),
     }));
   },
 
