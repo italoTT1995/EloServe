@@ -22,9 +22,9 @@ export default function Caixa() {
   return (
     <div className="space-y-6 max-w-5xl select-none">
       {/* Top Banner */}
-      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-5 rounded-3xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-3xl">
         <div>
-          <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
             <span>Controle de Caixa & Turno</span>
             <span
               className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
@@ -41,7 +41,7 @@ export default function Caixa() {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {isAberto ? (
             <>
               <button

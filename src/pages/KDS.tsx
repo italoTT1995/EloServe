@@ -9,6 +9,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { audio } from '../lib/audio';
 import { PedidoKDS } from '../types';
 
 export default function KDS() {
@@ -21,9 +22,9 @@ export default function KDS() {
   return (
     <div className="h-full flex flex-col space-y-4 select-none">
       {/* Top Banner */}
-      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-3xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 rounded-3xl">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
             <Flame className="w-5 h-5" />
           </div>
           <div>
@@ -41,17 +42,17 @@ export default function KDS() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => alert('Som de alerta testado com sucesso!')}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors"
+            onClick={() => audio.tocarAlertaNotificacao()}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors cursor-pointer"
           >
             <Volume2 className="w-4 h-4 text-emerald-400" />
-            <span>Alerta Sonoro Ativo</span>
+            <span>Testar Alerta Sonoro</span>
           </button>
         </div>
       </div>
 
       {/* Colunas do Kanban KDS */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0 overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0 overflow-y-auto md:overflow-hidden pb-6 md:pb-0">
         {/* Coluna 1: A Fazer (Novo) */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl flex flex-col overflow-hidden">
           <div className="p-3.5 border-b border-slate-800 bg-slate-900 flex items-center justify-between">

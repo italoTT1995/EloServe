@@ -40,9 +40,9 @@ export default function EloBot() {
 
   return (
     <div className="space-y-6 max-w-5xl select-none">
-      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-5 rounded-3xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-5 rounded-3xl">
         <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
             <Bot className="w-5 h-5" />
           </div>
           <div>

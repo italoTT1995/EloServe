@@ -39,8 +39,8 @@ export default function Mesas() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
             <div>
               <p className="text-[10px] text-slate-400 font-medium">Livres</p>
@@ -48,7 +48,7 @@ export default function Mesas() {
             </div>
           </div>
 
-          <div className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2.5">
+          <div className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-rose-400"></div>
             <div>
               <p className="text-[10px] text-slate-400 font-medium">Ocupadas</p>
@@ -56,7 +56,7 @@ export default function Mesas() {
             </div>
           </div>
 
-          <div className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2.5">
+          <div className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
             <div>
               <p className="text-[10px] text-slate-400 font-medium">Ocupação</p>
@@ -66,13 +66,13 @@ export default function Mesas() {
         </div>
       </div>
 
-      {/* Filtro de Setores */}
-      <div className="flex items-center gap-2">
+      {/* Filtro de Setores com scroll horizontal */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {setores.map((setor) => (
           <button
             key={setor}
             onClick={() => setSetorSelecionado(setor)}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
               setorSelecionado === setor
                 ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
                 : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
@@ -84,7 +84,7 @@ export default function Mesas() {
       </div>
 
       {/* Grid de Mesas */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {mesasFiltradas.map((mesa) => {
           const isLivre = mesa.status === 'livre';
           const isChamar = mesa.status === 'chamar_garcom';

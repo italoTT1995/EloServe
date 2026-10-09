@@ -8,8 +8,8 @@ import {
   TrendingUp,
   Bot,
   Zap,
-  ChevronRight,
   LogOut,
+  X,
 } from 'lucide-react';
 
 const menuItems = [
@@ -22,11 +22,20 @@ const menuItems = [
   { path: '/elobot', label: 'EloBot (WhatsApp IA)', icon: Bot, highlight: true },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
-    <aside className="w-64 bg-slate-900/95 border-r border-slate-800 flex flex-col h-screen select-none">
+    <aside
+      className={`fixed lg:static inset-y-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen select-none transition-transform duration-300 ease-in-out ${
+        isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
+      }`}
+    >
       {/* Brand Header */}
-      <div className="h-16 px-6 border-b border-slate-800 flex items-center justify-between">
+      <div className="h-16 px-5 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
             <Zap className="w-5 h-5 fill-white" />
@@ -40,11 +49,19 @@ export function Sidebar() {
             </p>
           </div>
         </div>
+
+        {/* Botão fechar apenas no mobile */}
+        <button
+          onClick={onClose}
+          className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Nav Menu */}
       <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
-        <p className="px-3 text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2">
+        <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
           Operação
         </p>
 
@@ -54,6 +71,9 @@ export function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={() => {
+                if (window.innerWidth < 1024) onClose();
+              }}
               className={({ isActive }) =>
                 `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
                   isActive
@@ -65,7 +85,11 @@ export function Sidebar() {
               {({ isActive }) => (
                 <>
                   <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.highlight ? 'text-emerald-400' : 'text-slate-300'}`} />
+                    <Icon
+                      className={`w-4 h-4 ${
+                        isActive ? 'text-white' : item.highlight ? 'text-emerald-400' : 'text-slate-400'
+                      }`}
+                    />
                     <span>{item.label}</span>
                   </div>
                   {item.badge && (
@@ -73,7 +97,7 @@ export function Sidebar() {
                       className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
                         isActive
                           ? 'bg-emerald-600 text-white'
-                          : 'bg-slate-800 text-slate-300'
+                          : 'bg-slate-800 text-slate-400'
                       }`}
                     >
                       {item.badge}
@@ -103,7 +127,7 @@ export function Sidebar() {
           </div>
           <button
             title="Sair do Caixa"
-            className="p-1.5 rounded-lg text-slate-300 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
           >
             <LogOut className="w-4 h-4" />
           </button>
