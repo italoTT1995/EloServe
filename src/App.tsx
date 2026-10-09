@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
+import { RotaProtegida } from './components/auth/RotaProtegida';
+import Login from './pages/Login';
 import PDV from './pages/PDV';
 import Mesas from './pages/Mesas';
 import KDS from './pages/KDS';
@@ -13,20 +15,115 @@ import MinhaAssinatura from './pages/MinhaAssinatura';
 export default function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<PDV />} />
-          <Route path="/mesas" element={<Mesas />} />
-          <Route path="/kds" element={<KDS />} />
-          <Route path="/cardapio" element={<Cardapio />} />
-          <Route path="/caixa" element={<Caixa />} />
-          <Route path="/relatorios" element={<Relatorios />} />
-          <Route path="/elobot" element={<EloBot />} />
-          <Route path="/minha-assinatura" element={<MinhaAssinatura />} />
-          <Route path="/saas" element={<SaaSMaster />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
+      <Routes>
+        {/* Rota Pública de Login */}
+        <Route path="/login" element={<Login />} />
+
+        {/* Rotas Protegidas dentro do Layout da Aplicação */}
+        <Route
+          path="/*"
+          element={
+            <RotaProtegida>
+              <Layout>
+                <Routes>
+                  {/* PDV / Frente de Caixa */}
+                  <Route
+                    path="/"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante', 'caixa', 'garcom']}>
+                        <PDV />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Mesas & Salão */}
+                  <Route
+                    path="/mesas"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante', 'caixa', 'garcom']}>
+                        <Mesas />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Cozinha KDS */}
+                  <Route
+                    path="/kds"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante', 'cozinha']}>
+                        <KDS />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Cardápio & Preços */}
+                  <Route
+                    path="/cardapio"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <Cardapio />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Caixa & Turno */}
+                  <Route
+                    path="/caixa"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante', 'caixa']}>
+                        <Caixa />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Relatórios DRE */}
+                  <Route
+                    path="/relatorios"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <Relatorios />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* EloBot WhatsApp IA */}
+                  <Route
+                    path="/elobot"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <EloBot />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Minha Assinatura */}
+                  <Route
+                    path="/minha-assinatura"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <MinhaAssinatura />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* SaaS Master (Exclusivo Super Admin / Dono do SaaS) */}
+                  <Route
+                    path="/saas"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin']}>
+                        <SaaSMaster />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Fallback */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Layout>
+            </RotaProtegida>
+          }
+        />
+      </Routes>
     </BrowserRouter>
   );
 }

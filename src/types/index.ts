@@ -1,4 +1,22 @@
-export type PerfilUsuario = 'admin' | 'gerente' | 'caixa' | 'garcom' | 'cozinha';
+export type CargoUsuario =
+  | 'super_admin'
+  | 'admin_restaurante'
+  | 'caixa'
+  | 'garcom'
+  | 'cozinha';
+
+export interface Usuario {
+  id: string;
+  nome: string;
+  email: string;
+  cargo: CargoUsuario;
+  tenantId: string;
+  avatar?: string;
+  pin: string;
+  ativo: boolean;
+}
+
+export type PerfilUsuario = CargoUsuario;
 
 export interface Categoria {
   id: string;
