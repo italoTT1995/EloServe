@@ -4,6 +4,8 @@ import { SessaoCaixa, Mesa, PedidoKDS } from '../types';
 interface AppState {
   caixaAtual: SessaoCaixa;
   operadorAtivo: string;
+  perfilAtivo: 'admin' | 'caixa' | 'garcom';
+  pinAdmin: string;
   mesas: Mesa[];
   pedidosKDS: PedidoKDS[];
   abrirCaixa: (saldoInicial: number) => void;
@@ -11,10 +13,14 @@ interface AppState {
   registrarVendaCaixa: (valor: number) => void;
   atualizarStatusMesa: (numero: number, status: Mesa['status']) => void;
   avancarStatusKDS: (pedidoId: string) => void;
+  alternarPerfil: (perfil: 'admin' | 'caixa' | 'garcom') => void;
+  validarPinAdmin: (pin: string) => boolean;
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  operadorAtivo: 'Italo Lemos (Gerente)',
+export const useAppStore = create<AppState>((set, get) => ({
+  operadorAtivo: 'Italo Lemos (Administrador)',
+  perfilAtivo: 'admin',
+  pinAdmin: '1234',
   caixaAtual: {
     id: 'caixa-01',
     status: 'aberto',
@@ -114,4 +120,19 @@ export const useAppStore = create<AppState>((set) => ({
         return { ...p, status: prox };
       }),
     })),
+
+  alternarPerfil: (perfil) =>
+    set({
+      perfilAtivo: perfil,
+      operadorAtivo:
+        perfil === 'admin'
+          ? 'Italo Lemos (Administrador)'
+          : perfil === 'caixa'
+          ? 'Operador 01 (Caixa)'
+          : 'Garçom Marcos (Salão)',
+    }),
+
+  validarPinAdmin: (pin) => {
+    return pin === get().pinAdmin;
+  },
 }));

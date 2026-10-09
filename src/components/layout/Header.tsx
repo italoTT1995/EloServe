@@ -3,15 +3,18 @@ import {
   Clock,
   Wifi,
   DollarSign,
-  Maximize2,
   HelpCircle,
   Bell,
+  ShieldCheck,
+  User,
+  ChevronDown,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 
 export function Header() {
   const [time, setTime] = useState(new Date().toLocaleTimeString());
-  const { caixaAtual } = useAppStore();
+  const [menuPerfilAberto, setMenuPerfilAberto] = useState(false);
+  const { caixaAtual, perfilAtivo, operadorAtivo, alternarPerfil } = useAppStore();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -35,7 +38,87 @@ export function Header() {
       </div>
 
       {/* Right Indicators */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3.5">
+        {/* Seletor de Perfil / Permissão */}
+        <div className="relative">
+          <button
+            onClick={() => setMenuPerfilAberto(!menuPerfilAberto)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all text-xs font-bold cursor-pointer ${
+              perfilAtivo === 'admin'
+                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                : perfilAtivo === 'caixa'
+                ? 'bg-blue-950/60 border-blue-500/40 text-blue-300'
+                : 'bg-amber-950/60 border-amber-500/40 text-amber-300'
+            }`}
+          >
+            {perfilAtivo === 'admin' ? (
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <User className="w-4 h-4" />
+            )}
+            <span>
+              {perfilAtivo === 'admin'
+                ? 'Modo Admin'
+                : perfilAtivo === 'caixa'
+                ? 'Modo Caixa'
+                : 'Modo Garçom'}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+          </button>
+
+          {menuPerfilAberto && (
+            <div className="absolute right-0 mt-2 w-52 bg-slate-900 border border-slate-800 rounded-2xl p-1.5 shadow-2xl z-50 space-y-1 animate-in fade-in zoom-in-95 duration-100">
+              <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Alternar Perfil de Acesso
+              </p>
+              <button
+                onClick={() => {
+                  alternarPerfil('admin');
+                  setMenuPerfilAberto(false);
+                }}
+                className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
+                  perfilAtivo === 'admin'
+                    ? 'bg-emerald-500 text-white font-bold'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <span>Administrador (Total)</span>
+                {perfilAtivo === 'admin' && <span className="text-[10px]">✓</span>}
+              </button>
+
+              <button
+                onClick={() => {
+                  alternarPerfil('caixa');
+                  setMenuPerfilAberto(false);
+                }}
+                className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
+                  perfilAtivo === 'caixa'
+                    ? 'bg-blue-500 text-white font-bold'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <span>Operador de Caixa</span>
+                {perfilAtivo === 'caixa' && <span className="text-[10px]">✓</span>}
+              </button>
+
+              <button
+                onClick={() => {
+                  alternarPerfil('garcom');
+                  setMenuPerfilAberto(false);
+                }}
+                className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
+                  perfilAtivo === 'garcom'
+                    ? 'bg-amber-500 text-slate-950 font-bold'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <span>Garçom (Salão)</span>
+                {perfilAtivo === 'garcom' && <span className="text-[10px]">✓</span>}
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Total do Caixa Atual */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60">
           <DollarSign className="w-4 h-4 text-emerald-400" />

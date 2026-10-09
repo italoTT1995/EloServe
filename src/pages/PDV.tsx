@@ -17,129 +17,8 @@ import {
 } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { useAppStore } from '../store/useAppStore';
-import { Produto, Categoria } from '../types';
+import { useProductStore } from '../store/useProductStore';
 
-const mockCategorias: Categoria[] = [
-  { id: 'todas', nome: 'Todos os Itens' },
-  { id: 'c1', nome: 'Burgers Artesanais' },
-  { id: 'c2', nome: 'Pizzas & Calzones' },
-  { id: 'c3', nome: 'Porções & Fritas' },
-  { id: 'c4', nome: 'Bebidas & Chopp' },
-  { id: 'c5', nome: 'Sobremesas' },
-];
-
-const mockProdutos: Produto[] = [
-  {
-    id: 'p1',
-    categoriaId: 'c1',
-    nome: 'EloBurger Smash Bacon',
-    descricao: 'Dois blends de 90g prensados, queijo cheddar inglês, fatias crocantes de bacon e maionese defumada.',
-    precoVenda: 34.9,
-    setorPreparo: 'cozinha',
-    disponivel: true,
-    destaque: true,
-  },
-  {
-    id: 'p2',
-    categoriaId: 'c1',
-    nome: 'EloBurger Clássico Salada',
-    descricao: 'Blend 160g, queijo prato derretido, alface americana, tomate fresco e picles artesanal.',
-    precoVenda: 29.9,
-    setorPreparo: 'cozinha',
-    disponivel: true,
-  },
-  {
-    id: 'p3',
-    categoriaId: 'c1',
-    nome: 'Gorgonzola & Cebola Caramelizada',
-    descricao: 'Blend 180g alto e suculento, creme de queijo gorgonzola e cebola caramelizada no pão brioche.',
-    precoVenda: 38.0,
-    setorPreparo: 'cozinha',
-    disponivel: true,
-  },
-  {
-    id: 'p4',
-    categoriaId: 'c2',
-    nome: 'Pizza Margherita Especial',
-    descricao: 'Molho pelati italiano, mussarela de búfala, manjericão fresco e azeite extravirgem.',
-    precoVenda: 58.0,
-    setorPreparo: 'cozinha',
-    disponivel: true,
-    destaque: true,
-  },
-  {
-    id: 'p5',
-    categoriaId: 'c2',
-    nome: 'Pizza Calabresa Artesanal',
-    descricao: 'Calabresa curada defumada em fatias finas, cebola roxa e azeitonas pretas chilenas.',
-    precoVenda: 52.0,
-    setorPreparo: 'cozinha',
-    disponivel: true,
-  },
-  {
-    id: 'p6',
-    categoriaId: 'c3',
-    nome: 'Batata Rústica com Alecrim',
-    descricao: 'Batatas rústicas com casca, fritas na hora com sal grosso, alho confit e alecrim fresco.',
-    precoVenda: 24.5,
-    setorPreparo: 'cozinha',
-    disponivel: true,
-  },
-  {
-    id: 'p7',
-    categoriaId: 'c3',
-    nome: 'Coxinha Cremosa sem Massa (6 un)',
-    descricao: 'Recheio 100% de frango desfiado com muito requeijão cremoso, empanada na farinha panko.',
-    precoVenda: 28.0,
-    setorPreparo: 'cozinha',
-    disponivel: true,
-  },
-  {
-    id: 'p8',
-    categoriaId: 'c4',
-    nome: 'Chopp IPA Artesanal 500ml',
-    descricao: 'Chopp artesanal fresco, notas cítricas e amargor balanceado.',
-    precoVenda: 18.0,
-    setorPreparo: 'bar',
-    disponivel: true,
-  },
-  {
-    id: 'p9',
-    categoriaId: 'c4',
-    nome: 'Coca-Cola Original 350ml',
-    descricao: 'Lata gelada 350ml.',
-    precoVenda: 7.5,
-    setorPreparo: 'bar',
-    disponivel: true,
-  },
-  {
-    id: 'p10',
-    categoriaId: 'c4',
-    nome: 'Suco Natural de Laranja 400ml',
-    descricao: 'Feito na hora, 100% puro da fruta sem adição de água ou conservantes.',
-    precoVenda: 12.0,
-    setorPreparo: 'bar',
-    disponivel: true,
-  },
-  {
-    id: 'p11',
-    categoriaId: 'c5',
-    nome: 'Pudim de Leite Condensado',
-    descricao: 'Receita tradicional cremosa sem furinhos, com calda de caramelo dourado.',
-    precoVenda: 14.0,
-    setorPreparo: 'cozinha',
-    disponivel: true,
-  },
-  {
-    id: 'p12',
-    categoriaId: 'c5',
-    nome: 'Brownie de Chocolate com Sorvete',
-    descricao: 'Brownie quente de chocolate 70% com nozes, acompanhado de sorvete de baunilha.',
-    precoVenda: 22.0,
-    setorPreparo: 'cozinha',
-    disponivel: true,
-  },
-];
 
 export default function PDV() {
   const [categoriaAtiva, setCategoriaAtiva] = useState('todas');
@@ -165,17 +44,19 @@ export default function PDV() {
   } = useCartStore();
 
   const { registrarVendaCaixa } = useAppStore();
+  const { produtos, categorias } = useProductStore();
 
   // Filtragem rápida
   const produtosFiltrados = useMemo(() => {
-    return mockProdutos.filter((prod) => {
+    return produtos.filter((prod) => {
+      if (prod.disponivel === false) return false;
       const matchCategoria = categoriaAtiva === 'todas' || prod.categoriaId === categoriaAtiva;
       const matchBusca =
         prod.nome.toLowerCase().includes(busca.toLowerCase()) ||
         (prod.descricao && prod.descricao.toLowerCase().includes(busca.toLowerCase()));
       return matchCategoria && matchBusca;
     });
-  }, [categoriaAtiva, busca]);
+  }, [produtos, categoriaAtiva, busca]);
 
   const totalLiquido = getTotalLiquido();
   const valorRecebidoNum = parseFloat(valorRecebido) || 0;
@@ -232,7 +113,17 @@ export default function PDV() {
 
           {/* Categorias em pílulas */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {mockCategorias.map((cat) => (
+            <button
+              onClick={() => setCategoriaAtiva('todas')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
+                categoriaAtiva === 'todas'
+                  ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                  : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+            >
+              Todos os Itens
+            </button>
+            {categorias.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setCategoriaAtiva(cat.id)}
