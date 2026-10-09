@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { TenantRestaurante, PlanoAssinatura, TipoPlanoSaaS, StatusAssinatura } from '../types';
 
 export const PLANOS_DISPONIVEIS: PlanoAssinatura[] = [
@@ -62,6 +63,7 @@ interface SaaSState {
   atualizarDadosTenant: (tenantId: string, dados: Partial<TenantRestaurante>) => void;
   atualizarStatusAssinatura: (tenantId: string, status: StatusAssinatura) => void;
   mudarPlanoTenant: (tenantId: string, planoId: TipoPlanoSaaS) => void;
+  atualizarPlano: (planoId: TipoPlanoSaaS, dados: Partial<PlanoAssinatura>, atualizarAssinantes?: boolean) => void;
   getTenantAtivo: () => TenantRestaurante;
   getMRR: () => number;
   getTotalAtivos: () => number;
@@ -158,88 +160,125 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
   },
 ];
 
-export const useSaaSStore = create<SaaSState>((set, get) => ({
-  planos: PLANOS_DISPONIVEIS,
-  tenants: TENANTS_INICIAIS,
-  tenantAtivoId: 'tenant-01',
-  abaAtivaMaster: 'restaurantes',
-  tenantEmEdicaoId: 'tenant-01',
+export const useSaaSStore = create<SaaSState>()(
+  persist(
+    (set, get) => ({
+      planos: PLANOS_DISPONIVEIS,
+      tenants: TENANTS_INICIAIS,
+      tenantAtivoId: 'tenant-01',
+      abaAtivaMaster: 'restaurantes',
+      tenantEmEdicaoId: 'tenant-01',
 
-  setAbaAtivaMaster: (aba) => set({ abaAtivaMaster: aba }),
-  setTenantEmEdicaoId: (id) => set({ tenantEmEdicaoId: id }),
+      setAbaAtivaMaster: (aba) => set({ abaAtivaMaster: aba }),
+      setTenantEmEdicaoId: (id) => set({ tenantEmEdicaoId: id }),
 
-  selecionarTenant: (tenantId: string) => {
-    set({ tenantAtivoId: tenantId });
-  },
+      selecionarTenant: (tenantId: string) => {
+        set({ tenantAtivoId: tenantId });
+      },
 
-  adicionarTenant: (novo) => {
-    const id = `tenant-${Date.now().toString().slice(-4)}`;
-    const criadoEm = new Date().toISOString().split('T')[0];
-    const tenantCompleto: TenantRestaurante = {
-      ...novo,
-      id,
-      criadoEm,
-    };
-    set((state) => ({
-      tenants: [tenantCompleto, ...state.tenants],
-    }));
-  },
+      adicionarTenant: (novo) => {
+        const id = `tenant-${Date.now().toString().slice(-4)}`;
+        const criadoEm = new Date().toISOString().split('T')[0];
+        const tenantCompleto: TenantRestaurante = {
+          ...novo,
+          id,
+          criadoEm,
+        };
+        set((state) => ({
+          tenants: [tenantCompleto, ...state.tenants],
+        }));
+      },
 
-  atualizarDadosTenant: (tenantId, dados) => {
-    set((state) => ({
-      tenants: state.tenants.map((t) =>
-        t.id === tenantId ? { ...t, ...dados } : t
-      ),
-    }));
-  },
+      atualizarDadosTenant: (tenantId, dados) => {
+        set((state) => ({
+          tenants: state.tenants.map((t) =>
+            t.id === tenantId ? { ...t, ...dados } : t
+          ),
+        }));
+      },
 
-  atualizarStatusAssinatura: (tenantId, status) => {
-    set((state) => ({
-      tenants: state.tenants.map((t) =>
-        t.id === tenantId ? { ...t, statusAssinatura: status } : t
-      ),
-    }));
-  },
+      atualizarStatusAssinatura: (tenantId, status) => {
+        set((state) => ({
+          tenants: state.tenants.map((t) =>
+            t.id === tenantId ? { ...t, statusAssinatura: status } : t
+          ),
+        }));
+      },
 
-  mudarPlanoTenant: (tenantId, planoId) => {
-    const plano = PLANOS_DISPONIVEIS.find((p) => p.id === planoId);
-    if (!plano) return;
-    set((state) => ({
-      tenants: state.tenants.map((t) =>
-        t.id === tenantId
-          ? {
-              ...t,
-              planoId,
-              valorMensalidade: plano.precoMensal,
-            }
-          : t
-      ),
-    }));
-  },
+      mudarPlanoTenant: (tenantId, planoId) => {
+        const plano = get().planos.find((p) => p.id === planoId);
+        if (!plano) return;
+        set((state) => ({
+          tenants: state.tenants.map((t) =>
+            t.id === tenantId
+              ? {
+                  ...t,
+                  planoId,
+                  valorMensalidade: plano.precoMensal,
+                }
+              : t
+          ),
+        }));
+      },
 
-  getTenantAtivo: () => {
-    const { tenants, tenantAtivoId } = get();
-    return tenants.find((t) => t.id === tenantAtivoId) || tenants[0];
-  },
+      atualizarPlano: (planoId, dados, atualizarAssinantes = false) => {
+        set((state) => {
+          const novosPlanos = state.planos.map((p) => {
+            if (p.id !== planoId) return p;
+            return {
+              ...p,
+              ...dados,
+              limites: {
+                ...p.limites,
+                ...(dados.limites || {}),
+              },
+            };
+          });
 
-  getMRR: () => {
-    const { tenants } = get();
-    return tenants
-      .filter((t) => t.statusAssinatura === 'ativo' || t.statusAssinatura === 'trial')
-      .reduce((acc, t) => acc + t.valorMensalidade, 0);
-  },
+          let novosTenants = state.tenants;
+          if (atualizarAssinantes && dados.precoMensal !== undefined) {
+            novosTenants = state.tenants.map((t) =>
+              t.planoId === planoId
+                ? { ...t, valorMensalidade: Number(dados.precoMensal) }
+                : t
+            );
+          }
 
-  getTotalAtivos: () => {
-    return get().tenants.filter((t) => t.statusAssinatura === 'ativo').length;
-  },
+          return {
+            planos: novosPlanos,
+            tenants: novosTenants,
+          };
+        });
+      },
 
-  getTotalTrials: () => {
-    return get().tenants.filter((t) => t.statusAssinatura === 'trial').length;
-  },
+      getTenantAtivo: () => {
+        const { tenants, tenantAtivoId } = get();
+        return tenants.find((t) => t.id === tenantAtivoId) || tenants[0];
+      },
 
-  getTotalAtrasados: () => {
-    return get().tenants.filter(
-      (t) => t.statusAssinatura === 'atrasado' || t.statusAssinatura === 'bloqueado'
-    ).length;
-  },
-}));
+      getMRR: () => {
+        const { tenants } = get();
+        return tenants
+          .filter((t) => t.statusAssinatura === 'ativo' || t.statusAssinatura === 'trial')
+          .reduce((acc, t) => acc + t.valorMensalidade, 0);
+      },
+
+      getTotalAtivos: () => {
+        return get().tenants.filter((t) => t.statusAssinatura === 'ativo').length;
+      },
+
+      getTotalTrials: () => {
+        return get().tenants.filter((t) => t.statusAssinatura === 'trial').length;
+      },
+
+      getTotalAtrasados: () => {
+        return get().tenants.filter(
+          (t) => t.statusAssinatura === 'atrasado' || t.statusAssinatura === 'bloqueado'
+        ).length;
+      },
+    }),
+    {
+      name: 'eloserve_saas_store_v2',
+    }
+  )
+);

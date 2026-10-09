@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import { useSaaSStore, AbaMasterSaaS } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
-import { TipoPlanoSaaS, StatusAssinatura, Produto } from '../types';
+import { TipoPlanoSaaS, StatusAssinatura, Produto, PlanoAssinatura } from '../types';
 
 export default function SaaSMaster() {
   const navigate = useNavigate();
@@ -56,6 +56,7 @@ export default function SaaSMaster() {
     atualizarDadosTenant,
     atualizarStatusAssinatura,
     mudarPlanoTenant,
+    atualizarPlano,
     getMRR,
     getTotalAtivos,
     getTotalTrials,
@@ -207,6 +208,77 @@ export default function SaaSMaster() {
       precoCusto: '',
       setorPreparo: 'cozinha',
     });
+  }
+
+  // Estados para Customização de Planos & Mensalidades
+  const [modalEditarPlano, setModalEditarPlano] = useState<PlanoAssinatura | null>(null);
+  const [formPlano, setFormPlano] = useState({
+    nome: '',
+    precoMensal: 0,
+    descricao: '',
+    destaque: false,
+    maxMesas: 999,
+    maxCaixasSimultaneos: 5,
+    kdsIncluso: true,
+    whatsappIAIncluso: false,
+    relatoriosAvancados: true,
+    suportePrioritario: true,
+    atualizarAssinantes: false,
+  });
+
+  const [precosPlanosLocais, setPrecosPlanosLocais] = useState<Record<string, number>>({});
+  const [sucessoPlanoSalvo, setSucessoPlanoSalvo] = useState<string | null>(null);
+
+  function handleSalvarPrecoPlanoRapido(planoId: TipoPlanoSaaS, novoPreco: number) {
+    if (isNaN(novoPreco) || novoPreco < 0) return;
+    atualizarPlano(planoId, { precoMensal: novoPreco }, false);
+    setSucessoPlanoSalvo(planoId);
+    setTimeout(() => setSucessoPlanoSalvo(null), 2500);
+  }
+
+  function handleAbrirModalEditarPlano(plano: PlanoAssinatura) {
+    setModalEditarPlano(plano);
+    setFormPlano({
+      nome: plano.nome,
+      precoMensal: plano.precoMensal,
+      descricao: plano.descricao,
+      destaque: !!plano.destaque,
+      maxMesas: plano.limites.maxMesas,
+      maxCaixasSimultaneos: plano.limites.maxCaixasSimultaneos,
+      kdsIncluso: plano.limites.kdsIncluso,
+      whatsappIAIncluso: plano.limites.whatsappIAIncluso,
+      relatoriosAvancados: plano.limites.relatoriosAvancados,
+      suportePrioritario: plano.limites.suportePrioritario,
+      atualizarAssinantes: false,
+    });
+  }
+
+  function handleSalvarModalPlano(e: React.FormEvent) {
+    e.preventDefault();
+    if (!modalEditarPlano) return;
+
+    atualizarPlano(
+      modalEditarPlano.id,
+      {
+        nome: formPlano.nome,
+        precoMensal: Number(formPlano.precoMensal),
+        descricao: formPlano.descricao,
+        destaque: formPlano.destaque,
+        limites: {
+          maxMesas: Number(formPlano.maxMesas),
+          maxCaixasSimultaneos: Number(formPlano.maxCaixasSimultaneos),
+          kdsIncluso: formPlano.kdsIncluso,
+          whatsappIAIncluso: formPlano.whatsappIAIncluso,
+          relatoriosAvancados: formPlano.relatoriosAvancados,
+          suportePrioritario: formPlano.suportePrioritario,
+        },
+      },
+      formPlano.atualizarAssinantes
+    );
+
+    setSucessoPlanoSalvo(modalEditarPlano.id);
+    setModalEditarPlano(null);
+    setTimeout(() => setSucessoPlanoSalvo(null), 3000);
   }
 
   // Form novo restaurante
@@ -1265,43 +1337,173 @@ export default function SaaSMaster() {
 
       {/* CONTEÚDO DA ABA 3: PLANOS & LIMITES */}
       {abaAtiva === 'planos' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {planos.map((p) => (
-            <div key={p.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4 flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">{p.id}</span>
-                  {p.destaque && (
-                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
-                      Mais Vendido
-                    </span>
-                  )}
-                </div>
-                <h4 className="text-lg font-black text-white">{p.nome}</h4>
-                <p className="text-xs text-slate-400 mt-1">{p.descricao}</p>
-
-                <div className="my-4 pt-3 border-t border-slate-800">
-                  <span className="text-3xl font-black text-emerald-400 font-mono">R$ {p.precoMensal.toFixed(2)}</span>
-                  <span className="text-xs text-slate-400"> / mês por restaurante</span>
-                </div>
-
-                <div className="space-y-2 text-xs text-slate-300">
-                  <p className="text-slate-500 font-bold uppercase text-[10px]">Limites Operacionais:</p>
-                  <p>• Mesas: <strong className="text-white">{p.limites.maxMesas > 100 ? 'Ilimitadas' : p.limites.maxMesas}</strong></p>
-                  <p>• Caixas PDV simultâneos: <strong className="text-white">{p.limites.maxCaixasSimultaneos > 10 ? 'Ilimitados' : p.limites.maxCaixasSimultaneos}</strong></p>
-                  <p>• Painel de Cozinha KDS: <strong className={p.limites.kdsIncluso ? 'text-emerald-400' : 'text-slate-500'}>{p.limites.kdsIncluso ? 'Habilitado' : 'Não incluso'}</strong></p>
-                  <p>• Atendente EloBot IA: <strong className={p.limites.whatsappIAIncluso ? 'text-purple-400' : 'text-slate-500'}>{p.limites.whatsappIAIncluso ? 'Incluso 24h' : 'Opcional'}</strong></p>
-                </div>
+        <div className="space-y-6">
+          {/* Header da aba */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-purple-950/40 via-slate-900 to-slate-900 border border-purple-500/30 p-5 rounded-3xl shadow-xl">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 uppercase tracking-wider">
+                  Configuração de Mensalidades
+                </span>
+                {sucessoPlanoSalvo && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 font-bold border border-emerald-500/40 flex items-center gap-1 animate-in fade-in">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Plano atualizado com sucesso!</span>
+                  </span>
+                )}
               </div>
-
-              <button
-                onClick={() => alert(`Para editar o plano ${p.nome}, você pode customizar os limites no arquivo useSaaSStore.ts.`)}
-                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors"
-              >
-                Ajustar Limites do Plano
-              </button>
+              <h3 className="text-lg font-black text-white flex items-center gap-2">
+                <Layers className="w-5 h-5 text-purple-400" />
+                <span>Customização de Planos & Valores de Assinatura</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Altere os valores de mensalidade, limites de mesas/caixas e recursos inclusos em cada plano. Todas as alterações refletem imediatamente nas propostas e cobranças.
+              </p>
             </div>
-          ))}
+          </div>
+
+          {/* Cards dos Planos */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {planos.map((p) => {
+              const precoAtual = precosPlanosLocais[p.id] !== undefined ? precosPlanosLocais[p.id] : p.precoMensal;
+              const foiSalvoRecentemente = sucessoPlanoSalvo === p.id;
+              const totalAssinantes = tenants.filter((t) => t.planoId === p.id).length;
+
+              return (
+                <div
+                  key={p.id}
+                  className={`bg-slate-900 border rounded-3xl p-6 shadow-xl space-y-4 flex flex-col justify-between transition-all ${
+                    p.destaque
+                      ? 'border-purple-500/50 shadow-purple-500/10'
+                      : 'border-slate-800'
+                  }`}
+                >
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
+                        {p.id}
+                      </span>
+                      {p.destaque && (
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                          Mais Vendido
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-lg font-black text-white">{p.nome}</h4>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">{p.descricao}</p>
+
+                    {/* Bloco de Preço Customizável com Edição Rápida */}
+                    <div className="my-4 p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Valor da Mensalidade
+                        </span>
+                        <span className="text-[10px] text-purple-400 font-semibold font-mono">
+                          {totalAssinantes} restaurantes
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-black text-emerald-400 font-mono">R$</span>
+                        <input
+                          type="number"
+                          step="1.00"
+                          value={precoAtual}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setPrecosPlanosLocais({ ...precosPlanosLocais, [p.id]: val });
+                          }}
+                          onBlur={() => {
+                            if (precosPlanosLocais[p.id] !== undefined) {
+                              handleSalvarPrecoPlanoRapido(p.id, precosPlanosLocais[p.id]);
+                            }
+                          }}
+                          className="w-28 px-3 py-1.5 bg-slate-900 border border-slate-700 focus:border-purple-400 rounded-xl text-xl font-black text-emerald-400 font-mono focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSalvarPrecoPlanoRapido(p.id, precoAtual)}
+                          title="Salvar novo valor de mensalidade"
+                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            foiSalvoRecentemente
+                              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                              : 'bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/20'
+                          }`}
+                        >
+                          {foiSalvoRecentemente ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Salvo!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-3.5 h-3.5" />
+                              <span>Salvar</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Botões rápidos de ajuste de valor */}
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <span className="text-[10px] text-slate-500">Ajuste:</span>
+                        {[-10, +10, +20, +50].map((delta) => (
+                          <button
+                            key={delta}
+                            type="button"
+                            onClick={() => {
+                              const novo = Math.max(0, precoAtual + delta);
+                              setPrecosPlanosLocais({ ...precosPlanosLocais, [p.id]: novo });
+                              handleSalvarPrecoPlanoRapido(p.id, novo);
+                            }}
+                            className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-purple-900/40 hover:text-purple-300 text-[10px] text-slate-400 font-mono font-bold transition-colors cursor-pointer border border-slate-800"
+                          >
+                            {delta > 0 ? `+${delta}` : delta}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-xs text-slate-300">
+                      <p className="text-slate-500 font-bold uppercase text-[10px]">Limites Operacionais:</p>
+                      <p>
+                        • Mesas:{' '}
+                        <strong className="text-white">
+                          {p.limites.maxMesas > 100 ? 'Ilimitadas' : `${p.limites.maxMesas} mesas`}
+                        </strong>
+                      </p>
+                      <p>
+                        • Caixas PDV simultâneos:{' '}
+                        <strong className="text-white">
+                          {p.limites.maxCaixasSimultaneos > 10 ? 'Ilimitados' : `${p.limites.maxCaixasSimultaneos} caixa(s)`}
+                        </strong>
+                      </p>
+                      <p>
+                        • Painel de Cozinha KDS:{' '}
+                        <strong className={p.limites.kdsIncluso ? 'text-emerald-400' : 'text-slate-500'}>
+                          {p.limites.kdsIncluso ? 'Habilitado' : 'Não incluso'}
+                        </strong>
+                      </p>
+                      <p>
+                        • Atendente EloBot IA:{' '}
+                        <strong className={p.limites.whatsappIAIncluso ? 'text-purple-400' : 'text-slate-500'}>
+                          {p.limites.whatsappIAIncluso ? 'Incluso 24h' : 'Opcional'}
+                        </strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleAbrirModalEditarPlano(p)}
+                    className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                    <span>Customizar Limites & Recursos do Plano</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -1682,6 +1884,167 @@ export default function SaaSMaster() {
                   className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer"
                 >
                   Salvar no Cardápio
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Customizar Plano e Valores pelo Super Admin */}
+      {modalEditarPlano && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-purple-400" />
+                <h3 className="text-base font-extrabold text-white">
+                  Editar Plano: {modalEditarPlano.nome}
+                </h3>
+              </div>
+              <button
+                onClick={() => setModalEditarPlano(null)}
+                className="p-1 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarModalPlano} className="space-y-4 text-xs">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Nome Comercial do Plano *</label>
+                <input
+                  type="text"
+                  required
+                  value={formPlano.nome}
+                  onChange={(e) => setFormPlano({ ...formPlano, nome: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Valor da Mensalidade (R$/mês) *</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-400 font-mono font-bold text-sm">
+                    R$
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={formPlano.precoMensal}
+                    onChange={(e) => setFormPlano({ ...formPlano, precoMensal: parseFloat(e.target.value) || 0 })}
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-base focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Descrição Comercial</label>
+                <textarea
+                  rows={2}
+                  value={formPlano.descricao}
+                  onChange={(e) => setFormPlano({ ...formPlano, descricao: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white resize-none focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-white font-bold block">Marcar como "Mais Vendido"</span>
+                  <span className="text-[11px] text-slate-400">Exibe uma etiqueta de recomendação no plano</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={formPlano.destaque}
+                  onChange={(e) => setFormPlano({ ...formPlano, destaque: e.target.checked })}
+                  className="w-5 h-5 accent-purple-600 rounded cursor-pointer"
+                />
+              </div>
+
+              {/* Limites Operacionais */}
+              <div className="space-y-3 pt-2 border-t border-slate-800">
+                <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
+                  Limites Operacionais do Plano
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">Máximo de Mesas</label>
+                    <input
+                      type="number"
+                      value={formPlano.maxMesas}
+                      onChange={(e) => setFormPlano({ ...formPlano, maxMesas: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono"
+                    />
+                    <span className="text-[10px] text-slate-500">Acima de 100 = Ilimitadas</span>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">Caixas Simultâneos</label>
+                    <input
+                      type="number"
+                      value={formPlano.maxCaixasSimultaneos}
+                      onChange={(e) => setFormPlano({ ...formPlano, maxCaixasSimultaneos: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono"
+                    />
+                    <span className="text-[10px] text-slate-500">Acima de 10 = Ilimitados</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <label className="flex items-center gap-2 p-2.5 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formPlano.kdsIncluso}
+                      onChange={(e) => setFormPlano({ ...formPlano, kdsIncluso: e.target.checked })}
+                      className="w-4 h-4 accent-emerald-500 rounded"
+                    />
+                    <span className="text-slate-300 font-medium">Painel Cozinha (KDS)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2.5 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formPlano.whatsappIAIncluso}
+                      onChange={(e) => setFormPlano({ ...formPlano, whatsappIAIncluso: e.target.checked })}
+                      className="w-4 h-4 accent-purple-500 rounded"
+                    />
+                    <span className="text-slate-300 font-medium">EloBot IA WhatsApp</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Opção de propagar para assinantes ativos */}
+              <div className="p-3 bg-purple-950/30 border border-purple-500/30 rounded-2xl flex items-center justify-between gap-3">
+                <div>
+                  <span className="text-purple-300 font-bold block">Atualizar Restaurantes Ativos</span>
+                  <span className="text-[11px] text-slate-400">
+                    Aplica o novo valor para todos os restaurantes atualmente neste plano
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={formPlano.atualizarAssinantes}
+                  onChange={(e) => setFormPlano({ ...formPlano, atualizarAssinantes: e.target.checked })}
+                  className="w-5 h-5 accent-purple-600 rounded cursor-pointer"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalEditarPlano(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Salvar Alterações do Plano</span>
                 </button>
               </div>
             </form>
