@@ -7,6 +7,8 @@ import Cardapio from './pages/Cardapio';
 import Caixa from './pages/Caixa';
 import Relatorios from './pages/Relatorios';
 import EloBot from './pages/EloBot';
+import SaaSMaster from './pages/SaaSMaster';
+import MinhaAssinatura from './pages/MinhaAssinatura';
 
 export default function App() {
   return (
@@ -20,6 +22,8 @@ export default function App() {
           <Route path="/caixa" element={<Caixa />} />
           <Route path="/relatorios" element={<Relatorios />} />
           <Route path="/elobot" element={<EloBot />} />
+          <Route path="/minha-assinatura" element={<MinhaAssinatura />} />
+          <Route path="/saas" element={<SaaSMaster />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

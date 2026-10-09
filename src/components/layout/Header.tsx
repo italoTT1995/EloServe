@@ -11,8 +11,10 @@ import {
   Menu,
   Eye,
   EyeOff,
+  Store,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { useSaaSStore } from '../../store/useSaaSStore';
 import { useWindowFocus } from '../../hooks/useWindowFocus';
 
 interface HeaderProps {
@@ -22,9 +24,12 @@ interface HeaderProps {
 export function Header({ onToggleSidebar }: HeaderProps) {
   const [time, setTime] = useState(new Date().toLocaleTimeString());
   const [menuPerfilAberto, setMenuPerfilAberto] = useState(false);
+  const [menuTenantAberto, setMenuTenantAberto] = useState(false);
   const [modalAtalhosAberto, setModalAtalhosAberto] = useState(false);
 
   const { caixaAtual, perfilAtivo, alternarPerfil } = useAppStore();
+  const { getTenantAtivo, tenants, selecionarTenant } = useSaaSStore();
+  const tenantAtual = getTenantAtivo();
   const { isFocused } = useWindowFocus();
 
   useEffect(() => {
@@ -36,7 +41,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
   return (
     <header className="h-16 px-4 sm:px-6 bg-slate-900 border-b border-slate-800 flex items-center justify-between select-none">
-      {/* Left: Mobile Menu Toggle & Store Name */}
+      {/* Left: Mobile Menu Toggle & Store Switcher */}
       <div className="flex items-center gap-3">
         {/* Botão Menu Hambúrguer Mobile */}
         <button
@@ -47,13 +52,55 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="min-w-0">
-          <h2 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2 truncate">
-            <span className="truncate">Restaurante EloServe</span>
-            <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/30 font-semibold shrink-0">
-              PDV #01
+        {/* Seletor de Loja / Tenant */}
+        <div className="relative">
+          <button
+            onClick={() => setMenuTenantAberto(!menuTenantAberto)}
+            className="flex items-center gap-1.5 sm:gap-2 text-left text-xs sm:text-sm font-bold text-white hover:text-emerald-300 transition-colors p-1 rounded-lg"
+          >
+            <Store className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="truncate max-w-[130px] sm:max-w-[220px]">{tenantAtual.nomeFantasia}</span>
+            <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
+            <span
+              className={`hidden md:inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
+                tenantAtual.statusAssinatura === 'ativo'
+                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
+                  : tenantAtual.statusAssinatura === 'trial'
+                  ? 'bg-amber-950 text-amber-400 border border-amber-500/30'
+                  : 'bg-rose-950 text-rose-400 border border-rose-500/30'
+              }`}
+            >
+              {tenantAtual.statusAssinatura}
             </span>
-          </h2>
+          </button>
+
+          {menuTenantAberto && (
+            <div className="absolute left-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl p-1.5 shadow-2xl z-50 space-y-1 animate-in fade-in duration-100">
+              <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Alternar Restaurante (Multi-Loja)
+              </p>
+              {tenants.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    selecionarTenant(t.id);
+                    setMenuTenantAberto(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
+                    t.id === tenantAtual.id
+                      ? 'bg-emerald-500 text-white font-bold'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <div className="truncate pr-2">
+                    <p className="truncate font-semibold">{t.nomeFantasia}</p>
+                    <p className="text-[10px] opacity-75 font-mono">{t.cidadeUf}</p>
+                  </div>
+                  {t.id === tenantAtual.id && <span className="text-[10px]">✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

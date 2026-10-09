@@ -10,9 +10,11 @@ import {
   Zap,
   LogOut,
   X,
+  CreditCard,
+  Crown,
 } from 'lucide-react';
 
-const menuItems = [
+const menuItemsOperacao = [
   { path: '/', label: 'Frente de Caixa (PDV)', icon: Store, badge: 'F1' },
   { path: '/mesas', label: 'Mesas & Salão', icon: LayoutGrid, badge: 'F2' },
   { path: '/kds', label: 'Cozinha (KDS)', icon: ChefHat, badge: 'F3' },
@@ -20,6 +22,11 @@ const menuItems = [
   { path: '/caixa', label: 'Controle de Caixa', icon: DollarSign },
   { path: '/relatorios', label: 'Faturamento & DRE', icon: TrendingUp },
   { path: '/elobot', label: 'EloBot (WhatsApp IA)', icon: Bot, highlight: true },
+];
+
+const menuItemsSaaS = [
+  { path: '/minha-assinatura', label: 'Minha Assinatura', icon: CreditCard },
+  { path: '/saas', label: 'Gestão SaaS Master', icon: Crown, badge: 'SaaS', adminDestaque: true },
 ];
 
 interface SidebarProps {
@@ -60,12 +67,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       </div>
 
       {/* Nav Menu */}
-      <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
-        <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-          Operação
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+          Operação do Restaurante
         </p>
 
-        {menuItems.map((item) => {
+        {menuItemsOperacao.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -75,7 +82,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 if (window.innerWidth < 1024) onClose();
               }}
               className={({ isActive }) =>
-                `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
                   isActive
                     ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 font-bold'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
@@ -111,6 +118,59 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </NavLink>
           );
         })}
+
+        {/* Seção SaaS */}
+        <div className="pt-3 mt-3 border-t border-slate-800/80">
+          <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            Assinatura & Multi-Lojas
+          </p>
+
+          {menuItemsSaaS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={() => {
+                  if (window.innerWidth < 1024) onClose();
+                }}
+                className={({ isActive }) =>
+                  `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                    isActive
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25 font-bold'
+                      : item.adminDestaque
+                      ? 'text-purple-300 bg-purple-950/20 border border-purple-500/20 hover:bg-purple-950/40'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <Icon
+                        className={`w-4 h-4 ${
+                          isActive ? 'text-white' : item.adminDestaque ? 'text-purple-400' : 'text-slate-400'
+                        }`}
+                      />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge && (
+                      <span
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                          isActive
+                            ? 'bg-purple-700 text-white'
+                            : 'bg-purple-950 text-purple-300 border border-purple-500/30'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </div>
       </nav>
 
       {/* Bottom Info */}

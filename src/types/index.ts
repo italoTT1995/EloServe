@@ -81,3 +81,44 @@ export interface SessaoCaixa {
   abertoEm: string;
   operador: string;
 }
+
+// SaaS Multi-Tenancy & Assinaturas
+export type TipoPlanoSaaS = 'starter' | 'pro' | 'enterprise';
+export type StatusAssinatura = 'ativo' | 'trial' | 'atrasado' | 'bloqueado' | 'cancelado';
+
+export interface LimitesPlano {
+  maxMesas: number;
+  maxCaixasSimultaneos: number;
+  kdsIncluso: boolean;
+  whatsappIAIncluso: boolean;
+  relatoriosAvancados: boolean;
+  suportePrioritario: boolean;
+}
+
+export interface PlanoAssinatura {
+  id: TipoPlanoSaaS;
+  nome: string;
+  precoMensal: number;
+  descricao: string;
+  limites: LimitesPlano;
+  destaque?: boolean;
+}
+
+export interface TenantRestaurante {
+  id: string;
+  nomeFantasia: string;
+  razaoSocial?: string;
+  documento: string;
+  responsavelNome: string;
+  telefoneWhatsApp: string;
+  email: string;
+  cidadeUf: string;
+  planoId: TipoPlanoSaaS;
+  statusAssinatura: StatusAssinatura;
+  valorMensalidade: number;
+  dataInicio: string;
+  proximoVencimento: string;
+  diasRestantesTrial?: number;
+  instanciaWhatsAppConectada: boolean;
+  criadoEm: string;
+}
