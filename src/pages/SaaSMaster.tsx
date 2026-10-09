@@ -25,6 +25,7 @@ import {
   QrCode,
   Layers,
   ArrowUpRight,
+  ArrowRight,
   Server,
   Save,
   Trash2,
@@ -38,7 +39,7 @@ import {
 } from 'lucide-react';
 import { useSaaSStore, AbaMasterSaaS } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
-import { TipoPlanoSaaS, StatusAssinatura, Produto, PlanoAssinatura } from '../types';
+import { TipoPlanoSaaS, StatusAssinatura, Produto, PlanoAssinatura, TenantRestaurante } from '../types';
 
 export default function SaaSMaster() {
   const navigate = useNavigate();
@@ -279,6 +280,38 @@ export default function SaaSMaster() {
     setSucessoPlanoSalvo(modalEditarPlano.id);
     setModalEditarPlano(null);
     setTimeout(() => setSucessoPlanoSalvo(null), 3000);
+  }
+
+  // Estados para Migração / Melhoria de Planos das Lojas
+  const [modalMigrarLoja, setModalMigrarLoja] = useState<TenantRestaurante | null>(null);
+  const [novoPlanoSelecionado, setNovoPlanoSelecionado] = useState<TipoPlanoSaaS>('enterprise');
+  const [toastMigracao, setToastMigracao] = useState<string | null>(null);
+
+  function handleConfirmarMigracaoPlano(e: React.FormEvent) {
+    e.preventDefault();
+    if (!modalMigrarLoja) return;
+
+    mudarPlanoTenant(modalMigrarLoja.id, novoPlanoSelecionado);
+    if (novoPlanoSelecionado === 'enterprise') {
+      atualizarDadosTenant(modalMigrarLoja.id, { instanciaWhatsAppConectada: true });
+    }
+
+    const planoNovo = planos.find((p) => p.id === novoPlanoSelecionado);
+    setToastMigracao(`Plano do restaurante "${modalMigrarLoja.nomeFantasia}" atualizado com sucesso para ${planoNovo?.nome || novoPlanoSelecionado}!`);
+    setModalMigrarLoja(null);
+    setTimeout(() => setToastMigracao(null), 4500);
+  }
+
+  function handleTrocarPlanoDireto(tenantId: string, novoPlano: TipoPlanoSaaS) {
+    const t = tenants.find((item) => item.id === tenantId);
+    if (!t) return;
+    mudarPlanoTenant(tenantId, novoPlano);
+    if (novoPlano === 'enterprise') {
+      atualizarDadosTenant(tenantId, { instanciaWhatsAppConectada: true });
+    }
+    const planoNovo = planos.find((p) => p.id === novoPlano);
+    setToastMigracao(`Plano de "${t.nomeFantasia}" alterado para ${planoNovo?.nome || novoPlano}!`);
+    setTimeout(() => setToastMigracao(null), 4000);
   }
 
   // Form novo restaurante
@@ -1491,11 +1524,61 @@ export default function SaaSMaster() {
                         </strong>
                       </p>
                     </div>
+
+                    {/* Lugares / Restaurantes que têm este plano */}
+                    <div className="pt-3 border-t border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Store className="w-3.5 h-3.5 text-purple-400" />
+                          <span>Restaurantes neste Plano:</span>
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-purple-950/80 text-purple-300 border border-purple-500/30">
+                          {tenants.filter((t) => t.planoId === p.id).length} {tenants.filter((t) => t.planoId === p.id).length === 1 ? 'loja' : 'lojas'}
+                        </span>
+                      </div>
+
+                      {tenants.filter((t) => t.planoId === p.id).length === 0 ? (
+                        <p className="text-[11px] text-slate-500 italic py-1">
+                          Nenhum restaurante assinando este plano no momento.
+                        </p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                          {tenants.filter((t) => t.planoId === p.id).map((t) => (
+                            <div
+                              key={t.id}
+                              className="p-2 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-white truncate">{t.nomeFantasia}</p>
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {t.cidadeUf} • <strong className="text-emerald-400 font-mono">R$ {t.valorMensalidade.toFixed(2)}</strong>
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setModalMigrarLoja(t);
+                                  if (p.id === 'starter') setNovoPlanoSelecionado('pro');
+                                  else if (p.id === 'pro') setNovoPlanoSelecionado('enterprise');
+                                  else setNovoPlanoSelecionado('enterprise');
+                                }}
+                                title="Modificar plano deste restaurante para melhoria"
+                                className="px-2 py-1 rounded-lg bg-purple-950 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/30 text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                              >
+                                <Sparkles className="w-3 h-3 text-amber-300" />
+                                <span>Mudar</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <button
                     onClick={() => handleAbrirModalEditarPlano(p)}
-                    className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                    className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-purple-600 hover:text-white text-slate-300 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm mt-3"
                   >
                     <Sliders className="w-3.5 h-3.5" />
                     <span>Customizar Limites & Recursos do Plano</span>
@@ -1503,6 +1586,179 @@ export default function SaaSMaster() {
                 </div>
               );
             })}
+          </div>
+
+          {/* PAINEL CENTRAL INTUITIVO: ONDE OS PLANOS ESTÃO INSTALADOS & MIGRAÇÃO */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div className="space-y-1">
+                <h4 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Store className="w-5 h-5 text-purple-400" />
+                  <span>Central de Restaurantes Assinantes & Possibilidades de Melhoria</span>
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Veja em tempo real onde cada plano está instalado e altere o plano de qualquer restaurante para desbloquear melhorias e novas ferramentas (KDS, WhatsApp IA ou mesas ilimitadas).
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-mono">Total: <strong className="text-white">{tenants.length} restaurantes</strong></span>
+              </div>
+            </div>
+
+            {toastMigracao && (
+              <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{toastMigracao}</span>
+              </div>
+            )}
+
+            {/* Tabela Interativa de Lojas e Planos */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[700px]">
+                <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="py-3 px-4">Restaurante / Localidade</th>
+                    <th className="py-3 px-4">Responsável & Contato</th>
+                    <th className="py-3 px-4">Plano Atual</th>
+                    <th className="py-3 px-4">Mensalidade</th>
+                    <th className="py-3 px-4">Recursos Desbloqueados</th>
+                    <th className="py-3 px-5 text-right">Alterar Plano para Melhoria</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-medium">
+                  {tenants.map((t) => {
+                    const planoDoTenant = planos.find((p) => p.id === t.planoId);
+                    return (
+                      <tr key={t.id} className="hover:bg-slate-800/40 transition-colors">
+                        {/* Restaurante */}
+                        <td className="py-3.5 px-4">
+                          <span className="font-bold text-white block text-sm">{t.nomeFantasia}</span>
+                          <span className="text-[11px] text-slate-400 font-mono">{t.cidadeUf}</span>
+                        </td>
+
+                        {/* Contato */}
+                        <td className="py-3.5 px-4">
+                          <p className="text-slate-300 font-semibold">{t.responsavelNome}</p>
+                          <p className="text-[11px] text-emerald-400 font-mono">{t.telefoneWhatsApp}</p>
+                        </td>
+
+                        {/* Plano Atual */}
+                        <td className="py-3.5 px-4">
+                          <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider ${
+                            t.planoId === 'enterprise'
+                              ? 'bg-purple-950 text-purple-300 border border-purple-500/30'
+                              : t.planoId === 'pro'
+                              ? 'bg-blue-950 text-blue-300 border border-blue-500/30'
+                              : 'bg-slate-800 text-slate-300'
+                          }`}>
+                            {planoDoTenant?.nome.replace('EloServe ', '') || t.planoId}
+                          </span>
+                        </td>
+
+                        {/* Valor Mensalidade */}
+                        <td className="py-3.5 px-4 font-mono font-bold text-white">
+                          R$ {t.valorMensalidade.toFixed(2)}/mês
+                        </td>
+
+                        {/* Recursos */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                              {(planoDoTenant?.limites.maxMesas ?? 0) > 100 ? 'Mesas Ilimitadas' : `${planoDoTenant?.limites.maxMesas ?? 0} Mesas`}
+                            </span>
+                            {planoDoTenant?.limites.kdsIncluso && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30 font-bold">
+                                KDS
+                              </span>
+                            )}
+                            {planoDoTenant?.limites.whatsappIAIncluso && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/30 font-bold">
+                                Robô IA WhatsApp
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Seletor Rápido de Upgrade/Melhoria */}
+                        <td className="py-3.5 px-5 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <select
+                              value={t.planoId}
+                              onChange={(e) => handleTrocarPlanoDireto(t.id, e.target.value as TipoPlanoSaaS)}
+                              className="px-2.5 py-1.5 bg-slate-950 border border-purple-500/40 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-purple-400 transition-colors cursor-pointer"
+                            >
+                              {planos.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.nome.replace('EloServe ', '')} (R$ {p.precoMensal.toFixed(2)})
+                                </option>
+                              ))}
+                            </select>
+
+                            <button
+                              onClick={() => {
+                                setModalMigrarLoja(t);
+                                if (t.planoId === 'starter') setNovoPlanoSelecionado('pro');
+                                else if (t.planoId === 'pro') setNovoPlanoSelecionado('enterprise');
+                                else setNovoPlanoSelecionado('enterprise');
+                              }}
+                              title="Comparar recursos e fazer upgrade para melhoria"
+                              className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-md shadow-purple-600/25 cursor-pointer shrink-0"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                              <span>Melhorar</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Comparativo Visual Intuitivo entre Planos */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+            <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span>Comparativo Rápido de Recursos & Vantagens por Nível</span>
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Nível Starter (Essencial)</span>
+                <p className="text-white font-black text-sm">Ideal para Bares e Cafés Pequenos</p>
+                <ul className="space-y-1 text-slate-300 text-[11px] pt-1">
+                  <li>✓ PDV Frente de Caixa Rápido</li>
+                  <li>✓ Até 10 Mesas no Salão</li>
+                  <li>✗ Sem painel de Cozinha KDS</li>
+                  <li>✗ Sem Robô de WhatsApp IA</li>
+                </ul>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-blue-950/30 border border-blue-500/30 space-y-2">
+                <span className="text-blue-400 font-bold uppercase text-[10px]">Nível Pro (Operação Completa)</span>
+                <p className="text-white font-black text-sm">Ideal para Pizzarias & Restaurantes Médios</p>
+                <ul className="space-y-1 text-slate-300 text-[11px] pt-1">
+                  <li>✓ PDV Frente de Caixa + 5 Caixas</li>
+                  <li>✓ Mesas Ilimitadas no Salão</li>
+                  <li>✓ <strong>Painel de Cozinha KDS Habilitado</strong></li>
+                  <li>✗ Sem Robô de WhatsApp IA</li>
+                </ul>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-purple-950/30 border border-purple-500/30 space-y-2">
+                <span className="text-purple-400 font-bold uppercase text-[10px]">Nível Enterprise & IA (Automação Total)</span>
+                <p className="text-white font-black text-sm">Máxima Eficiência e Vendas 24h</p>
+                <ul className="space-y-1 text-slate-300 text-[11px] pt-1">
+                  <li>✓ Mesas & Caixas PDV Ilimitados</li>
+                  <li>✓ Painel de Cozinha KDS Habilitado</li>
+                  <li>✓ <strong>EloBot Inteligência Artificial no WhatsApp 24h</strong></li>
+                  <li>✓ Suporte Prioritário Franqueador</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -2045,6 +2301,163 @@ export default function SaaSMaster() {
                 >
                   <Save className="w-4 h-4" />
                   <span>Salvar Alterações do Plano</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmar Migração / Melhoria de Plano do Restaurante */}
+      {modalMigrarLoja && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-purple-950/80 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-base font-extrabold text-white">
+                    Melhorar / Alterar Plano do Restaurante
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Restaurante: <strong className="text-white">{modalMigrarLoja.nomeFantasia}</strong> ({modalMigrarLoja.cidadeUf})
+                </p>
+              </div>
+              <button
+                onClick={() => setModalMigrarLoja(null)}
+                className="p-1 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmarMigracaoPlano} className="space-y-4 text-xs">
+              {/* Plano Atual */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Plano Atual</span>
+                  <p className="text-sm font-black text-white">
+                    {planos.find((p) => p.id === modalMigrarLoja.planoId)?.nome || modalMigrarLoja.planoId}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Mensalidade Atual</span>
+                  <span className="text-sm font-mono font-bold text-emerald-400">
+                    R$ {modalMigrarLoja.valorMensalidade.toFixed(2)}/mês
+                  </span>
+                </div>
+              </div>
+
+              {/* Escolha do Novo Plano */}
+              <div>
+                <label className="text-slate-300 font-bold block mb-2">
+                  Selecione o Novo Plano Desejado:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {planos.map((p) => {
+                    const isSelecionado = novoPlanoSelecionado === p.id;
+                    const isAtual = modalMigrarLoja.planoId === p.id;
+                    return (
+                      <button
+                        type="button"
+                        key={p.id}
+                        onClick={() => setNovoPlanoSelecionado(p.id)}
+                        className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                          isSelecionado
+                            ? 'border-purple-500 bg-purple-950/40 text-white shadow-lg shadow-purple-500/10 ring-2 ring-purple-500/50'
+                            : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        {isAtual && (
+                          <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300">
+                            Atual
+                          </span>
+                        )}
+                        <p className="font-extrabold text-xs text-white">{p.nome.replace('EloServe ', '')}</p>
+                        <p className="font-mono text-xs text-emerald-400 font-bold mt-1">
+                          R$ {p.precoMensal}/mês
+                        </p>
+                        <div className="mt-2 space-y-0.5 text-[10px] text-slate-300">
+                          <p>{p.limites.maxMesas > 100 ? '✓ Mesas Ilimitadas' : `✓ Até ${p.limites.maxMesas} mesas`}</p>
+                          <p>{p.limites.kdsIncluso ? '✓ KDS Cozinha' : '✗ Sem KDS'}</p>
+                          <p>{p.limites.whatsappIAIncluso ? '✓ WhatsApp IA' : '✗ Sem Bot IA'}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Comparativo de Impacto & Benefícios da Mudança */}
+              {(() => {
+                const planoAlvo = planos.find((p) => p.id === novoPlanoSelecionado);
+                if (!planoAlvo) return null;
+
+                const diferenca = planoAlvo.precoMensal - modalMigrarLoja.valorMensalidade;
+                const isUpgrade = diferenca > 0;
+
+                return (
+                  <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-500/30 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-purple-300">Impacto na Mensalidade:</span>
+                      <div className="flex items-center gap-1.5 font-mono text-xs">
+                        <span className="text-slate-400">R$ {modalMigrarLoja.valorMensalidade.toFixed(2)}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-purple-400" />
+                        <span className="text-emerald-400 font-bold">R$ {planoAlvo.precoMensal.toFixed(2)}/mês</span>
+                        {diferenca !== 0 && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ml-1 ${
+                            isUpgrade ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400'
+                          }`}>
+                            {isUpgrade ? `+R$ ${diferenca.toFixed(2)}` : `-R$ ${Math.abs(diferenca).toFixed(2)}`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-purple-500/20 pt-2 space-y-1">
+                      <p className="text-[11px] font-bold text-white flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span>O que muda para {modalMigrarLoja.nomeFantasia}:</span>
+                      </p>
+                      {novoPlanoSelecionado === 'enterprise' && (
+                        <p className="text-[11px] text-slate-300">
+                          🚀 <strong>Automação Total:</strong> Desbloqueia o robô <strong>EloBot Inteligência Artificial no WhatsApp 24h</strong>, painel KDS de cozinha, mesas e caixas ilimitados.
+                        </p>
+                      )}
+                      {novoPlanoSelecionado === 'pro' && (
+                        <p className="text-[11px] text-slate-300">
+                          🍽️ <strong>Operação Completa:</strong> Desbloqueia o <strong>Painel de Cozinha (KDS)</strong> e controle de até 30 mesas com 5 caixas simultâneos.
+                        </p>
+                      )}
+                      {novoPlanoSelecionado === 'starter' && (
+                        <p className="text-[11px] text-slate-300">
+                          📦 <strong>Plano Essencial:</strong> Adequado para operações simples de balcão (sem KDS e sem automação de WhatsApp).
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Botões de Ação */}
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalMigrarLoja(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>Confirmar Migração de Plano</span>
                 </button>
               </div>
             </form>
