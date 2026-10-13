@@ -98,6 +98,41 @@ class AudioManager {
       // Silencioso
     }
   }
+
+  // Alerta sonoro duplo característico de chamada de WhatsApp / Transbordo Humano
+  tocarAlertaTransbordo() {
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return;
+
+      const agora = ctx.currentTime;
+      // Tom 1 (Ding)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(880, agora);
+      gain1.gain.setValueAtTime(0.18, agora);
+      gain1.gain.exponentialRampToValueAtTime(0.001, agora + 0.35);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(agora);
+      osc1.stop(agora + 0.35);
+
+      // Tom 2 (Dong - mais agudo)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1320, agora + 0.14);
+      gain2.gain.setValueAtTime(0.22, agora + 0.14);
+      gain2.gain.exponentialRampToValueAtTime(0.001, agora + 0.65);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(agora + 0.14);
+      osc2.stop(agora + 0.65);
+    } catch {
+      // Silencioso
+    }
+  }
 }
 
 export const audio = new AudioManager();

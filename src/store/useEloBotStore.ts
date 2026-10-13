@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Produto } from '../types';
+import { tocarAlertaTransbordo } from '../utils/audioAlert';
 
 export interface MensagemWhatsApp {
   id: string;
@@ -92,6 +93,8 @@ interface EloBotState {
   removerConversa: (tenantId: string, conversaId: string) => void;
   marcarComoLida: (tenantId: string, conversaId: string) => void;
   notificarStatusPedidoWhatsApp: (tenantId: string, telefone: string, clienteNome: string, numeroPedido: number, novoStatus: string) => void;
+  dispararCampanhaPromocional: (tenantId: string, clientes: Array<{ nome: string; telefone: string }>, mensagem: string, cupom?: string) => void;
+  getTotalTransbordosPendentes: (tenantId: string) => number;
 }
 
 const CONFIG_PADRAO: ConfigEloBot = {
@@ -634,6 +637,11 @@ export const useEloBotStore = create<EloBotState>()(
             respostaBot = `Com certeza, ${conversaAtual?.clienteNome || 'amigo(a)'}! Estou transferindo o seu atendimento agora mesmo para a nossa equipe humana da loja. 👤🔔 Por favor, aguarde só um instante que um atendente irá te responder por aqui!`;
             tipoResposta = 'aviso';
             transbordo = true;
+            try {
+              tocarAlertaTransbordo();
+            } catch (e) {
+              console.warn(e);
+            }
           }
           // 2. Consulta de Cardápio / Preço / Opções
           else if (
@@ -800,6 +808,60 @@ export const useEloBotStore = create<EloBotState>()(
             };
           });
         }, 800);
+      },
+
+      dispararCampanhaPromocional: (tenantId: string, clientes: Array<{ nome: string; telefone: string }>, mensagem: string, cupom?: string) => {
+        const horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        set((state) => {
+          let lista = [...(state.conversasPorTenant[tenantId] || [])];
+          for (const cli of clientes) {
+            const limpo = cli.telefone.replace(/\D/g, '');
+            const textoPersonalizado = mensagem
+              .replace(/\{nome\}/g, cli.nome.split(' ')[0])
+              .replace(/\{cupom\}/g, cupom || 'ELOPROMO10');
+
+            const novaMsg: MensagemWhatsApp = {
+              id: `msg-camp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              remetente: 'bot',
+              texto: textoPersonalizado,
+              hora: horaAtual,
+              statusEnvio: 'entregue',
+              tipo: 'texto',
+            };
+
+            const idx = lista.findIndex((c) => c.clienteTelefone.replace(/\D/g, '') === limpo);
+            if (idx >= 0) {
+              lista[idx] = {
+                ...lista[idx],
+                ultimaMensagem: textoPersonalizado,
+                ultimaHora: horaAtual,
+                mensagens: [...lista[idx].mensagens, novaMsg],
+              };
+            } else {
+              lista.unshift({
+                id: `conv-camp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                clienteNome: cli.nome,
+                clienteTelefone: cli.telefone,
+                status: 'ia',
+                ultimaMensagem: textoPersonalizado,
+                ultimaHora: horaAtual,
+                naoLidas: 0,
+                mensagens: [novaMsg],
+              });
+            }
+          }
+          return {
+            conversasPorTenant: {
+              ...state.conversasPorTenant,
+              [tenantId]: lista,
+            },
+          };
+        });
+      },
+
+      getTotalTransbordosPendentes: (tenantId: string) => {
+        const conversas = get().conversasPorTenant[tenantId] || [];
+        return conversas.filter((c) => c.status === 'humano').length;
       },
     }),
     {

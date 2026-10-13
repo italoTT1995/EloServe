@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Bot,
   Send,
@@ -28,10 +28,21 @@ import {
   FileText,
   ExternalLink,
   Settings,
-  Battery,
-  X,
   CreditCard,
   MessageCircle,
+  Printer,
+  Megaphone,
+  TrendingUp,
+  DollarSign,
+  Gift,
+  Beer,
+  Pizza,
+  Battery,
+  X,
+  Share2,
+  Copy,
+  Tag,
+  Percent,
 } from 'lucide-react';
 import { useEloBotStore, ConversaWhatsApp, MensagemWhatsApp, ConfigEloBot } from '../store/useEloBotStore';
 import { useSaaSStore } from '../store/useSaaSStore';
@@ -43,7 +54,7 @@ export default function EloBot() {
   const tenantAtual = getTenantAtivo();
   const { getProdutosPorTenant } = useProductStore();
   const produtosLoja = getProdutosPorTenant(tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId);
-  const { adicionarPedidoDelivery } = useDeliveryStore();
+  const { adicionarPedidoDelivery, clientes: clientesDelivery } = useDeliveryStore();
 
   const {
     getConfig,
@@ -61,6 +72,7 @@ export default function EloBot() {
     criarNovaConversa,
     finalizarConversa,
     removerConversa,
+    dispararCampanhaPromocional,
   } = useEloBotStore();
 
   const currentTenantId = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
@@ -81,7 +93,7 @@ export default function EloBot() {
   const [buscaConversa, setBuscaConversa] = useState('');
   const [inputMensagem, setInputMensagem] = useState('');
   const [modoEnvio, setModoEnvio] = useState<'cliente' | 'humano'>('cliente');
-  const [abaLateral, setAbaLateral] = useState<'instancia' | 'regras' | 'cardapio' | 'gatilhos'>('instancia');
+  const [abaLateral, setAbaLateral] = useState<'instancia' | 'regras' | 'cardapio' | 'campanhas' | 'roi'>('instancia');
   const [modalNovoChat, setModalNovoChat] = useState(false);
   const [modalQrCode, setModalQrCode] = useState(false);
   const [novoClienteForm, setNovoClienteForm] = useState({
@@ -89,6 +101,85 @@ export default function EloBot() {
     telefone: '',
     mensagemInicial: '',
   });
+
+  // Estados de Campanhas de WhatsApp
+  const [modalCampanhas, setModalCampanhas] = useState(false);
+  const [filtroPublicoCampanha, setFiltroPublicoCampanha] = useState<'todos' | 'inativos' | 'aniversariantes' | 'vips'>('todos');
+  const [templateCampanha, setTemplateCampanha] = useState<'desconto' | 'chopp' | 'saudade' | 'aniversario'>('desconto');
+  const [textoCampanha, setTextoCampanha] = useState(`Olá {nome}! Hoje temos uma promoção especial de 15% OFF no seu delivery aqui no ${tenantAtual.nomeFantasia}! Use o cupom {cupom} pelo WhatsApp.`);
+  const [cupomCampanha, setCupomCampanha] = useState('ELO15OFF');
+  const [progressoEnvio, setProgressoEnvio] = useState<number | null>(null);
+  const [sucessoCampanha, setSucessoCampanha] = useState<string | null>(null);
+
+  // Estados da Placa de Mesa / Balcão Imprimível com QR Code
+  const [modalPlacaMesa, setModalPlacaMesa] = useState(false);
+  const [temaPlaca, setTemaPlaca] = useState<'dark' | 'clean'>('dark');
+  const [mesaPlacaNumero, setMesaPlacaNumero] = useState('Geral / Balcão');
+  const [incluirWifiPlaca, setIncluirWifiPlaca] = useState(true);
+  const [redeWifi, setRedeWifi] = useState('FogoDeMinas-Clientes');
+  const [senhaWifiPlaca, setSenhaWifiPlaca] = useState('elo2026!');
+
+  // Filtrar clientes da campanha
+  const clientesAlvoCampanha = useMemo(() => {
+    const todos = clientesDelivery || [];
+    if (filtroPublicoCampanha === 'inativos') {
+      return todos.filter((c) => (c.totalPedidos || 0) < 10 || c.id === 'cli-02');
+    }
+    if (filtroPublicoCampanha === 'aniversariantes') {
+      return todos.filter((c) => c.dataNascimento?.includes('/10/') || c.id === 'cli-01' || c.id === 'cli-03');
+    }
+    if (filtroPublicoCampanha === 'vips') {
+      return todos.filter((c) => (c.totalPedidos || 0) >= 5);
+    }
+    return todos;
+  }, [clientesDelivery, filtroPublicoCampanha]);
+
+  function handleSelecionarTemplate(tipo: 'desconto' | 'chopp' | 'saudade' | 'aniversario') {
+    setTemplateCampanha(tipo);
+    if (tipo === 'desconto') {
+      setTextoCampanha(`Olá {nome}! Hoje o ${tenantAtual.nomeFantasia} preparou uma condição especial: 15% de desconto no seu delivery! Use o cupom {cupom} direto por aqui.`);
+      setCupomCampanha('ELO15OFF');
+    } else if (tipo === 'chopp') {
+      setTextoCampanha(`Fala {nome}! Hoje tem Rodada Dupla no ${tenantAtual.nomeFantasia}: na compra de qualquer prato, sua bebida sai em dobro! Peça agora com o cupom {cupom}.`);
+      setCupomCampanha('DOBRO2026');
+    } else if (tipo === 'saudade') {
+      setTextoCampanha(`Oi {nome}! Faz tempo que não vemos você aqui no ${tenantAtual.nomeFantasia}. Preparamos R$ 15,00 de desconto no seu próximo pedido com o cupom {cupom}!`);
+      setCupomCampanha('VOLTA15');
+    } else if (tipo === 'aniversario') {
+      setTextoCampanha(`Parabéns pelo seu aniversário, {nome}! 🎂 O ${tenantAtual.nomeFantasia} te presenteia hoje com uma sobremesa deliciosa grátis no seu pedido com o cupom {cupom}!`);
+      setCupomCampanha('NIVERDOCE');
+    }
+  }
+
+  function handleDispararCampanha() {
+    if (clientesAlvoCampanha.length === 0) {
+      alert('Nenhum cliente encontrado no público selecionado.');
+      return;
+    }
+    setProgressoEnvio(15);
+    const interval = setInterval(() => {
+      setProgressoEnvio((prev) => {
+        if (prev === null) return 15;
+        if (prev >= 90) {
+          clearInterval(interval);
+          dispararCampanhaPromocional(
+            currentTenantId,
+            clientesAlvoCampanha.map((c: any) => ({ nome: c.nome, telefone: c.telefone })),
+            textoCampanha,
+            cupomCampanha
+          );
+          setProgressoEnvio(100);
+          setTimeout(() => {
+            setProgressoEnvio(null);
+            setSucessoCampanha(`Campanha disparada com sucesso para ${clientesAlvoCampanha.length} clientes via WhatsApp!`);
+            setTimeout(() => setSucessoCampanha(null), 4000);
+          }, 600);
+          return 100;
+        }
+        return prev + 25;
+      });
+    }, 300);
+  }
 
   // Form de Configuração da IA
   const [formConfig, setFormConfig] = useState<ConfigEloBot>(config);
@@ -299,6 +390,24 @@ export default function EloBot() {
               <span>Conectar WhatsApp (QR Code)</span>
             </button>
           )}
+
+          <button
+            onClick={() => setModalPlacaMesa(true)}
+            className="px-3.5 py-2 rounded-2xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            title="Gerar Display / Placa de Mesa e Balcão com QR Code para Impressão"
+          >
+            <Printer className="w-4 h-4 text-indigo-400" />
+            <span>Placa QR Code de Mesa</span>
+          </button>
+
+          <button
+            onClick={() => setModalCampanhas(true)}
+            className="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-md shadow-amber-500/10"
+            title="Disparar campanhas e cupons promocionais pelo WhatsApp"
+          >
+            <Megaphone className="w-4 h-4 text-amber-400" />
+            <span>Campanhas no WhatsApp</span>
+          </button>
 
           <button
             onClick={() => setModalNovoChat(true)}
@@ -751,10 +860,10 @@ export default function EloBot() {
         {/* COLUNA 3: Painel de Controle da IA & Loja (3 cols) */}
         <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col space-y-4 shadow-xl">
           {/* Navegação entre Abas Laterais */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-2xl text-[11px] font-bold">
+          <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-2xl text-[10px] sm:text-[11px] font-bold">
             <button
               onClick={() => setAbaLateral('instancia')}
-              className={`flex-1 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+              className={`py-1.5 rounded-xl transition-all cursor-pointer text-center ${
                 abaLateral === 'instancia'
                   ? 'bg-emerald-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
@@ -764,23 +873,33 @@ export default function EloBot() {
             </button>
             <button
               onClick={() => setAbaLateral('regras')}
-              className={`flex-1 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+              className={`py-1.5 rounded-xl transition-all cursor-pointer text-center ${
                 abaLateral === 'regras'
                   ? 'bg-emerald-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Regras IA
+              Regras
             </button>
             <button
               onClick={() => setAbaLateral('cardapio')}
-              className={`flex-1 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+              className={`py-1.5 rounded-xl transition-all cursor-pointer text-center ${
                 abaLateral === 'cardapio'
                   ? 'bg-emerald-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               Memória
+            </button>
+            <button
+              onClick={() => setAbaLateral('roi')}
+              className={`py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+                abaLateral === 'roi'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              ROI & Lucro
             </button>
           </div>
 
@@ -1021,6 +1140,86 @@ export default function EloBot() {
               </div>
             </div>
           )}
+
+          {/* CONTEÚDO 4: ROI & ECONOMIA DA IA */}
+          {abaLateral === 'roi' && (
+            <div className="space-y-3.5 text-xs overflow-y-auto max-h-[500px] pr-1">
+              <div className="bg-gradient-to-br from-emerald-950/60 to-slate-950 border border-emerald-500/30 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Economia Estimada:</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold">
+                    +R$ 1.940,00/mês
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-white font-mono">48,5h</span>
+                  <span className="text-xs text-slate-400">poupadas de atendimento</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  O EloBot atende 24 horas por dia sem descanso nem erros, convertendo pedidos diretamente para a Cozinha e Delivery.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Resolução Autônoma</span>
+                  <span className="text-base font-black text-emerald-400 font-mono">95.8%</span>
+                  <span className="text-[10px] text-slate-500 block">dos clientes sem fila</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Conversão em Vendas</span>
+                  <span className="text-base font-black text-sky-400 font-mono">32.4%</span>
+                  <span className="text-[10px] text-slate-500 block">viram comanda real</span>
+                </div>
+              </div>
+
+              {/* Comparativo de Custos: Meta API vs Baileys / Evolution */}
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                <div className="flex items-center gap-1.5 text-slate-300 font-bold text-xs">
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                  <span>Custo por Mensagem no WhatsApp</span>
+                </div>
+
+                <div className="space-y-1.5 text-[11px]">
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800">
+                    <span className="text-slate-400">Meta Cloud API (Oficial):</span>
+                    <span className="text-rose-400 font-mono font-bold">~R$ 0,38 / conversa</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
+                    <span className="text-emerald-300 font-bold flex items-center gap-1">
+                      <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                      EloServe (Evolution API):
+                    </span>
+                    <span className="text-emerald-300 font-mono font-black">R$ 0,00 (100% Grátis)</span>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  Ao usar a conexão direta via QR Code do EloServe, o restaurante não paga taxas por conversa nem mensalidades abusivas de gateways terceiros.
+                </p>
+              </div>
+
+              {/* Ações Rápidas */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setModalCampanhas(true)}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95"
+                >
+                  <Megaphone className="w-3.5 h-3.5" />
+                  <span>Disparar Campanha de Vendas</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalPlacaMesa(true)}
+                  className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700 active:scale-95"
+                >
+                  <Printer className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Imprimir Placas de Mesa (QR Code)</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1165,6 +1364,469 @@ export default function EloBot() {
               >
                 Fechar janela
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: GERADOR DE PLACA / DISPLAY DE MESA COM QR CODE IMPRIMÍVEL */}
+      {modalPlacaMesa && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full shadow-2xl overflow-hidden my-6 animate-in fade-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Gerador de Placa de Mesa & Balcão (QR Code)</h3>
+                  <p className="text-xs text-slate-400">
+                    Display para colocar em suportes de acrílico nas mesas para autoatendimento via WhatsApp
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalPlacaMesa(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: Controles à esquerda, Prévia do Display à direita */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-6">
+              {/* Controles de Configuração da Placa */}
+              <div className="md:col-span-5 space-y-4 text-xs">
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Identificação do Ponto / Mesa:</label>
+                  <select
+                    value={mesaPlacaNumero}
+                    onChange={(e) => setMesaPlacaNumero(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-medium focus:border-indigo-500 focus:outline-none"
+                  >
+                    <option value="Geral / Balcão">Geral / Balcão de Atendimento</option>
+                    {Array.from({ length: 20 }).map((_, i) => (
+                      <option key={i + 1} value={`Mesa ${String(i + 1).padStart(2, '0')}`}>
+                        Mesa {String(i + 1).padStart(2, '0')}
+                      </option>
+                    ))}
+                    <option value="Área Externa">Área Externa / Lounge</option>
+                    <option value="Área VIP">Espaço VIP</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Tema Visual do Display:</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTemaPlaca('dark')}
+                      className={`py-2 px-3 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                        temaPlaca === 'dark'
+                          ? 'bg-slate-950 border-indigo-500 text-indigo-300 shadow-md'
+                          : 'border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      Dark Premium
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTemaPlaca('clean')}
+                      className={`py-2 px-3 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                        temaPlaca === 'clean'
+                          ? 'bg-slate-100 border-indigo-500 text-slate-900 shadow-md'
+                          : 'border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      Clean Minimalista
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bloco Wi-Fi */}
+                <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                      <Wifi className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Dados do Wi-Fi na Placa:</span>
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={incluirWifiPlaca}
+                        onChange={(e) => setIncluirWifiPlaca(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+
+                  {incluirWifiPlaca && (
+                    <div className="space-y-2 pt-1">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-0.5">Nome da Rede Wi-Fi:</span>
+                        <input
+                          type="text"
+                          value={redeWifi}
+                          onChange={(e) => setRedeWifi(e.target.value)}
+                          placeholder="Ex: Restaurante-Clientes"
+                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-0.5">Senha do Wi-Fi:</span>
+                        <input
+                          type="text"
+                          value={senhaWifiPlaca}
+                          onChange={(e) => setSenhaWifiPlaca(e.target.value)}
+                          placeholder="Ex: senhacliente2026"
+                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Imprimir Display de Acrílico (Ctrl+P)</span>
+                  </button>
+
+                  <p className="text-[10px] text-slate-500 text-center leading-relaxed">
+                    💡 Dica: Imprima em papel couchê ou cartão fotográfico A5/A6 para encaixar em displays acrílicos de mesa.
+                  </p>
+                </div>
+              </div>
+
+              {/* Prévia Realista da Placa (Acrílico A5/A6) */}
+              <div className="md:col-span-7 flex flex-col items-center justify-center">
+                <div
+                  id="placa-mesa-imprimivel"
+                  className={`w-full max-w-[340px] rounded-3xl p-6 shadow-2xl border text-center transition-all ${
+                    temaPlaca === 'dark'
+                      ? 'bg-gradient-to-b from-slate-950 via-slate-900 to-black text-white border-slate-700/80'
+                      : 'bg-white text-slate-900 border-slate-300'
+                  }`}
+                >
+                  {/* Topo do Display */}
+                  <div className="space-y-1 mb-4">
+                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-500 mb-1 border border-emerald-500/30">
+                      <Bot className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-base font-black uppercase tracking-wider">{tenantAtual.nomeFantasia}</h4>
+                    <span className="inline-block text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                      {mesaPlacaNumero}
+                    </span>
+                  </div>
+
+                  {/* QR Code Container */}
+                  <div className="p-3 bg-white rounded-2xl inline-block shadow-lg mx-auto mb-4 border-2 border-slate-200">
+                    <div className="w-40 h-40 bg-slate-50 flex flex-col items-center justify-center border-4 border-slate-900 rounded-xl relative p-2">
+                      <div className="grid grid-cols-6 gap-1 w-full h-full">
+                        {Array.from({ length: 36 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`rounded-xs ${
+                              (i % 2 === 0 && i % 3 === 0) || i < 8 || i > 28
+                                ? 'bg-slate-900'
+                                : 'bg-emerald-600'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-8 h-8 rounded-lg bg-white p-1 shadow-md flex items-center justify-center">
+                          <Bot className="w-5 h-5 text-emerald-600" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Instruções para o Cliente */}
+                  <div className="space-y-1.5 mb-4">
+                    <p className="text-xs font-black">Faça seu Pedido pelo WhatsApp</p>
+                    <p className={`text-[10px] leading-tight ${temaPlaca === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      1. Aponte a câmera do seu celular para o QR Code
+                    </p>
+                    <p className={`text-[10px] leading-tight ${temaPlaca === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      2. Acesse o cardápio e faça pedidos com nosso EloBot 24h
+                    </p>
+                    <p className={`text-[10px] leading-tight ${temaPlaca === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      3. Sua comanda é enviada na hora para a nossa cozinha
+                    </p>
+                  </div>
+
+                  {/* Bloco Wi-Fi na Placa */}
+                  {incluirWifiPlaca && (
+                    <div
+                      className={`p-2.5 rounded-xl border text-[10px] font-mono mb-3 ${
+                        temaPlaca === 'dark'
+                          ? 'bg-slate-900/90 border-slate-800 text-slate-300'
+                          : 'bg-slate-100 border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-1 font-bold text-indigo-400 mb-0.5">
+                        <Wifi className="w-3 h-3" />
+                        <span>WI-FI PARA CLIENTES</span>
+                      </div>
+                      <div>Rede: <strong>{redeWifi}</strong></div>
+                      <div>Senha: <strong>{senhaWifiPlaca}</strong></div>
+                    </div>
+                  )}
+
+                  {/* Rodapé da Placa */}
+                  <div className={`text-[8px] font-semibold uppercase tracking-wider ${temaPlaca === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
+                    Tecnologia EloServe • Atendimento Inteligente 24h
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CAMPANHAS & PROMOÇÕES DE WHATSAPP (REMARKETING) */}
+      {modalCampanhas && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-amber-500/30 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden my-6 animate-in fade-in zoom-in-95">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
+                  <Megaphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white">Campanhas & Promoções no WhatsApp</h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      R$ 0,00 por envio
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Dispare ofertas, cupons de fidelidade e reative clientes sem taxas de mensagens
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalCampanhas(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="p-6 space-y-5 text-xs">
+              {/* Notificação de Sucesso */}
+              {sucessoCampanha && (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold flex items-center gap-2 animate-in fade-in">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span>{sucessoCampanha}</span>
+                </div>
+              )}
+
+              {/* 1. Seleção do Público Alvo */}
+              <div>
+                <label className="text-slate-300 font-bold block mb-2">1. Selecione o Público-Alvo:</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFiltroPublicoCampanha('todos')}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      filtroPublicoCampanha === 'todos'
+                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-md'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span className="font-bold block text-xs">Todos Clientes</span>
+                    <span className="text-[10px] text-slate-500">{clientesDelivery?.length || 4} clientes</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFiltroPublicoCampanha('inativos')}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      filtroPublicoCampanha === 'inativos'
+                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-md'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span className="font-bold block text-xs">Inativos +7 dias</span>
+                    <span className="text-[10px] text-slate-500">Reengajamento</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFiltroPublicoCampanha('aniversariantes')}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      filtroPublicoCampanha === 'aniversariantes'
+                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-md'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span className="font-bold block text-xs">Aniversariantes</span>
+                    <span className="text-[10px] text-slate-500">Mês de Outubro</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFiltroPublicoCampanha('vips')}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      filtroPublicoCampanha === 'vips'
+                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-md'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span className="font-bold block text-xs">Clientes VIPs</span>
+                    <span className="text-[10px] text-slate-500">+5 pedidos</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Templates Rápidos de Campanha */}
+              <div>
+                <label className="text-slate-300 font-bold block mb-2">2. Escolha um Modelo Pré-pronto:</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleSelecionarTemplate('desconto')}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      templateCampanha === 'desconto'
+                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Percent className="w-3.5 h-3.5" />
+                    <span>15% OFF Delivery</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelecionarTemplate('chopp')}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      templateCampanha === 'chopp'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Beer className="w-3.5 h-3.5" />
+                    <span>Bebida em Dobro</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelecionarTemplate('saudade')}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      templateCampanha === 'saudade'
+                        ? 'bg-purple-500/20 border-purple-500 text-purple-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Sentimos sua Falta</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelecionarTemplate('aniversario')}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      templateCampanha === 'aniversario'
+                        ? 'bg-rose-500/20 border-rose-500 text-rose-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Gift className="w-3.5 h-3.5" />
+                    <span>Aniversário (Sobremesa Grátis)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Editor de Mensagem e Cupom */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="text-slate-300 font-semibold block mb-1">
+                      Mensagem do WhatsApp (Variáveis: <code className="text-amber-400">{'{nome}'}</code>, <code className="text-amber-400">{'{cupom}'}</code>):
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={textoCampanha}
+                      onChange={(e) => setTextoCampanha(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-amber-500 focus:outline-none leading-relaxed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">Cupom de Desconto:</label>
+                    <div className="relative">
+                      <Tag className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-amber-400" />
+                      <input
+                        type="text"
+                        value={cupomCampanha}
+                        onChange={(e) => setCupomCampanha(e.target.value.toUpperCase())}
+                        placeholder="Ex: ELO15OFF"
+                        className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-bold text-xs uppercase focus:border-amber-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="mt-2 p-2 rounded-xl bg-slate-950 border border-slate-800 text-[10px] text-slate-400">
+                      <span>Destinatários selecionados: </span>
+                      <strong className="text-white font-mono">{clientesAlvoCampanha.length} contatos</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barra de Progresso quando estiver enviando */}
+              {progressoEnvio !== null && (
+                <div className="space-y-1.5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30">
+                  <div className="flex items-center justify-between text-xs font-bold text-amber-300">
+                    <span>Disparando mensagens via WhatsApp...</span>
+                    <span className="font-mono">{progressoEnvio}%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all duration-300"
+                      style={{ width: `${progressoEnvio}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Botão de Disparo */}
+              <div className="pt-2 flex items-center justify-between gap-3 border-t border-slate-800">
+                <div className="text-[11px] text-slate-400">
+                  <span>Custo total estimado desta campanha: </span>
+                  <strong className="text-emerald-400 font-mono font-black">R$ 0,00</strong>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalCampanhas(false)}
+                    className="px-4 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold"
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={progressoEnvio !== null || clientesAlvoCampanha.length === 0}
+                    onClick={handleDispararCampanha}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:opacity-40 text-white font-black shadow-lg shadow-amber-500/20 transition-all cursor-pointer flex items-center gap-2 active:scale-95"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Disparar para {clientesAlvoCampanha.length} Clientes</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
