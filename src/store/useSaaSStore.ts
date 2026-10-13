@@ -176,6 +176,13 @@ interface SaaSState {
   getTotalAtivos: () => number;
   getTotalTrials: () => number;
   getTotalAtrasados: () => number;
+  codigoSegurancaMaster: string;
+  masterDesbloqueado: boolean;
+  tentativasFalhasMaster: number;
+  bloqueadoAte: number | null;
+  desbloquearMaster: (codigo: string) => { sucesso: boolean; mensagem?: string };
+  bloquearMaster: () => void;
+  alterarCodigoMaster: (codigoAtual: string, novoCodigo: string) => { sucesso: boolean; mensagem?: string };
 }
 
 export const TENANT_GLOBAL: TenantRestaurante = {
@@ -360,6 +367,10 @@ export const useSaaSStore = create<SaaSState>()(
       custosInfra: CUSTOS_INFRA_PADRAO,
       avisos: AVISOS_INICIAIS,
       logsAuditoria: LOGS_INICIAIS,
+      codigoSegurancaMaster: '889900',
+      masterDesbloqueado: false,
+      tentativasFalhasMaster: 0,
+      bloqueadoAte: null,
 
       setAbaAtivaMaster: (aba) => set({ abaAtivaMaster: aba }),
       setTenantEmEdicaoId: (id) => set({ tenantEmEdicaoId: id }),
@@ -515,9 +526,64 @@ export const useSaaSStore = create<SaaSState>()(
           (a) => a.ativo && (a.destinoTenantId === 'todos' || a.destinoTenantId === tenantId)
         );
       },
+
+      desbloquearMaster: (codigo: string) => {
+        const state = get();
+        const agora = Date.now();
+        if (state.bloqueadoAte && agora < state.bloqueadoAte) {
+          const segs = Math.ceil((state.bloqueadoAte - agora) / 1000);
+          return { sucesso: false, mensagem: `Cofre bloqueado por segurança. Aguarde ${segs} segundos.` };
+        }
+
+        if (codigo === state.codigoSegurancaMaster) {
+          set({
+            masterDesbloqueado: true,
+            tentativasFalhasMaster: 0,
+            bloqueadoAte: null,
+          });
+          get().registrarLogAuditoria('Desbloqueio do Painel Master', 'seguranca', 'Painel executivo SaaS Master autenticado e desbloqueado com sucesso.');
+          return { sucesso: true };
+        }
+
+        const falhas = state.tentativasFalhasMaster + 1;
+        let novoBloqueio = null;
+        let msg = `Código Master incorreto (${falhas}/3 tentativas).`;
+        if (falhas >= 3) {
+          novoBloqueio = agora + 30 * 1000;
+          msg = '3 tentativas incorretas atingidas. Cofre bloqueado temporariamente por 30 segundos.';
+        }
+        set({
+          tentativasFalhasMaster: falhas,
+          bloqueadoAte: novoBloqueio,
+        });
+        get().registrarLogAuditoria('Falha de Desbloqueio Master', 'seguranca', `Tentativa de acesso com código incorreto (${falhas}ª tentativa).`);
+        return { sucesso: false, mensagem: msg };
+      },
+
+      bloquearMaster: () => {
+        set({ masterDesbloqueado: false });
+        get().registrarLogAuditoria('Bloqueio do Painel Master', 'seguranca', 'O painel SaaS Master foi bloqueado pelo Super Admin.');
+      },
+
+      alterarCodigoMaster: (codigoAtual: string, novoCodigo: string) => {
+        const state = get();
+        if (codigoAtual !== state.codigoSegurancaMaster) {
+          return { sucesso: false, mensagem: 'O código atual informado está incorreto.' };
+        }
+        if (!novoCodigo || novoCodigo.length < 4 || novoCodigo.length > 8) {
+          return { sucesso: false, mensagem: 'O novo código deve conter entre 4 e 8 dígitos numéricos.' };
+        }
+        set({ codigoSegurancaMaster: novoCodigo });
+        get().registrarLogAuditoria('Alteração de Código Master', 'seguranca', 'O Código de Segurança Master foi alterado pelo Super Admin.');
+        return { sucesso: true, mensagem: 'Código de Segurança Master alterado com sucesso!' };
+      },
     }),
     {
-      name: 'eloserve_saas_store_v4',
+      name: 'eloserve_saas_store_v5',
+      partialize: (state) => {
+        const { masterDesbloqueado, tentativasFalhasMaster, bloqueadoAte, ...rest } = state;
+        return rest;
+      },
     }
   )
 );
