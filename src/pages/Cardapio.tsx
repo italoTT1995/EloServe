@@ -21,6 +21,10 @@ import {
   CheckCircle2,
   Circle,
   HelpCircle,
+  GripVertical,
+  ChevronLeft,
+  ChevronRight,
+  Move,
 } from 'lucide-react';
 import { useProductStore } from '../store/useProductStore';
 import { useSaaSStore } from '../store/useSaaSStore';
@@ -129,6 +133,99 @@ export default function Cardapio() {
 
   // Modal Prévia Cardápio Digital
   const [modalDigitalAberto, setModalDigitalAberto] = useState(false);
+
+  // Referência do Quadro Horizontal para Arrastar com o Mouse (Drag-to-Scroll)
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeftState, setScrollLeftState] = useState(0);
+  const [arrastandoScroll, setArrastandoScroll] = useState(false);
+
+  // Drag and Drop de pratos entre categorias (Arrastar e Soltar)
+  const [produtoArrastandoId, setProdutoArrastandoId] = useState<string | null>(null);
+  const [colunaHoverId, setColunaHoverId] = useState<string | null>(null);
+
+  // 1. Drag-to-Scroll (Arrastar com o mouse para navegar pelas colunas horizontais)
+  function handleMouseDownBoard(e: React.MouseEvent) {
+    if (e.button !== 0) return; // Apenas botão esquerdo
+    const target = e.target as HTMLElement;
+    // Se clicou em botão, input, menu, link ou num card arrastável, não inicia scroll de tela
+    if (target.closest('button, input, select, textarea, a, [data-drag-handle="true"]')) {
+      return;
+    }
+    if (!boardRef.current) return;
+    setIsMouseDown(true);
+    setArrastandoScroll(false);
+    setStartX(e.pageX - boardRef.current.offsetLeft);
+    setScrollLeftState(boardRef.current.scrollLeft);
+  }
+
+  function handleMouseMoveBoard(e: React.MouseEvent) {
+    if (!isMouseDown || !boardRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - boardRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    if (Math.abs(x - startX) > 5) {
+      setArrastandoScroll(true);
+    }
+    boardRef.current.scrollLeft = scrollLeftState - walk;
+  }
+
+  function handleMouseUpBoard() {
+    setIsMouseDown(false);
+    setTimeout(() => setArrastandoScroll(false), 50);
+  }
+
+  function rolarBoard(direcao: 'esq' | 'dir') {
+    if (!boardRef.current) return;
+    boardRef.current.scrollBy({
+      left: direcao === 'esq' ? -340 : 340,
+      behavior: 'smooth',
+    });
+  }
+
+  // 2. Drag-and-Drop de Cards entre Categorias (Arrastar e Soltar)
+  function handleDragStartCard(e: React.DragEvent, id: string) {
+    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.effectAllowed = 'move';
+    setProdutoArrastandoId(id);
+  }
+
+  function handleDragEndCard() {
+    setProdutoArrastandoId(null);
+    setColunaHoverId(null);
+  }
+
+  function handleDragOverColuna(e: React.DragEvent, catId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (colunaHoverId !== catId) {
+      setColunaHoverId(catId);
+    }
+  }
+
+  function handleDragLeaveColuna(catId: string) {
+    if (colunaHoverId === catId) {
+      setColunaHoverId(null);
+    }
+  }
+
+  function handleDropColuna(e: React.DragEvent, targetCatId: string) {
+    e.preventDefault();
+    const prodId = e.dataTransfer.getData('text/plain') || produtoArrastandoId;
+    if (prodId) {
+      const prod = produtos.find((p) => p.id === prodId);
+      const catDestino = categorias.find((c) => c.id === targetCatId);
+      if (prod && catDestino) {
+        if (prod.categoriaId !== targetCatId) {
+          editarProduto(prodId, { categoriaId: targetCatId }, idLoja);
+          exibirToast(`"${prod.nome}" movido para "${catDestino.nome}"!`);
+        }
+      }
+    }
+    setProdutoArrastandoId(null);
+    setColunaHoverId(null);
+  }
 
   // Toast Helper
   function exibirToast(msg: string) {
@@ -553,21 +650,80 @@ export default function Cardapio() {
         )}
       </div>
 
-      {/* ÁREA PRINCIPAL: COLUNAS CATEGORIZADAS (KANBAN HORIZONTAL - Modelo Exato do Print) */}
-      <div className="overflow-x-auto pb-6 scrollbar-thin">
-        <div className="flex gap-4 min-w-max">
+      {/* BARRA DE DICA DE ARRASTE + CONTROLES DE ROLAGEM */}
+      <div className="flex items-center justify-between px-1 text-xs">
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-semibold border ${
+            isWhite ? 'bg-orange-50 text-orange-950 border-orange-200' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+          }`}>
+            <Move className="w-3.5 h-3.5 text-orange-500" />
+            <span>Arraste com o mouse para navegar ou arraste os pratos entre colunas</span>
+          </span>
+        </div>
+
+        {/* Botões Rápidos de Rolagem Lateral */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => rolarBoard('esq')}
+            className={`p-1.5 rounded-xl border transition-all cursor-pointer active:scale-95 ${
+              isWhite
+                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                : 'bg-[#141416] hover:bg-slate-800 text-slate-300 border-slate-800'
+            }`}
+            title="Rolar colunas para a esquerda (ou arraste com o mouse)"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => rolarBoard('dir')}
+            className={`p-1.5 rounded-xl border transition-all cursor-pointer active:scale-95 ${
+              isWhite
+                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                : 'bg-[#141416] hover:bg-slate-800 text-slate-300 border-slate-800'
+            }`}
+            title="Rolar colunas para a direita (ou arraste com o mouse)"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* ÁREA PRINCIPAL: COLUNAS CATEGORIZADAS (KANBAN HORIZONTAL COM ARRASTE POR MOUSE) */}
+      <div
+        ref={boardRef}
+        onMouseDown={handleMouseDownBoard}
+        onMouseMove={handleMouseMoveBoard}
+        onMouseUp={handleMouseUpBoard}
+        onMouseLeave={handleMouseUpBoard}
+        className={`overflow-x-auto pb-6 scrollbar-thin select-none transition-colors ${
+          isMouseDown ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
+      >
+        <div className="flex gap-4 min-w-max p-1">
           {(categoriaFiltro === 'todas'
             ? categorias
             : categorias.filter((c) => c.id === categoriaFiltro)
           ).map((cat) => {
             const itensDestaCategoria = produtosFiltrados.filter((p) => p.categoriaId === cat.id);
+            const isDropAlvo = colunaHoverId === cat.id;
 
             return (
               <div
                 key={cat.id}
-                className="w-80 shrink-0 flex flex-col space-y-3"
+                onDragOver={(e) => handleDragOverColuna(e, cat.id)}
+                onDragLeave={() => handleDragLeaveColuna(cat.id)}
+                onDrop={(e) => handleDropColuna(e, cat.id)}
+                className={`w-80 shrink-0 flex flex-col space-y-3 rounded-3xl p-2.5 transition-all duration-150 ${
+                  isDropAlvo
+                    ? 'bg-orange-500/10 border-2 border-dashed border-orange-500 scale-[1.01] shadow-lg shadow-orange-500/10'
+                    : isWhite
+                    ? 'bg-slate-100/60 border border-slate-200/80'
+                    : 'bg-[#141416]/50 border border-slate-800/60'
+                }`}
               >
-                {/* Cabeçalho da Coluna de Categoria: Nome + Contador (Print 1: Almoço 14, Bebidas 26...) */}
+                {/* Cabeçalho da Coluna de Categoria */}
                 <div className="flex items-center justify-between pb-1 px-1">
                   <h3 className={`font-black text-sm tracking-tight ${isWhite ? 'text-slate-900' : 'text-white'}`}>
                     {cat.nome}
@@ -579,31 +735,53 @@ export default function Cardapio() {
                   </span>
                 </div>
 
+                {/* Feedback Visual de Drop Alvo quando arrastando produto */}
+                {isDropAlvo && (
+                  <div className="p-2.5 rounded-2xl bg-orange-500 text-white font-bold text-center text-xs shadow-md animate-pulse">
+                    Solte aqui para mover para "{cat.nome}"
+                  </div>
+                )}
+
                 {/* Lista de Cards da Coluna */}
                 <div className="space-y-2.5">
                   {itensDestaCategoria.length === 0 ? (
                     <div className={`p-6 rounded-2xl border text-center text-xs ${
                       isWhite ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-[#0e0e10]/60 border-slate-800/60 text-slate-600'
                     }`}>
-                      Nenhum item cadastrado nesta categoria.
+                      Nenhum item nesta categoria. Arraste pratos para cá!
                     </div>
                   ) : (
                     itensDestaCategoria.map((prod) => {
                       const selecionado = itensSelecionados.includes(prod.id);
+                      const isSendoArrastado = produtoArrastandoId === prod.id;
 
                       return (
                         <div
                           key={prod.id}
-                          className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 text-xs relative group ${
-                            isWhite
+                          draggable={true}
+                          data-drag-handle="true"
+                          onDragStart={(e) => handleDragStartCard(e, prod.id)}
+                          onDragEnd={handleDragEndCard}
+                          className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-2.5 text-xs relative group cursor-grab active:cursor-grabbing ${
+                            isSendoArrastado
+                              ? 'opacity-35 scale-95 border-2 border-dashed border-orange-500'
+                              : isWhite
                               ? selecionado
                                 ? 'bg-orange-50 border-orange-300 shadow-sm'
-                                : 'bg-slate-50 hover:bg-slate-100/90 border-slate-200 shadow-sm'
+                                : 'bg-white hover:bg-slate-50 border-slate-200 shadow-sm'
                               : selecionado
                               ? 'bg-orange-950/20 border-orange-500/50'
                               : 'bg-[#0e0e10] border-slate-800/80 hover:border-slate-700'
                           }`}
                         >
+                          {/* 0. ÍCONE DE ARRASTE (Grip Handle) */}
+                          <div
+                            className="text-slate-400 hover:text-orange-500 cursor-grab active:cursor-grabbing shrink-0"
+                            title="Arraste este prato para outra categoria"
+                          >
+                            <GripVertical className="w-3.5 h-3.5" />
+                          </div>
+
                           {/* 1. SELEÇÃO (Círculo de Checkbox do Print) */}
                           <button
                             type="button"
