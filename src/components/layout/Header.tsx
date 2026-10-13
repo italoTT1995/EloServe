@@ -51,6 +51,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const { getTotalTransbordosPendentes } = useEloBotStore();
   const pendentesTransbordo = getTotalTransbordosPendentes(tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId);
   const { tema, alternarTema, setTema } = useThemeStore();
+  const isWhite = tema === 'light';
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -60,13 +61,17 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   }, []);
 
   return (
-    <header className="h-16 px-4 sm:px-6 bg-slate-900 border-b border-slate-800 flex items-center justify-between select-none">
+    <header className={`h-16 px-4 sm:px-6 ${
+      isWhite ? 'bg-white border-b border-slate-200' : 'bg-slate-900 border-b border-slate-800'
+    } flex items-center justify-between select-none`}>
       {/* Left: Mobile Menu Toggle & Store Switcher */}
       <div className="flex items-center gap-3">
         {/* Botão Menu Hambúrguer Mobile */}
         <button
           onClick={onToggleSidebar}
-          className="lg:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+          className={`lg:hidden p-2 rounded-xl transition-colors ${
+            isWhite ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+          }`}
           title="Abrir Menu"
         >
           <Menu className="w-5 h-5" />
@@ -77,46 +82,60 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <div className="relative">
             <button
               onClick={() => setMenuTenantAberto(!menuTenantAberto)}
-              className={`flex items-center gap-1.5 sm:gap-2.5 text-left text-xs sm:text-sm font-bold text-white transition-all px-2.5 py-1.5 rounded-xl border cursor-pointer ${
+              className={`flex items-center gap-1.5 sm:gap-2.5 text-left text-xs sm:text-sm font-bold transition-all px-2.5 py-1.5 rounded-xl border cursor-pointer ${
                 isModoGlobal
-                  ? 'bg-purple-950/40 border-purple-500/30 hover:border-purple-400'
-                  : 'bg-amber-950/40 border-amber-500/30 hover:border-amber-400'
+                  ? isWhite
+                    ? 'bg-purple-50 border-purple-200 hover:border-purple-300 text-purple-950 shadow-sm'
+                    : 'bg-purple-950/40 border-purple-500/30 hover:border-purple-400 text-white'
+                  : isWhite
+                  ? 'bg-amber-50 border-amber-300 hover:border-amber-400 text-amber-950 shadow-sm'
+                  : 'bg-amber-950/40 border-amber-500/30 hover:border-amber-400 text-white'
               }`}
             >
               {isModoGlobal ? (
                 <>
-                  <Globe className="w-4 h-4 text-purple-400 shrink-0" />
+                  <Globe className={`w-4 h-4 ${isWhite ? 'text-purple-600' : 'text-purple-400'} shrink-0`} />
                   <div className="flex flex-col text-left">
-                    <span className="truncate max-w-[130px] sm:max-w-[220px] font-extrabold text-white">
+                    <span className={`truncate max-w-[130px] sm:max-w-[220px] font-extrabold ${isWhite ? 'text-purple-950' : 'text-white'}`}>
                       EloServe SaaS (Visão Global)
                     </span>
-                    <span className="text-[9px] text-purple-400 font-normal">
+                    <span className={`text-[9px] font-medium ${isWhite ? 'text-purple-700' : 'text-purple-400'}`}>
                       {tenants.length} Restaurantes Assinantes
                     </span>
                   </div>
-                  <ChevronDown className="w-3 h-3 opacity-60 shrink-0 text-purple-300" />
-                  <span className="hidden md:inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                  <ChevronDown className={`w-3 h-3 opacity-70 shrink-0 ${isWhite ? 'text-purple-700' : 'text-purple-300'}`} />
+                  <span className={`hidden md:inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
+                    isWhite
+                      ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                      : 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                  }`}>
                     MASTER
                   </span>
                 </>
               ) : (
                 <>
-                  <Store className="w-4 h-4 text-amber-400 shrink-0" />
+                  <Store className={`w-4 h-4 ${isWhite ? 'text-amber-700' : 'text-amber-400'} shrink-0`} />
                   <div className="flex flex-col text-left">
-                    <span className="text-[9px] text-amber-400 font-bold uppercase tracking-wider">
+                    <span className={`text-[9px] font-bold uppercase tracking-wider ${isWhite ? 'text-amber-800' : 'text-amber-400'}`}>
                       Inspecionando Loja:
                     </span>
-                    <span className="truncate max-w-[130px] sm:max-w-[190px] font-extrabold text-white">
+                    <span className={`truncate max-w-[130px] sm:max-w-[190px] font-extrabold ${isWhite ? 'text-slate-900' : 'text-white'}`}>
                       {tenantAtual.nomeFantasia}
                     </span>
                   </div>
-                  <ChevronDown className="w-3 h-3 opacity-60 shrink-0 text-amber-300" />
+                  <ChevronDown className={`w-3 h-3 opacity-70 shrink-0 ${isWhite ? 'text-amber-700' : 'text-amber-300'}`} />
                   <span
                     className={`hidden md:inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
                       tenantAtual.statusAssinatura === 'ativo'
-                        ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
+                        ? isWhite
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
                         : tenantAtual.statusAssinatura === 'trial'
-                        ? 'bg-amber-950 text-amber-400 border border-amber-500/30'
+                        ? isWhite
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-amber-950 text-amber-400 border border-amber-500/30'
+                        : isWhite
+                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
                         : 'bg-rose-950 text-rose-400 border border-rose-500/30'
                     }`}
                   >
@@ -127,9 +146,13 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             </button>
 
             {menuTenantAberto && (
-              <div className="absolute left-0 mt-2 w-72 bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-2xl z-50 space-y-1.5 animate-in fade-in duration-100">
-                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
-                  <Crown className="w-3 h-3 text-purple-400" />
+              <div className={`absolute left-0 mt-2 w-72 ${
+                isWhite ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+              } border rounded-2xl p-2 shadow-2xl z-50 space-y-1.5 animate-in fade-in duration-100`}>
+                <p className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                  isWhite ? 'text-purple-800' : 'text-purple-400'
+                }`}>
+                  <Crown className="w-3 h-3" />
                   <span>Ambiente Super Admin (Dono do SaaS)</span>
                 </p>
 
@@ -142,26 +165,40 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   }}
                   className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
                     isModoGlobal
-                      ? 'bg-purple-600 text-white font-bold shadow-md shadow-purple-600/30'
+                      ? 'bg-purple-600 !text-white font-bold shadow-md shadow-purple-600/30'
+                      : isWhite
+                      ? 'text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200'
                       : 'text-purple-300 bg-purple-950/30 hover:bg-purple-900/40 border border-purple-500/20'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
-                      <Globe className="w-4 h-4 text-purple-300" />
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                      isModoGlobal
+                        ? 'bg-white/20 !text-white'
+                        : isWhite
+                        ? 'bg-purple-200 text-purple-800'
+                        : 'bg-purple-500/20 text-purple-300'
+                    }`}>
+                      <Globe className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="font-bold">EloServe SaaS (Visão Global)</p>
-                      <p className="text-[10px] opacity-80">Administração de todos os restaurantes</p>
+                      <p className={`text-[10px] ${isModoGlobal ? '!text-white/80' : isWhite ? 'text-purple-700' : 'opacity-80'}`}>
+                        Administração de todos os restaurantes
+                      </p>
                     </div>
                   </div>
-                  {isModoGlobal && <span className="text-xs font-bold">✓</span>}
+                  {isModoGlobal && <span className="text-xs font-bold !text-white">✓</span>}
                 </button>
 
-                <div className="pt-2 pb-1 border-t border-slate-800">
-                  <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <div className={`pt-2 pb-1 border-t ${isWhite ? 'border-slate-100' : 'border-slate-800'}`}>
+                  <p className={`px-3 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+                    isWhite ? 'text-slate-600' : 'text-slate-400'
+                  }`}>
                     <span>Inspecionar Loja Cliente</span>
-                    <span className="text-[9px] text-amber-400/90 font-mono">Modo Suporte</span>
+                    <span className={`text-[9px] font-mono font-bold ${
+                      isWhite ? 'text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded' : 'text-amber-400/90'
+                    }`}>Modo Suporte</span>
                   </p>
                 </div>
 
@@ -176,7 +213,11 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                       }}
                       className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
                         t.id === tenantAtivoId
-                          ? 'bg-amber-500 text-slate-950 font-bold'
+                          ? isWhite
+                            ? 'bg-amber-100 text-amber-950 font-bold border border-amber-300'
+                            : 'bg-amber-500 text-slate-950 font-bold'
+                          : isWhite
+                          ? 'text-slate-800 hover:bg-slate-100 hover:text-slate-900'
                           : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                       }`}
                     >
@@ -186,16 +227,22 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                           <span
                             className={`text-[8px] px-1.5 py-0.2 rounded font-bold uppercase ${
                               t.statusAssinatura === 'ativo'
-                                ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
+                                ? isWhite
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
                                 : t.statusAssinatura === 'trial'
-                                ? 'bg-amber-950 text-amber-300 border border-amber-500/30'
+                                ? isWhite
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  : 'bg-amber-950 text-amber-300 border border-amber-500/30'
+                                : isWhite
+                                ? 'bg-rose-100 text-rose-800 border border-rose-300'
                                 : 'bg-rose-950 text-rose-300 border border-rose-500/30'
                             }`}
                           >
                             {t.statusAssinatura}
                           </span>
                         </div>
-                        <p className="text-[10px] opacity-75 font-mono">
+                        <p className={`text-[10px] font-mono ${isWhite ? 'text-slate-500' : 'opacity-75'}`}>
                           {t.cidadeUf} • {t.planoId.toUpperCase()}
                         </p>
                       </div>
@@ -208,15 +255,21 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </div>
         ) : (
           /* Usuário de restaurante (Gerente, Caixa, Garçom, Cozinha): Vê apenas a sua loja */
-          <div className="flex items-center gap-2 text-left text-xs sm:text-sm font-bold text-white p-1">
-            <Store className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="truncate max-w-[130px] sm:max-w-[220px]">{tenantAtual.nomeFantasia}</span>
+          <div className="flex items-center gap-2 text-left text-xs sm:text-sm font-bold p-1">
+            <Store className={`w-4 h-4 ${isWhite ? 'text-emerald-700' : 'text-emerald-400'} shrink-0`} />
+            <span className={`truncate max-w-[130px] sm:max-w-[220px] ${isWhite ? 'text-slate-900 font-bold' : 'text-white'}`}>{tenantAtual.nomeFantasia}</span>
             <span
               className={`hidden md:inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
                 tenantAtual.statusAssinatura === 'ativo'
-                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
+                  ? isWhite
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
                   : tenantAtual.statusAssinatura === 'trial'
-                  ? 'bg-amber-950 text-amber-400 border border-amber-500/30'
+                  ? isWhite
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                    : 'bg-amber-950 text-amber-400 border border-amber-500/30'
+                  : isWhite
+                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
                   : 'bg-rose-950 text-rose-400 border border-rose-500/30'
               }`}
             >
@@ -230,12 +283,14 @@ export function Header({ onToggleSidebar }: HeaderProps) {
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Alternador Rápido de Visão: Painel do Dono vs Frente de Caixa */}
         {usuarioLogado?.cargo === 'admin_restaurante' && (
-          <div className="hidden md:flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+          <div className={`hidden md:flex items-center ${isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'} p-1 rounded-xl border text-xs`}>
             <Link
               to="/painel-dono"
               className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 location.pathname === '/painel-dono' || location.pathname === '/'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 !text-white shadow-sm'
+                  : isWhite
+                  ? 'text-slate-700 hover:text-slate-900'
                   : 'text-slate-400 hover:text-white'
               }`}
               title="Abrir Painel de Gestão do Dono"
@@ -247,7 +302,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               to="/pdv"
               className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 location.pathname === '/pdv'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 !text-white shadow-sm'
+                  : isWhite
+                  ? 'text-slate-700 hover:text-slate-900'
                   : 'text-slate-400 hover:text-white'
               }`}
               title="Abrir Frente de Caixa (PDV)"
@@ -262,10 +319,10 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         {pendentesTransbordo > 0 && (
           <Link
             to="/elobot"
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all animate-pulse"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 border border-amber-500/40 text-xs font-bold transition-all animate-pulse"
             title="Clique para atender o cliente no WhatsApp!"
           >
-            <Bell className="w-3.5 h-3.5 text-amber-400" />
+            <Bell className="w-3.5 h-3.5 text-amber-700" />
             <span>{pendentesTransbordo} no WhatsApp</span>
           </Link>
         )}
@@ -279,11 +336,19 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           }
           className={`hidden md:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
             isFocused
-              ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-400'
+              ? isWhite
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold'
+                : 'bg-emerald-950/60 border-emerald-500/30 text-emerald-400'
+              : isWhite
+              ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold animate-pulse'
               : 'bg-amber-950/60 border-amber-500/30 text-amber-400 animate-pulse'
           }`}
         >
-          {isFocused ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+          {isFocused ? (
+            <Eye className={`w-3.5 h-3.5 ${isWhite ? 'text-emerald-700' : 'text-emerald-400'}`} />
+          ) : (
+            <EyeOff className={`w-3.5 h-3.5 ${isWhite ? 'text-amber-700' : 'text-amber-400'}`} />
+          )}
           <span className="text-[11px] font-semibold">
             {isFocused ? 'Em Foco' : 'Fora de Foco'}
           </span>
@@ -316,7 +381,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         <div className="relative">
           <button
             onClick={() => setMenuPerfilAberto(!menuPerfilAberto)}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border transition-all text-xs font-bold cursor-pointer ${infoCargo.cor}`}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border transition-all text-xs font-bold cursor-pointer ${
+              isWhite ? 'bg-slate-100 border-slate-300 text-slate-800' : infoCargo.cor
+            }`}
           >
             <span>{infoCargo.icone}</span>
             <span className="hidden sm:inline">
@@ -329,27 +396,29 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </button>
 
           {menuPerfilAberto && (
-            <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-2xl z-50 space-y-1 animate-in fade-in zoom-in-95 duration-100">
-              <div className="px-3 py-2 border-b border-slate-800">
-                <p className="text-xs font-bold text-white">{usuarioLogado?.nome}</p>
-                <p className="text-[10px] text-slate-400 font-mono">{usuarioLogado?.email}</p>
+            <div className={`absolute right-0 mt-2 w-64 ${
+              isWhite ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+            } border rounded-2xl p-2 shadow-2xl z-50 space-y-1 animate-in fade-in zoom-in-95 duration-100`}>
+              <div className={`px-3 py-2 border-b ${isWhite ? 'border-slate-100' : 'border-slate-800'}`}>
+                <p className={`text-xs font-bold ${isWhite ? 'text-slate-900' : 'text-white'}`}>{usuarioLogado?.nome}</p>
+                <p className={`text-[10px] ${isWhite ? 'text-slate-500' : 'text-slate-400'} font-mono`}>{usuarioLogado?.email}</p>
                 <span className={`inline-block mt-1 text-[9px] px-2 py-0.5 rounded font-bold border uppercase ${infoCargo.cor}`}>
                   {infoCargo.nivel}
                 </span>
               </div>
 
               {/* Opção de White Color / Dark Mode dentro do menu */}
-              <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-                  {tema === 'light' ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-slate-400" />}
+              <div className={`px-3 py-2 border-b ${isWhite ? 'border-slate-100' : 'border-slate-800'} flex items-center justify-between`}>
+                <span className={`text-[11px] font-bold ${isWhite ? 'text-slate-700' : 'text-slate-300'} flex items-center gap-1.5`}>
+                  {tema === 'light' ? <Sun className="w-3.5 h-3.5 text-amber-600" /> : <Moon className="w-3.5 h-3.5 text-slate-400" />}
                   <span>Aparência</span>
                 </span>
-                <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px] font-bold">
+                <div className={`flex items-center ${isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'} p-0.5 rounded-lg border text-[10px] font-bold`}>
                   <button
                     type="button"
                     onClick={() => setTema('light')}
                     className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                      tema === 'light' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white'
+                      tema === 'light' ? 'bg-white text-slate-900 shadow-sm' : isWhite ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     White
@@ -358,7 +427,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                     type="button"
                     onClick={() => setTema('dark')}
                     className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                      tema === 'dark' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                      tema === 'dark' ? 'bg-slate-800 !text-white shadow-sm' : isWhite ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     Dark
@@ -366,7 +435,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 </div>
               </div>
 
-              <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <p className={`px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                 Simular Outro Cargo (Hierarquia)
               </p>
 
@@ -385,7 +454,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   }}
                   className={`w-full text-left px-3 py-1.5 rounded-xl text-xs flex items-center justify-between transition-colors ${
                     usuarioLogado?.cargo === p.cargo
-                      ? 'bg-emerald-500 text-white font-bold'
+                      ? 'bg-emerald-600 !text-white font-bold'
+                      : isWhite
+                      ? 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                       : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`}
                 >
@@ -393,17 +464,19 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                     <span>{p.icone}</span>
                     <span>{p.label}</span>
                   </span>
-                  {usuarioLogado?.cargo === p.cargo && <span className="text-[10px]">✓</span>}
+                  {usuarioLogado?.cargo === p.cargo && <span className="text-[10px] !text-white">✓</span>}
                 </button>
               ))}
 
-              <div className="pt-2 mt-1 border-t border-slate-800">
+              <div className={`pt-2 mt-1 border-t ${isWhite ? 'border-slate-100' : 'border-slate-800'}`}>
                 <button
                   onClick={() => {
                     logout();
                     window.location.href = '/login';
                   }}
-                  className="w-full text-left px-3 py-2 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 font-bold transition-colors cursor-pointer"
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center gap-2 font-bold transition-colors cursor-pointer ${
+                    isWhite ? 'text-rose-600 hover:bg-rose-50' : 'text-rose-400 hover:bg-rose-500/10'
+                  }`}
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Sair da Conta (Logout)</span>
@@ -417,22 +490,30 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         {isSuperAdmin && isModoGlobal ? (
           <div
             title="Receita Recorrente Mensal (MRR) de todos os restaurantes clientes do EloServe"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30"
+            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${
+              isWhite
+                ? 'bg-purple-50 border border-purple-200'
+                : 'bg-purple-950/60 border border-purple-500/30'
+            }`}
           >
-            <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
+            <TrendingUp className={`w-3.5 h-3.5 ${isWhite ? 'text-purple-600' : 'text-purple-400'}`} />
             <div className="flex items-baseline gap-1.5">
-              <span className="text-[10px] text-purple-300 font-medium">MRR SaaS:</span>
-              <span className="text-xs font-bold text-purple-300 font-mono">
+              <span className={`text-[10px] font-medium ${isWhite ? 'text-purple-800' : 'text-purple-300'}`}>MRR SaaS:</span>
+              <span className={`text-xs font-bold font-mono ${isWhite ? 'text-purple-950' : 'text-purple-300'}`}>
                 R$ {mrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
               </span>
             </div>
           </div>
         ) : (
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60">
-            <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+          <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${
+            isWhite
+              ? 'bg-emerald-50 border border-emerald-300'
+              : 'bg-slate-800/80 border border-slate-700/60'
+          }`}>
+            <DollarSign className={`w-3.5 h-3.5 ${isWhite ? 'text-emerald-700' : 'text-emerald-400'}`} />
             <div className="flex items-baseline gap-1.5">
-              <span className="text-[10px] text-slate-400 font-medium">Vendas Caixa:</span>
-              <span className="text-xs font-bold text-emerald-400 font-mono">
+              <span className={`text-[10px] font-medium ${isWhite ? 'text-emerald-800' : 'text-slate-400'}`}>Vendas Caixa:</span>
+              <span className={`text-xs font-bold font-mono ${isWhite ? 'text-emerald-800' : 'text-emerald-400'}`}>
                 R$ {caixaAtual.totalVendas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -440,8 +521,12 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         )}
 
         {/* Live Clock */}
-        <div className="hidden lg:flex items-center gap-1.5 text-slate-200 text-xs font-mono font-medium bg-slate-800/40 px-2.5 py-1 rounded-lg border border-slate-700/30">
-          <Clock className="w-3.5 h-3.5 text-slate-400" />
+        <div className={`hidden lg:flex items-center gap-1.5 text-xs font-mono font-medium px-2.5 py-1 rounded-lg border ${
+          isWhite
+            ? 'bg-slate-100 text-slate-700 border-slate-200'
+            : 'text-slate-200 bg-slate-800/40 border-slate-700/30'
+        }`}>
+          <Clock className={`w-3.5 h-3.5 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`} />
           <span>{time}</span>
         </div>
 

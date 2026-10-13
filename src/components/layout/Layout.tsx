@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSaaSStore } from '../../store/useSaaSStore';
+import { useThemeStore } from '../../store/useThemeStore';
 
 interface LayoutProps {
   children: ReactNode;
@@ -17,6 +18,8 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { usuarioLogado } = useAuthStore();
   const { getTenantAtivo, getAvisosAtivosParaTenant, tenantAtivoId, selecionarTenant } = useSaaSStore();
+  const { tema } = useThemeStore();
+  const isWhite = tema === 'light';
 
   const isSuperAdmin = usuarioLogado?.cargo === 'super_admin';
   const isNaTelaSaaS = location.pathname === '/saas';
@@ -24,7 +27,7 @@ export function Layout({ children }: LayoutProps) {
   const avisosAtivos = getAvisosAtivosParaTenant ? getAvisosAtivosParaTenant(tenantAtual.id).filter(a => !avisosDispensados.includes(a.id)) : [];
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-950 font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className={`flex h-screen w-screen overflow-hidden ${isWhite ? 'bg-slate-50' : 'bg-slate-950'} font-['Plus_Jakarta_Sans',sans-serif]`}>
       {/* Backdrop para mobile quando a sidebar estiver aberta */}
       {sidebarAberta && (
         <div
@@ -43,22 +46,26 @@ export function Layout({ children }: LayoutProps) {
 
         {/* Banner de Aviso de Modo Suporte do Super Admin */}
         {isSuperAdmin && tenantAtivoId !== 'global' && (
-          <div className="bg-gradient-to-r from-purple-950 via-purple-900 to-slate-900 border-b border-purple-500/40 px-4 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-purple-200 animate-in fade-in duration-150 z-20 shrink-0">
+          <div className={`${
+            isWhite
+              ? 'bg-purple-100 border-b border-purple-200 text-purple-950 font-medium'
+              : 'bg-gradient-to-r from-purple-950 via-purple-900 to-slate-900 border-b border-purple-500/40 text-purple-200'
+          } px-4 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs animate-in fade-in duration-150 z-20 shrink-0`}>
             <div className="flex items-center gap-2">
-              <Crown className="w-4 h-4 text-purple-400 shrink-0 animate-pulse" />
+              <Crown className={`w-4 h-4 ${isWhite ? 'text-purple-700' : 'text-purple-400'} shrink-0 animate-pulse`} />
               <span>
-                <strong>Modo Suporte / Inspeção de Loja:</strong> Você está visualizando o sistema como o restaurante{' '}
-                <strong className="text-white underline">{tenantAtual.nomeFantasia}</strong> ({tenantAtual.cidadeUf}).
+                <strong className={isWhite ? 'text-purple-900 font-extrabold' : 'text-purple-200'}>Modo Suporte / Inspeção de Loja:</strong> Você está visualizando o sistema como o restaurante{' '}
+                <strong className={`${isWhite ? 'text-purple-950 font-black' : 'text-white'} underline`}>{tenantAtual.nomeFantasia}</strong> ({tenantAtual.cidadeUf}).
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {!isNaTelaSaaS && (
                 <Link
                   to="/saas"
-                  className="px-2.5 py-1 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all flex items-center gap-1.5 shadow-md shadow-purple-600/30 text-[11px]"
+                  className="px-2.5 py-1 rounded-xl bg-purple-600 hover:bg-purple-500 !text-white font-bold transition-all flex items-center gap-1.5 shadow-md shadow-purple-600/30 text-[11px]"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Painel SaaS</span>
+                  <ArrowLeft className="w-3.5 h-3.5 !text-white" />
+                  <span className="!text-white">Painel SaaS</span>
                 </Link>
               )}
               <button
@@ -66,7 +73,11 @@ export function Layout({ children }: LayoutProps) {
                   selecionarTenant('global');
                   navigate('/saas');
                 }}
-                className="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-200 border border-purple-500/30 font-bold transition-all text-[11px] cursor-pointer"
+                className={`px-3 py-1 rounded-xl ${
+                  isWhite
+                    ? 'bg-white hover:bg-purple-50 text-purple-900 border border-purple-300 shadow-sm'
+                    : 'bg-slate-800 hover:bg-slate-700 text-purple-200 border border-purple-500/30'
+                } font-bold transition-all text-[11px] cursor-pointer`}
               >
                 <span>Voltar para Visão Global</span>
               </button>
