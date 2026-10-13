@@ -48,8 +48,11 @@ import { useEloBotStore, ConversaWhatsApp, MensagemWhatsApp, ConfigEloBot } from
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
 import { useDeliveryStore } from '../store/useDeliveryStore';
+import { useThemeStore } from '../store/useThemeStore';
 
 export default function EloBot() {
+  const { tema } = useThemeStore();
+  const isWhite = tema === 'light';
   const { tenantAtivoId, getTenantAtivo, planos } = useSaaSStore();
   const tenantAtual = getTenantAtivo();
   const { getProdutosPorTenant } = useProductStore();
@@ -349,21 +352,31 @@ export default function EloBot() {
   return (
     <div className="space-y-5 max-w-7xl mx-auto select-none pb-10">
       {/* Top Banner do EloBot */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40 border border-slate-800 p-5 rounded-3xl shadow-xl">
+      <div className={`flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-5 rounded-3xl shadow-xl border ${
+        isWhite
+          ? 'bg-white border-slate-200'
+          : 'bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40 border-slate-800'
+      }`}>
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
-            <Bot className="w-6 h-6" />
+            <Bot className="w-6 h-6 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black text-white">EloBot — Atendente Inteligente 24h no WhatsApp</h2>
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 uppercase tracking-wider flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <h2 className={`text-lg font-black ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                EloBot — Atendente Inteligente 24h no WhatsApp
+              </h2>
+              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase tracking-wider flex items-center gap-1 ${
+                isWhite
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${isWhite ? 'bg-emerald-600' : 'bg-emerald-400'} animate-pulse`}></span>
                 <span>{config.statusInstancia === 'conectado' ? 'IA Online' : 'Desconectado'}</span>
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Atendimento autônomo com cardápio dinâmico do restaurante <strong className="text-white">{tenantAtual.nomeFantasia}</strong>, fechamento de pedidos e transbordo humano.
+            <p className={`text-xs mt-0.5 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
+              Atendimento autônomo com cardápio dinâmico do restaurante <strong className={isWhite ? 'text-slate-900 font-extrabold' : 'text-white'}>{tenantAtual.nomeFantasia}</strong>, fechamento de pedidos e transbordo humano.
             </p>
           </div>
         </div>
@@ -371,12 +384,16 @@ export default function EloBot() {
         {/* Status da Instância & Ações Rápidas */}
         <div className="flex items-center gap-2.5 flex-wrap shrink-0">
           {config.statusInstancia === 'conectado' ? (
-            <div className="flex items-center gap-2 bg-slate-950/80 border border-emerald-500/30 px-3.5 py-2 rounded-2xl">
-              <Phone className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-xs font-mono font-bold text-emerald-300">{config.telefoneInstancia}</span>
-              <span className="text-[10px] text-slate-500">|</span>
-              <Battery className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-[11px] font-mono text-slate-300">{config.bateriaPct}%</span>
+            <div className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl border ${
+              isWhite
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-900 shadow-sm'
+                : 'bg-slate-950/80 border-emerald-500/30'
+            }`}>
+              <Phone className={`w-3.5 h-3.5 ${isWhite ? 'text-emerald-700' : 'text-emerald-400'}`} />
+              <span className={`text-xs font-mono font-bold ${isWhite ? 'text-emerald-900' : 'text-emerald-300'}`}>{config.telefoneInstancia}</span>
+              <span className={isWhite ? 'text-emerald-400' : 'text-slate-500'}>|</span>
+              <Battery className={`w-3.5 h-3.5 ${isWhite ? 'text-emerald-700' : 'text-slate-400'}`} />
+              <span className={`text-[11px] font-mono ${isWhite ? 'text-emerald-800' : 'text-slate-300'}`}>{config.bateriaPct}%</span>
             </div>
           ) : (
             <button
@@ -384,7 +401,11 @@ export default function EloBot() {
                 gerarNovoQrCode(currentTenantId);
                 setModalQrCode(true);
               }}
-              className="px-3.5 py-2 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              className={`px-3.5 py-2 rounded-2xl border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer active:scale-95 ${
+                isWhite
+                  ? 'bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-900'
+                  : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300'
+              }`}
             >
               <QrCode className="w-4 h-4" />
               <span>Conectar WhatsApp (QR Code)</span>
@@ -393,28 +414,36 @@ export default function EloBot() {
 
           <button
             onClick={() => setModalPlacaMesa(true)}
-            className="px-3.5 py-2 rounded-2xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+            className={`px-3.5 py-2 rounded-2xl border font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm ${
+              isWhite
+                ? 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-900'
+                : 'bg-indigo-600/20 hover:bg-indigo-600/30 border-indigo-500/30 text-indigo-300'
+            }`}
             title="Gerar Display / Placa de Mesa e Balcão com QR Code para Impressão"
           >
-            <Printer className="w-4 h-4 text-indigo-400" />
+            <Printer className={`w-4 h-4 ${isWhite ? 'text-indigo-600' : 'text-indigo-400'}`} />
             <span>Placa QR Code de Mesa</span>
           </button>
 
           <button
             onClick={() => setModalCampanhas(true)}
-            className="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-md shadow-amber-500/10"
+            className={`px-3.5 py-2 rounded-2xl border font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm ${
+              isWhite
+                ? 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900'
+                : 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border-amber-500/40 text-amber-300'
+            }`}
             title="Disparar campanhas e cupons promocionais pelo WhatsApp"
           >
-            <Megaphone className="w-4 h-4 text-amber-400" />
+            <Megaphone className={`w-4 h-4 ${isWhite ? 'text-amber-700' : 'text-amber-400'}`} />
             <span>Campanhas no WhatsApp</span>
           </button>
 
           <button
             onClick={() => setModalNovoChat(true)}
-            className="px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+            className="px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 !text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
-            <Plus className="w-4 h-4" />
-            <span>Novo Chat de Cliente</span>
+            <Plus className="w-4 h-4 !text-white" />
+            <span className="!text-white">Novo Chat de Cliente</span>
           </button>
         </div>
       </div>
