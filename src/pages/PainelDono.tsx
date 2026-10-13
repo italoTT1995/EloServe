@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Store,
   DollarSign,
   TrendingUp,
   TrendingDown,
@@ -11,26 +10,17 @@ import {
   Bike,
   ChefHat,
   Bot,
-  Zap,
+  Store,
+  Printer,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
   CheckCircle2,
-  AlertCircle,
-  Plus,
-  Minus,
-  Edit2,
+  Tag,
   Check,
   X,
-  Printer,
-  Megaphone,
-  Lock,
-  Unlock,
-  Clock,
-  Sparkles,
-  ArrowRight,
-  Eye,
-  Sliders,
-  Power,
-  Tag,
-  Percent,
+  Edit2,
+  Search,
 } from 'lucide-react';
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -38,7 +28,6 @@ import { useAppStore } from '../store/useAppStore';
 import { useProductStore } from '../store/useProductStore';
 import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useEloBotStore } from '../store/useEloBotStore';
-import { useFuncionarioStore } from '../store/useFuncionarioStore';
 
 export default function PainelDono() {
   const { tenantAtivoId, getTenantAtivo } = useSaaSStore();
@@ -52,43 +41,24 @@ export default function PainelDono() {
   const { getConversas, getConfig } = useEloBotStore();
   const configEloBot = getConfig(currentTenantId);
   const conversasEloBot = getConversas(currentTenantId);
-  const { funcionarios } = useFuncionarioStore();
 
-  // Estado da Loja Aberta/Fechada
+  // Estados locais
   const [lojaAberta, setLojaAberta] = useState(true);
   const [toastMensagem, setToastMensagem] = useState<string | null>(null);
+  const [categoriaCardapio, setCategoriaCardapio] = useState<string>('todos');
+  const [buscaItem, setBuscaItem] = useState<string>('');
+  const [paginaPedidos, setPaginaPedidos] = useState<number>(1);
+  const [modalImprimir, setModalImprimir] = useState<boolean>(false);
 
-  // Edição Rápida de Preço Express
-  const [produtoEditandoPreco, setProdutoEditandoPreco] = useState<string | null>(null);
-  const [novoPrecoInput, setNovoPrecoInput] = useState<string>('');
+  // Edição rápida de preço
+  const [editandoPrecoId, setEditandoPrecoId] = useState<string | null>(null);
+  const [novoPrecoValor, setNovoPrecoValor] = useState<string>('');
 
-  // Modal de Impressão do Fechamento do Dia
-  const [modalImprimirFechamento, setModalImprimirFechamento] = useState(false);
-
-  // Cálculos em tempo real
-  const mesasOcupadas = mesas.filter((m) => m.status !== 'livre');
-  const consumoAbertoMesas = mesasOcupadas.reduce((acc, m) => acc + (m.totalConsumo || 0), 0);
-  const kdsEmPreparo = pedidosKDS.filter((p) => p.status !== 'pronto');
-  const deliveryEmAndamento = (pedidosDelivery || []).filter(
-    (p) => p.status === 'a_caminho' || p.status === 'preparando'
-  );
-
-  // Números do Dia
-  const faturamentoBalcao = caixaAtual.totalVendas || 1840.0;
-  const faturamentoMesas = consumoAbertoMesas + 1580.0;
-  const faturamentoWhatsApp = 860.5;
-  const faturamentoTotalHoje = faturamentoBalcao + faturamentoMesas + faturamentoWhatsApp;
-  const totalPedidosHoje = 68;
-  const ticketMedio = faturamentoTotalHoje / totalPedidosHoje;
-  const lucroEstimado = faturamentoTotalHoje * 0.58; // Margem líquida média de 58%
-
-  // Disparar toast informativo
   function dispararToast(msg: string) {
     setToastMensagem(msg);
     setTimeout(() => setToastMensagem(null), 3500);
   }
 
-  // Alternar Loja Aberta / Fechada
   function handleToggleLoja() {
     const novoStatus = !lojaAberta;
     setLojaAberta(novoStatus);
@@ -99,537 +69,627 @@ export default function PainelDono() {
     );
   }
 
-  // Pausar/Despausar Produto com 1 clique
-  function handleAlternarPausaProduto(id: string, nome: string, disponivel: boolean) {
+  function handleToggleProduto(id: string, nome: string, disponivel: boolean) {
     alternarDisponibilidade(id, currentTenantId);
     dispararToast(
       disponivel
-        ? `Produto "${nome}" foi pausado como ESGOTADO no cardápio e WhatsApp!`
-        : `Produto "${nome}" foi ATIVADO novamente no cardápio!`
+        ? `"${nome}" pausado como ESGOTADO no cardápio e WhatsApp!`
+        : `"${nome}" ativado como DISPONÍVEL no cardápio!`
     );
   }
 
-  // Salvar Preço Express
-  function handleSalvarPrecoExpress(id: string, nome: string) {
-    const valor = parseFloat(novoPrecoInput.replace(',', '.'));
+  function handleSalvarPreco(id: string, nome: string) {
+    const valor = parseFloat(novoPrecoValor.replace(',', '.'));
     if (isNaN(valor) || valor <= 0) {
       alert('Digite um valor numérico válido.');
       return;
     }
     atualizarPreco(id, valor, currentTenantId);
-    setProdutoEditandoPreco(null);
-    setNovoPrecoInput('');
+    setEditandoPrecoId(null);
+    setNovoPrecoValor('');
     dispararToast(`Preço de "${nome}" atualizado para R$ ${valor.toFixed(2).replace('.', ',')}!`);
   }
 
+  // Filtrar produtos do cardápio express
+  const produtosFiltrados = useMemo(() => {
+    return produtos.filter((p) => {
+      const matchBusca = p.nome.toLowerCase().includes(buscaItem.toLowerCase());
+      const matchCat =
+        categoriaCardapio === 'todos' ||
+        (categoriaCardapio === 'almoco' && p.setorPreparo === 'cozinha') ||
+        (categoriaCardapio === 'bebidas' && p.setorPreparo === 'bar');
+      return matchBusca && matchCat;
+    });
+  }, [produtos, buscaItem, categoriaCardapio]);
+
+  // Lista de Pedidos Recentes (estilo Print 3)
+  const pedidosRecentes = [
+    {
+      id: '#M24-2305',
+      status: 'Concluído',
+      statusCor: 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
+      origem: 'Mesa 24 • 3 itens',
+      valor: 'R$ 85,97',
+      hora: '13:42',
+    },
+    {
+      id: '#M4-9359',
+      status: 'Concluído',
+      statusCor: 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
+      origem: 'Mesa 4 • 2 itens',
+      valor: 'R$ 32,99',
+      hora: '13:35',
+    },
+    {
+      id: '#M26-2378',
+      status: 'Concluído',
+      statusCor: 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
+      origem: 'Mesa 26 • 3 itens',
+      valor: 'R$ 138,94',
+      hora: '13:20',
+    },
+    {
+      id: '#M21-2576',
+      status: 'Novo',
+      statusCor: 'bg-orange-950/80 text-orange-400 border border-orange-500/30',
+      origem: 'Mesa 21 • 3 itens',
+      valor: 'R$ 99,96',
+      hora: '13:14',
+    },
+    {
+      id: '##2607033RAJ',
+      status: 'Concluído',
+      statusCor: 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
+      origem: 'Nuane Cabral Queiroz - Delivery • 1 item',
+      valor: 'R$ 27,49',
+      hora: '12:58',
+    },
+  ];
+
+  // Itens Mais Vendidos (estilo Print 3)
+  const itensMaisVendidos = [
+    { nome: 'Prato com Churrasco', qtd: 160, barPct: 100 },
+    { nome: 'Guaraná 1l', qtd: 25, barPct: 22 },
+    { nome: 'Coca Cola KS 290ml', qtd: 24, barPct: 20 },
+    { nome: 'Coca Cola 350ml', qtd: 20, barPct: 16 },
+    { nome: 'Coca Cola 1,5l', qtd: 18, barPct: 14 },
+  ];
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto select-none pb-12">
-      {/* Toast Notificação Rápida */}
+      {/* Toast Notificação */}
       {toastMensagem && (
-        <div className="fixed top-20 right-6 z-50 bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-top-4">
+        <div className="fixed top-20 right-6 z-50 bg-orange-600 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{toastMensagem}</span>
         </div>
       )}
 
-      {/* 1. TOPO: BOAS-VINDAS, STATUS DA LOJA & ATALHOS RÁPIDOS */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider border border-emerald-500/30 flex items-center gap-1.5">
-              <span>👔</span>
-              <span>Nível 2 • Dono & Gerente</span>
-            </span>
-            <span className="text-xs text-slate-400 font-medium">Unidade Ativa:</span>
-            <strong className="text-sm font-black text-white">{tenantAtual.nomeFantasia}</strong>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-black text-white">
-            Painel de Gestão do Restaurante
-          </h2>
-          <p className="text-xs text-slate-400 max-w-xl">
-            Visão simplificada em tempo real. Acompanhe vendas, mesas, pedidos na cozinha e controle seu cardápio com máxima facilidade.
+      {/* HEADER PRINCIPAL (Exatamente como o Print 1) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Dashboard</h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Visão geral do seu negócio nos últimos 7 dias • <strong className="text-slate-200">{tenantAtual.nomeFantasia}</strong>
           </p>
         </div>
 
-        {/* Status da Loja (Chave Liga/Desliga) e Atalho para o Caixa */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Chave de Expediente Aberto / Fechado */}
+        {/* Ações Rápidas do Dono */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Status Loja Aberta/Fechada */}
           <button
             type="button"
             onClick={handleToggleLoja}
-            className={`px-4 py-2.5 rounded-2xl border font-black text-xs transition-all flex items-center gap-2 cursor-pointer shadow-lg active:scale-95 ${
+            className={`px-3.5 py-2 rounded-2xl border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md active:scale-95 ${
               lojaAberta
-                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 shadow-emerald-500/10'
-                : 'bg-rose-500/20 border-rose-500/40 text-rose-300 hover:bg-rose-500/30 shadow-rose-500/10'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
             }`}
-            title="Clique para abrir ou fechar o restaurante para novos pedidos"
           >
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                lojaAberta ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'
-              }`}
-            />
-            <span>{lojaAberta ? 'LOJA ABERTA (Recebendo)' : 'LOJA FECHADA (Encerrada)'}</span>
+            <span className={`w-2 h-2 rounded-full ${lojaAberta ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+            <span>{lojaAberta ? 'Loja Aberta' : 'Loja Fechada'}</span>
           </button>
 
-          {/* Botão Ir para o Caixa (PDV) */}
+          {/* Botão Ir para Caixa / PDV */}
           <Link
             to="/pdv"
-            className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
-            title="Abrir tela de Frente de Caixa para passar vendas no balcão"
+            className="px-3.5 py-2 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-lg shadow-orange-500/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
-            <Store className="w-4 h-4" />
+            <Store className="w-3.5 h-3.5" />
             <span>Frente de Caixa (PDV)</span>
           </Link>
+
+          {/* Imprimir Resumo */}
+          <button
+            type="button"
+            onClick={() => setModalImprimir(true)}
+            className="p-2 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            title="Imprimir Fechamento do Dia"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      {/* 2. OS 4 GRANDES INDICADORES DO NEGÓCIO HOJE */}
+      {/* 1. OS 4 CARDS DE MÉTRICAS (Estilo Exato do Print 1) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Faturamento Total */}
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2 relative overflow-hidden group hover:border-slate-700 transition-all shadow-lg">
+        {/* Card 1: VENDAS HOJE */}
+        <div className="bg-[#141416] border border-slate-800/80 rounded-2xl p-5 shadow-lg relative overflow-hidden group hover:border-slate-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Vendas Hoje (Total)</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">VENDAS HOJE</span>
+            <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-white font-mono">
-              R$ {faturamentoTotalHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </span>
+          <div className="mt-3">
+            <span className="text-2xl font-black text-white font-mono tracking-tight">R$ 1.046,11</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] pt-1 text-slate-400 border-t border-slate-800/80">
-            <span>Balcão: R$ {faturamentoBalcao.toFixed(0)}</span>
-            <span>Mesas: R$ {faturamentoMesas.toFixed(0)}</span>
-            <span className="text-emerald-400 font-semibold">Whats: R$ {faturamentoWhatsApp.toFixed(0)}</span>
+          <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-rose-400">
+            <TrendingDown className="w-3.5 h-3.5" />
+            <span>-34% vs ontem</span>
           </div>
         </div>
 
-        {/* Lucro Líquido Estimado */}
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2 relative overflow-hidden group hover:border-slate-700 transition-all shadow-lg">
+        {/* Card 2: PEDIDOS */}
+        <div className="bg-[#141416] border border-slate-800/80 rounded-2xl p-5 shadow-lg relative overflow-hidden group hover:border-slate-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Lucro Líquido Estimado</span>
-            <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-emerald-400 font-mono">
-              R$ {lucroEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-              58% margem
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
-            Já descontando custo de ingredientes (CMV).
-          </p>
-        </div>
-
-        {/* Total de Pedidos & Ticket Médio */}
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2 relative overflow-hidden group hover:border-slate-700 transition-all shadow-lg">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Total de Pedidos</span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">PEDIDOS</span>
+            <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center">
               <ShoppingBag className="w-4 h-4" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-white font-mono">{totalPedidosHoje}</span>
-            <span className="text-xs text-slate-400">comandas hoje</span>
+          <div className="mt-3">
+            <span className="text-2xl font-black text-white font-mono tracking-tight">20</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] pt-1 text-slate-400 border-t border-slate-800/80">
-            <span>Ticket Médio:</span>
-            <strong className="text-indigo-300 font-mono">
-              R$ {ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </strong>
+          <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-rose-400">
+            <TrendingDown className="w-3.5 h-3.5" />
+            <span>-44% vs ontem</span>
           </div>
         </div>
 
-        {/* WhatsApp & EloBot IA */}
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2 relative overflow-hidden group hover:border-slate-700 transition-all shadow-lg">
+        {/* Card 3: TICKET MÉDIO */}
+        <div className="bg-[#141416] border border-slate-800/80 rounded-2xl p-5 shadow-lg relative overflow-hidden group hover:border-slate-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Vendas WhatsApp (IA)</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-              <Bot className="w-4 h-4" />
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">TICKET MÉDIO</span>
+            <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-emerald-400 font-mono">
-              R$ {faturamentoWhatsApp.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </span>
+          <div className="mt-3">
+            <span className="text-2xl font-black text-white font-mono tracking-tight">R$ 52,31</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] pt-1 text-slate-400 border-t border-slate-800/80">
-            <span>Atendimentos hoje:</span>
-            <span className="text-slate-200 font-mono font-bold">{conversasEloBot.length} clientes</span>
+          <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>+19% vs ontem</span>
+          </div>
+        </div>
+
+        {/* Card 4: CLIENTES */}
+        <div className="bg-[#141416] border border-slate-800/80 rounded-2xl p-5 shadow-lg relative overflow-hidden group hover:border-slate-700 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">CLIENTES</span>
+            <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-black text-white font-mono tracking-tight">17</span>
+          </div>
+          <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-rose-400">
+            <TrendingDown className="w-3.5 h-3.5" />
+            <span>-15% vs ontem</span>
           </div>
         </div>
       </div>
 
-      {/* 3. RADAR DA OPERAÇÃO AO VIVO: O QUE ESTÁ ACONTECENDO AGORA */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></div>
-            <h3 className="text-base font-black text-white">Radar da Loja em Tempo Real</h3>
+      {/* 2. LINHA DO MEIO: VENDAS (ÚLTIMOS 7 DIAS) & POR CATEGORIA (Estilo Exato do Print 1) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Gráfico de Vendas 7 Dias (8 cols) */}
+        <div className="lg:col-span-8 bg-[#141416] border border-slate-800/80 rounded-2xl p-6 shadow-lg space-y-4">
+          <h3 className="text-sm font-bold text-white">Vendas (últimos 7 dias)</h3>
+
+          <div className="relative h-64 w-full">
+            {/* Eixo Y */}
+            <div className="absolute left-0 top-0 bottom-6 w-12 flex flex-col justify-between text-[10px] text-slate-500 font-mono">
+              <span>R$1.6k</span>
+              <span>R$1.2k</span>
+              <span>R$800</span>
+              <span>R$400</span>
+              <span>R$0</span>
+            </div>
+
+            {/* Linhas de Grade e Curva SVG */}
+            <div className="ml-14 h-full flex flex-col justify-between relative pb-6">
+              <div className="w-full border-b border-slate-800/60 h-0" />
+              <div className="w-full border-b border-slate-800/60 h-0" />
+              <div className="w-full border-b border-slate-800/60 h-0" />
+              <div className="w-full border-b border-slate-800/60 h-0" />
+              <div className="w-full border-b border-slate-800/60 h-0" />
+
+              {/* Curva SVG com Gradiente Laranja */}
+              <svg
+                viewBox="0 0 700 200"
+                className="absolute inset-0 w-full h-[85%] overflow-visible"
+                preserveAspectRatio="none"
+              >
+                <defs>
+                  <linearGradient id="laranjaGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f97316" stopOpacity="0.35" />
+                    <stop offset="100%" stopColor="#f97316" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+                {/* Área preenchida */}
+                <path
+                  d="M 0 145 C 50 150, 100 185, 150 180 C 200 130, 250 120, 300 120 C 350 120, 400 95, 450 70 C 500 45, 550 40, 600 55 C 650 75, 680 90, 700 95 L 700 200 L 0 200 Z"
+                  fill="url(#laranjaGradient)"
+                />
+                {/* Linha da curva */}
+                <path
+                  d="M 0 145 C 50 150, 100 185, 150 180 C 200 130, 250 120, 300 120 C 350 120, 400 95, 450 70 C 500 45, 550 40, 600 55 C 650 75, 680 90, 700 95"
+                  fill="none"
+                  stroke="#ea580c"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+
+              {/* Eixo X: Dias da Semana */}
+              <div className="absolute -bottom-1 left-0 right-0 flex justify-between text-[11px] text-slate-400 font-medium">
+                <span>Sáb</span>
+                <span>Dom</span>
+                <span>Seg</span>
+                <span>Ter</span>
+                <span>Qua</span>
+                <span>Qui</span>
+                <span>Sex</span>
+              </div>
+            </div>
           </div>
-          <span className="text-xs text-slate-400 font-medium">Atualização contínua</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Quadrante 1: Salão & Mesas */}
+        {/* Gráfico Por Categoria (4 cols) */}
+        <div className="lg:col-span-4 bg-[#141416] border border-slate-800/80 rounded-2xl p-6 shadow-lg flex flex-col justify-between">
+          <h3 className="text-sm font-bold text-white">Por Categoria</h3>
+
+          {/* Gráfico Donut SVG */}
+          <div className="relative flex items-center justify-center my-4">
+            <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 100 100">
+              {/* Background do círculo */}
+              <circle
+                cx="50"
+                cy="50"
+                r="40"
+                className="text-slate-800"
+                strokeWidth="14"
+                stroke="currentColor"
+                fill="transparent"
+              />
+              {/* Segmento Mesa (89%) */}
+              <circle
+                cx="50"
+                cy="50"
+                r="40"
+                stroke="#ea580c"
+                strokeWidth="14"
+                strokeDasharray="251.2"
+                strokeDashoffset="27.6"
+                strokeLinecap="round"
+                fill="transparent"
+              />
+              {/* Segmento Delivery (11%) */}
+              <circle
+                cx="50"
+                cy="50"
+                r="40"
+                stroke="#fdba74"
+                strokeWidth="14"
+                strokeDasharray="251.2"
+                strokeDashoffset="223.5"
+                fill="transparent"
+              />
+            </svg>
+
+            {/* Texto Central */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+              <span className="text-[10px] text-slate-400">Total 7d</span>
+              <span className="text-base font-black text-white font-mono">R$ 6.1k</span>
+            </div>
+          </div>
+
+          {/* Legenda */}
+          <div className="space-y-1.5 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-600"></span>
+                <span>Mesa</span>
+              </span>
+              <span className="font-mono text-slate-200 font-bold">89%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-300"></span>
+                <span>Delivery</span>
+              </span>
+              <span className="font-mono text-slate-200 font-bold">11%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+                <span>Retirada</span>
+              </span>
+              <span className="font-mono text-slate-200 font-bold">0%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. LINHA INFERIOR: ITENS MAIS VENDIDOS & PEDIDOS RECENTES (Estilo Exato dos Prints 1 e 3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Itens mais vendidos (7 dias) (7 cols) */}
+        <div className="lg:col-span-7 bg-[#141416] border border-slate-800/80 rounded-2xl p-6 shadow-lg space-y-4">
+          <h3 className="text-sm font-bold text-white">Itens mais vendidos (7 dias)</h3>
+
+          <div className="space-y-3 pt-2">
+            {itensMaisVendidos.map((item, idx) => (
+              <div key={idx} className="space-y-1 text-xs">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span className="font-medium truncate">{item.nome}</span>
+                  <span className="font-mono font-bold text-orange-400 shrink-0">{item.qtd} un</span>
+                </div>
+                <div className="w-full h-3 rounded-full bg-slate-800/70 overflow-hidden">
+                  <div
+                    className="h-full bg-orange-500 rounded-full transition-all duration-500"
+                    style={{ width: `${item.barPct}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="pt-2 flex justify-between text-[10px] text-slate-500 font-mono">
+            <span>0</span>
+            <span>45</span>
+            <span>90</span>
+            <span>135</span>
+            <span>180</span>
+          </div>
+        </div>
+
+        {/* Pedidos Recentes (5 cols) */}
+        <div className="lg:col-span-5 bg-[#141416] border border-slate-800/80 rounded-2xl p-6 shadow-lg flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white">Pedidos Recentes</h3>
+            {/* Paginação < 1/6 > */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
+              <button
+                type="button"
+                onClick={() => setPaginaPedidos((p) => Math.max(1, p - 1))}
+                className="p-1 hover:text-white cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span>{paginaPedidos}/6</span>
+              <button
+                type="button"
+                onClick={() => setPaginaPedidos((p) => Math.min(6, p + 1))}
+                className="p-1 hover:text-white cursor-pointer"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="divide-y divide-slate-800/70 text-xs">
+            {pedidosRecentes.map((ped, idx) => (
+              <div key={idx} className="py-2.5 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white font-mono">{ped.id}</span>
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${ped.statusCor}`}>
+                      {ped.status}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">{ped.origem}</p>
+                </div>
+                <div className="text-right">
+                  <span className="font-bold text-white font-mono block">{ped.valor}</span>
+                  <span className="text-[9px] text-slate-500">{ped.hora}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <Link
             to="/mesas"
-            className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-amber-500/40 hover:bg-slate-950 transition-all flex flex-col justify-between group cursor-pointer"
+            className="text-center text-xs font-bold text-orange-400 hover:text-orange-300 transition-colors pt-1"
           >
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Salão & Mesas</span>
-                <LayoutGrid className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-black text-white font-mono">{mesasOcupadas.length}</span>
-                <span className="text-xs text-slate-400">de {mesas.length} mesas ocupadas</span>
-              </div>
-              <p className="text-[11px] text-amber-400/90 font-mono font-semibold">
-                R$ {consumoAbertoMesas.toFixed(2).replace('.', ',')} em consumo ativo
-              </p>
-            </div>
-            <div className="pt-3 mt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-amber-400">
-              <span>Abrir Mapa de Mesas</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
-
-          {/* Quadrante 2: Cozinha KDS */}
-          <Link
-            to="/kds"
-            className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-rose-500/40 hover:bg-slate-950 transition-all flex flex-col justify-between group cursor-pointer"
-          >
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cozinha (KDS)</span>
-                <ChefHat className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-black text-white font-mono">{kdsEmPreparo.length}</span>
-                <span className="text-xs text-slate-400">pedidos em preparo</span>
-              </div>
-              <p className="text-[11px] text-slate-400">Tempo médio de espera: ~14 min</p>
-            </div>
-            <div className="pt-3 mt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-rose-400">
-              <span>Ver Painel da Cozinha</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
-
-          {/* Quadrante 3: Delivery */}
-          <Link
-            to="/delivery"
-            className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-sky-500/40 hover:bg-slate-950 transition-all flex flex-col justify-between group cursor-pointer"
-          >
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivery & Motos</span>
-                <Bike className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-black text-white font-mono">{deliveryEmAndamento.length}</span>
-                <span className="text-xs text-slate-400">pedidos em rota/saída</span>
-              </div>
-              <p className="text-[11px] text-slate-400">Entregadores ativos na rua</p>
-            </div>
-            <div className="pt-3 mt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-sky-400">
-              <span>Acompanhar Entregas</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
-
-          {/* Quadrante 4: EloBot WhatsApp */}
-          <Link
-            to="/elobot"
-            className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-emerald-500/40 hover:bg-slate-950 transition-all flex flex-col justify-between group cursor-pointer"
-          >
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">WhatsApp 24h</span>
-                <Bot className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-black text-emerald-400 font-mono">IA Conectada</span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                {configEloBot.statusInstancia === 'conectado' ? 'Atendendo clientes sem fila' : 'Desconectado'}
-              </p>
-            </div>
-            <div className="pt-3 mt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-emerald-400">
-              <span>Abrir Painel WhatsApp</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
+            Ver Todas as Mesas & Comandas &rarr;
           </Link>
         </div>
       </div>
 
-      {/* 4. AÇÕES RÁPIDAS & CONTROLE EXPRESS DO CARDÁPIO */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* LADO ESQUERDO: CONTROLE RÁPIDO DO CARDÁPIO (PAUSAR ITENS ESGOTADOS & EDITAR PREÇOS) (7 cols) */}
-        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-black text-white flex items-center gap-2">
-                <Tag className="w-4 h-4 text-amber-400" />
-                <span>Cardápio Express (Pausar & Alterar Preços)</span>
-              </h3>
-              <p className="text-xs text-slate-400">
-                Acabou algum ingrediente? Pause o produto em 1 clique para não vender no WhatsApp nem no PDV.
-              </p>
-            </div>
-
-            <Link
-              to="/cardapio"
-              className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
-            >
-              Ver Cardápio Completo &rarr;
-            </Link>
+      {/* 4. CARDÁPIO EXPRESS: COM TOGGLE DE DISPONIBILIDADE (Exatamente como o Print 2) */}
+      <div className="bg-[#141416] border border-slate-800/80 rounded-2xl p-6 shadow-lg space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-base font-black text-white flex items-center gap-2">
+              <Tag className="w-4 h-4 text-orange-500" />
+              <span>Cardápio & Controle de Disponibilidade</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              Clique no toggle para pausar itens esgotados instantaneamente no PDV e WhatsApp.
+            </p>
           </div>
 
-          <div className="divide-y divide-slate-800/80 max-h-[380px] overflow-y-auto pr-1">
-            {produtos.map((prod) => (
-              <div key={prod.id} className="py-3 flex items-center justify-between gap-3 text-xs">
-                {/* Nome e Categoria */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white truncate">{prod.nome}</span>
-                    {!prod.disponivel && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold uppercase border border-rose-500/30">
-                        Esgotado
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-slate-500 truncate block">
-                    Custo: R$ {(prod.precoCusto || 0).toFixed(2).replace('.', ',')} • Setor: {prod.setorPreparo}
-                  </span>
-                </div>
+          <Link
+            to="/cardapio"
+            className="text-xs font-bold text-orange-400 hover:text-orange-300 transition-colors"
+          >
+            Abrir Gestor de Cardápio Completo &rarr;
+          </Link>
+        </div>
 
-                {/* Preço e Edição Rápida */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {produtoEditandoPreco === prod.id ? (
-                    <div className="flex items-center gap-1">
-                      <span className="text-slate-400 text-xs">R$</span>
+        {/* Barra de Filtros e Busca (Estilo Print 2) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={buscaItem}
+              onChange={(e) => setBuscaItem(e.target.value)}
+              placeholder="Buscar item..."
+              className="w-full pl-8 pr-3 py-1.5 bg-[#0e0e10] border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500"
+            />
+          </div>
+
+          {/* Chips de Categorias (Pills estilo Print 2) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
+            {[
+              { id: 'todos', label: 'Todos' },
+              { id: 'almoco', label: 'Cozinha & Pratos' },
+              { id: 'bebidas', label: 'Bebidas & Bar' },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setCategoriaCardapio(cat.id)}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  categoriaCardapio === cat.id
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
+                    : 'bg-[#0e0e10] text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Grid de Cards de Itens (Estilo Print 2 com Toggle Verde/Cinza) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {produtosFiltrados.slice(0, 8).map((prod) => (
+            <div
+              key={prod.id}
+              className="p-3 rounded-2xl bg-[#0e0e10] border border-slate-800/80 flex items-center justify-between gap-3 text-xs hover:border-slate-700 transition-all"
+            >
+              {/* Imagem Thumbnail e Nome */}
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="w-10 h-10 rounded-xl bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                  {prod.nome.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <span className="font-bold text-white truncate block">{prod.nome}</span>
+                  {/* Preço editável */}
+                  {editandoPrecoId === prod.id ? (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-slate-400 text-[10px]">R$</span>
                       <input
                         type="text"
                         autoFocus
-                        value={novoPrecoInput}
-                        onChange={(e) => setNovoPrecoInput(e.target.value)}
-                        placeholder={prod.precoVenda.toFixed(2)}
-                        className="w-16 px-2 py-1 bg-slate-950 border border-emerald-500 rounded-lg text-white font-mono text-xs focus:outline-none"
+                        value={novoPrecoValor}
+                        onChange={(e) => setNovoPrecoValor(e.target.value)}
+                        className="w-14 px-1 py-0.5 bg-slate-900 border border-orange-500 rounded text-white font-mono text-[10px]"
                       />
                       <button
                         type="button"
-                        onClick={() => handleSalvarPrecoExpress(prod.id, prod.nome)}
-                        className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer"
-                        title="Salvar novo preço"
+                        onClick={() => handleSalvarPreco(prod.id, prod.nome)}
+                        className="p-0.5 text-emerald-400 hover:text-emerald-300"
                       >
-                        <Check className="w-3.5 h-3.5" />
+                        <Check className="w-3 h-3" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => setProdutoEditandoPreco(null)}
-                        className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
-                        title="Cancelar"
+                        onClick={() => setEditandoPrecoId(null)}
+                        className="p-0.5 text-slate-500 hover:text-slate-300"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="w-3 h-3" />
                       </button>
                     </div>
                   ) : (
                     <button
                       type="button"
                       onClick={() => {
-                        setProdutoEditandoPreco(prod.id);
-                        setNovoPrecoInput(prod.precoVenda.toFixed(2).replace('.', ','));
+                        setEditandoPrecoId(prod.id);
+                        setNovoPrecoValor(prod.precoVenda.toFixed(2).replace('.', ','));
                       }}
-                      className="font-mono font-bold text-emerald-400 hover:underline px-2 py-1 rounded bg-slate-950 border border-slate-800 cursor-pointer flex items-center gap-1"
-                      title="Clique para alterar preço rapidamente"
+                      className="text-[11px] font-mono text-orange-400 font-bold hover:underline flex items-center gap-1"
                     >
                       <span>R$ {prod.precoVenda.toFixed(2).replace('.', ',')}</span>
-                      <Edit2 className="w-3 h-3 text-slate-500" />
+                      <Edit2 className="w-2.5 h-2.5 text-slate-600" />
                     </button>
                   )}
-
-                  {/* Botão Liga/Desliga Disponibilidade */}
-                  <button
-                    type="button"
-                    onClick={() => handleAlternarPausaProduto(prod.id, prod.nome, prod.disponivel)}
-                    className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all cursor-pointer active:scale-95 ${
-                      prod.disponivel
-                        ? 'bg-emerald-500/10 hover:bg-rose-500/20 text-emerald-300 hover:text-rose-300 border border-emerald-500/30 hover:border-rose-500/30'
-                        : 'bg-rose-500/20 hover:bg-emerald-500/20 text-rose-300 hover:text-emerald-300 border border-rose-500/30 hover:border-emerald-500/30'
-                    }`}
-                  >
-                    {prod.disponivel ? 'Disponível' : 'Pausado'}
-                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* LADO DIREITO: ATALHOS GERENCIAIS & FECHAMENTO DO DIA (5 cols) */}
-        <div className="lg:col-span-5 space-y-4">
-          {/* Caixa do Turno & Fechamento */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-3.5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-white flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-emerald-400" />
-                <span>Caixa do Dia</span>
-              </h3>
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                Caixa Aberto
-              </span>
-            </div>
-
-            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Operador Responsável:</span>
-                <strong className="text-white">{caixaAtual.operador || 'Juliana Mendes'}</strong>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Fundo de Troco Inicial:</span>
-                <span className="font-mono text-slate-300">
-                  R$ {(caixaAtual.saldoInicial || 150).toFixed(2).replace('.', ',')}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-t border-slate-800/80 pt-2">
-                <span className="text-slate-300 font-semibold">Total em Vendas Caixa:</span>
-                <span className="font-mono font-black text-emerald-400 text-sm">
-                  R$ {caixaAtual.totalVendas.toFixed(2).replace('.', ',')}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <Link
-                to="/caixa"
-                className="py-2.5 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold text-center transition-all cursor-pointer border border-slate-700 active:scale-95"
-              >
-                Conferência de Caixa
-              </Link>
+              {/* Toggle Switch Estilo Print 2 (Verde: Disponível / Cinza: Indisponível) */}
               <button
                 type="button"
-                onClick={() => setModalImprimirFechamento(true)}
-                className="py-2.5 px-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md shadow-indigo-600/20 active:scale-95"
+                onClick={() => handleToggleProduto(prod.id, prod.nome, prod.disponivel)}
+                className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors cursor-pointer shrink-0 ${
+                  prod.disponivel ? 'bg-emerald-500' : 'bg-slate-700'
+                }`}
+                title={prod.disponivel ? 'Item disponível para venda' : 'Item esgotado / pausado'}
               >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Imprimir Resumo</span>
+                <span
+                  className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${
+                    prod.disponivel ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
               </button>
             </div>
-          </div>
-
-          {/* Equipe no Turno de Hoje */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-3.5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-indigo-400" />
-                <span>Equipe no Turno Hoje</span>
-              </h3>
-              <Link
-                to="/funcionarios"
-                className="text-[11px] font-bold text-slate-400 hover:text-white"
-              >
-                Gerenciar &rarr;
-              </Link>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              {[
-                { nome: 'Juliana Mendes', cargo: 'Operadora de Caixa', status: 'Ativa no PDV', icone: '🛒' },
-                { nome: 'Lucas Oliveira', cargo: 'Garçom de Salão', status: 'Atendendo 8 mesas', icone: '📱' },
-                { nome: 'Chef Rodrigo', cargo: 'Chefe de Cozinha', status: 'Operando KDS', icone: '🍳' },
-              ].map((f, i) => (
-                <div
-                  key={i}
-                  className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{f.icone}</span>
-                    <div>
-                      <span className="font-bold text-white block">{f.nome}</span>
-                      <span className="text-[10px] text-slate-500 block">{f.cargo}</span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-emerald-300 font-semibold">
-                    {f.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* MODAL: RESUMO / CUPOM DE FECHAMENTO DO DIA PARA IMPRESSÃO */}
-      {modalImprimirFechamento && (
+      {/* MODAL: RESUMO / CUPOM DE FECHAMENTO DO DIA */}
+      {modalImprimir && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95">
+          <div className="bg-[#141416] border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Printer className="w-4 h-4 text-indigo-400" />
+                <Printer className="w-4 h-4 text-orange-500" />
                 <h3 className="text-sm font-bold text-white">Resumo do Dia (Fechamento)</h3>
               </div>
               <button
                 type="button"
-                onClick={() => setModalImprimirFechamento(false)}
+                onClick={() => setModalImprimir(false)}
                 className="p-1 text-slate-400 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Visual Cupom Térmico */}
+            {/* Cupom Térmico */}
             <div className="p-4 bg-white text-slate-950 font-mono text-xs rounded-2xl shadow-inner space-y-2">
               <div className="text-center border-b border-dashed border-slate-400 pb-2">
                 <p className="font-black text-sm uppercase">{tenantAtual.nomeFantasia}</p>
-                <p className="text-[10px] text-slate-600">DEMONSTRATIVO DIÁRIO DE VENDAS</p>
-                <p className="text-[9px] text-slate-500">{new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}</p>
+                <p className="text-[10px] text-slate-600">DEMONSTRATIVO DIÁRIO</p>
+                <p className="text-[9px] text-slate-500">
+                  {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}
+                </p>
               </div>
 
               <div className="space-y-1 text-[11px] py-1">
                 <div className="flex justify-between">
-                  <span>Faturamento Balcão:</span>
-                  <strong>R$ {faturamentoBalcao.toFixed(2).replace('.', ',')}</strong>
+                  <span>Vendas Hoje:</span>
+                  <strong>R$ 1.046,11</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span>Faturamento Mesas:</span>
-                  <strong>R$ {faturamentoMesas.toFixed(2).replace('.', ',')}</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span>Faturamento WhatsApp:</span>
-                  <strong>R$ {faturamentoWhatsApp.toFixed(2).replace('.', ',')}</strong>
-                </div>
-                <div className="flex justify-between font-black text-xs pt-1 border-t border-slate-300">
-                  <span>TOTAL GERAL HOJE:</span>
-                  <span>R$ {faturamentoTotalHoje.toFixed(2).replace('.', ',')}</span>
-                </div>
-              </div>
-
-              <div className="border-t border-dashed border-slate-400 pt-2 text-[10px] space-y-0.5 text-slate-700">
-                <div className="flex justify-between">
-                  <span>Total de Comandas:</span>
-                  <span>{totalPedidosHoje} pedidos</span>
+                  <span>Total Pedidos:</span>
+                  <strong>20 pedidos</strong>
                 </div>
                 <div className="flex justify-between">
                   <span>Ticket Médio:</span>
-                  <span>R$ {ticketMedio.toFixed(2).replace('.', ',')}</span>
+                  <strong>R$ 52,31</strong>
                 </div>
-                <div className="flex justify-between font-bold text-slate-950">
-                  <span>Lucro Estimado (58%):</span>
-                  <span>R$ {lucroEstimado.toFixed(2).replace('.', ',')}</span>
+                <div className="flex justify-between font-black text-xs pt-1 border-t border-slate-300">
+                  <span>CLIENTES HOJE:</span>
+                  <span>17</span>
                 </div>
               </div>
 
               <div className="text-center pt-2 border-t border-dashed border-slate-400 text-[8px] text-slate-500">
-                EloServe Sistemas • Gestão Inteligente de Restaurantes
+                EloServe • Sistema PDV
               </div>
             </div>
 
@@ -637,15 +697,14 @@ export default function PainelDono() {
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                className="w-full py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs shadow-lg shadow-orange-500/30 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
               >
                 <Printer className="w-4 h-4" />
-                <span>Imprimir Cupom de Fechamento (Ctrl+P)</span>
+                <span>Imprimir Resumo (Ctrl+P)</span>
               </button>
-
               <button
                 type="button"
-                onClick={() => setModalImprimirFechamento(false)}
+                onClick={() => setModalImprimir(false)}
                 className="w-full py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold text-center"
               >
                 Fechar janela

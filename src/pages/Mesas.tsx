@@ -15,6 +15,11 @@ import {
   UserCheck,
   Smartphone,
   Sparkles,
+  MoreVertical,
+  Pencil,
+  UtensilsCrossed,
+  FileText,
+  Trash2,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useFuncionarioStore } from '../store/useFuncionarioStore';
@@ -26,6 +31,7 @@ export default function Mesas() {
   const garconsDisponiveis = funcionarios.filter((f) => f.cargo === 'garcom' && f.ativo);
 
   const [setorSelecionado, setSetorSelecionado] = useState<string>('todos');
+  const [menuAcoesMesaId, setMenuAcoesMesaId] = useState<number | null>(null);
 
   // Modais
   const [mesaParaAbrir, setMesaParaAbrir] = useState<Mesa | null>(null);
@@ -212,7 +218,7 @@ export default function Mesas() {
                     </h3>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 relative">
                     <button
                       onClick={() => setMesaModalQR(mesa)}
                       title="Abrir QR Code da Mesa"
@@ -244,6 +250,150 @@ export default function Mesas() {
                         ? 'Conta Pedida'
                         : 'Ocupada'}
                     </span>
+
+                    {/* Botão 3 Pontos com Menu de Contexto (Idêntico ao Print 4) */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMenuAcoesMesaId(menuAcoesMesaId === mesa.numero ? null : mesa.numero);
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+                        title="Opções da Mesa"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {menuAcoesMesaId === mesa.numero && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-9 w-48 bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200 py-1.5 z-40 text-xs font-semibold animate-in fade-in zoom-in-95 space-y-0.5"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAcoesMesaId(null);
+                              if (isLivre) {
+                                setMesaParaAbrir(mesa);
+                                setFormAbertura({
+                                  quantidadePessoas: mesa.capacidade,
+                                  responsavelNome: '',
+                                  garcomResponsavel: garconsDisponiveis[0]?.nome || 'Lucas Oliveira',
+                                });
+                              } else {
+                                dispararToast(`Novo pedido para Mesa #${mesa.numero}!`);
+                              }
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-slate-600" />
+                            <span>Novo Pedido</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAcoesMesaId(null);
+                              dispararToast(`Editando pedido da Mesa #${mesa.numero}...`);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                            <span>Editar Pedido</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAcoesMesaId(null);
+                              dispararToast(`Itens consumidos na Mesa #${mesa.numero}: R$ ${(mesa.totalConsumo || 0).toFixed(2)}`);
+                            }}
+                            className="w-full px-3 py-1.5 text-left bg-slate-100 hover:bg-slate-200 flex items-center gap-2.5 text-slate-900 font-bold cursor-pointer"
+                          >
+                            <UtensilsCrossed className="w-3.5 h-3.5 text-slate-700" />
+                            <span>Ver Pedidos</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAcoesMesaId(null);
+                              window.print();
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-slate-600" />
+                            <span>Visualizar Comanda</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAcoesMesaId(null);
+                              atualizarStatusMesa(mesa.numero, 'chamar_garcom');
+                              dispararToast(`Atenção marcada para Mesa #${mesa.numero}!`);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
+                          >
+                            <Bell className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Marcar Atenção</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAcoesMesaId(null);
+                              setMesaParaFechar(mesa);
+                              setPessoasDivisao(mesa.quantidadePessoas || 2);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
+                          >
+                            <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Fechar Conta</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAcoesMesaId(null);
+                              atualizarStatusMesa(mesa.numero, 'livre');
+                              dispararToast(`Mesa #${mesa.numero} liberada com sucesso!`);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-emerald-50 flex items-center gap-2.5 text-emerald-600 font-bold cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Liberar Mesa</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAcoesMesaId(null);
+                              setMesaModalQR(mesa);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
+                          >
+                            <QrCode className="w-3.5 h-3.5 text-slate-600" />
+                            <span>Ver QR Code</span>
+                          </button>
+
+                          <div className="border-t border-slate-100 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMenuAcoesMesaId(null);
+                                dispararToast(`Mesa #${mesa.numero} excluída/desativada.`);
+                              }}
+                              className="w-full px-3 py-1.5 text-left hover:bg-rose-50 flex items-center gap-2.5 text-rose-600 font-bold cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                              <span>Excluir Mesa</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

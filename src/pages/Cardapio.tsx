@@ -216,18 +216,18 @@ export default function Cardapio() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => executarComAdmin(() => setModalCategoriasAberto(true))}
-            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all flex items-center gap-2 cursor-pointer"
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700/60 transition-all flex items-center gap-2 cursor-pointer"
           >
-            <Tag className="w-4 h-4 text-slate-400" />
+            <Tag className="w-4 h-4 text-orange-400" />
             <span>Categorias ({categorias.length})</span>
           </button>
 
           <button
             onClick={abrirNovoProduto}
-            className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            className="px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            <span>Novo Item no Cardápio</span>
+            <span>+ Novo Produto</span>
           </button>
         </div>
       </div>
@@ -240,8 +240,8 @@ export default function Cardapio() {
             type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar prato, bebida ou ingrediente..."
-            className="w-full pl-11 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+            placeholder="Buscar no cardápio..."
+            className="w-full pl-11 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-orange-500"
           />
         </div>
 
@@ -250,25 +250,28 @@ export default function Cardapio() {
             onClick={() => setCategoriaFiltro('todas')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
               categoriaFiltro === 'todas'
-                ? 'bg-emerald-500 text-white shadow-sm'
+                ? 'bg-orange-500 text-white shadow-sm'
                 : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
             }`}
           >
-            Todas ({produtos.length})
+            Todos ({produtos.length})
           </button>
-          {categorias.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setCategoriaFiltro(cat.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                categoriaFiltro === cat.id
-                  ? 'bg-emerald-500 text-white shadow-sm'
-                  : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              {cat.nome}
-            </button>
-          ))}
+          {categorias.map((cat) => {
+            const count = produtos.filter((p) => p.categoriaId === cat.id).length;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setCategoriaFiltro(cat.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  categoriaFiltro === cat.id
+                    ? 'bg-orange-500 text-white shadow-sm'
+                    : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                {cat.nome} ({count})
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -351,13 +354,23 @@ export default function Cardapio() {
                     <td className="py-3.5 px-4">
                       <button
                         onClick={() => executarComAdmin(() => alternarDisponibilidade(item.id))}
-                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
-                          item.disponivel
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                        }`}
+                        className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
+                        title={item.disponivel ? 'Clique para desativar no cardápio/PDV' : 'Clique para disponibilizar no cardápio/PDV'}
                       >
-                        {item.disponivel ? 'Ativo no PDV' : 'Pausado'}
+                        <div
+                          className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 flex items-center ${
+                            item.disponivel ? 'bg-emerald-500 justify-end' : 'bg-slate-700 justify-start'
+                          }`}
+                        >
+                          <div className="w-4 h-4 rounded-full bg-white shadow-sm" />
+                        </div>
+                        <span
+                          className={`text-xs font-semibold select-none ${
+                            item.disponivel ? 'text-emerald-400' : 'text-slate-500'
+                          }`}
+                        >
+                          {item.disponivel ? 'Disponível' : 'Indisponível'}
+                        </span>
                       </button>
                     </td>
 
