@@ -3,7 +3,8 @@ export type CargoUsuario =
   | 'admin_restaurante'
   | 'caixa'
   | 'garcom'
-  | 'cozinha';
+  | 'cozinha'
+  | 'entregador';
 
 export interface Usuario {
   id: string;
@@ -58,6 +59,14 @@ export interface Mesa {
   tempoOcupadaMin?: number;
   totalConsumo?: number;
   qrCodeUrl?: string;
+  quantidadePessoas?: number;
+  responsavelNome?: string;
+  garcomResponsavel?: string;
+  tempoChamadaGarcomMin?: number;
+  garcomAtendeu?: boolean;
+  alertaCritico?: boolean;
+  solicitacaoTransferida?: boolean;
+  mesasUnidas?: number[];
 }
 
 export type StatusProducaoKDS = 'novo' | 'em_preparo' | 'pronto';
@@ -151,4 +160,198 @@ export interface TenantRestaurante {
   diasRestantesTrial?: number;
   instanciaWhatsAppConectada: boolean;
   criadoEm: string;
+}
+
+// -------------------------------------------------------------
+// GESTÃO DE ESTOQUE INTELIGENTE & COMPRAS (SEÇÕES 1.3 - 1.10, 11, 19, 20)
+// -------------------------------------------------------------
+export type CategoriaEstoque =
+  | 'alimentos'
+  | 'bebidas'
+  | 'higiene'
+  | 'utensilios'
+  | 'limpeza'
+  | 'balcao';
+
+export type MetodoControleEstoque =
+  | 'recorrente'   // Insumos recorrentes com consumo diário previsto e verificação de sobras na abertura
+  | 'individual'   // Bebidas e unitários com baixa automática na venda
+  | 'manual';      // Limpeza e operação com baixa manual de unidades inteiras
+
+export type StatusDisponibilidade = 'disponivel' | 'esgotando' | 'esgotado';
+
+export interface ItemEstoque {
+  id: string;
+  nome: string;
+  categoria: CategoriaEstoque;
+  metodoControle: MetodoControleEstoque;
+  quantidadeAtual: number;
+  unidadeMedida: 'kg' | 'g' | 'un' | 'pct' | 'l' | 'ml' | 'frasco' | 'cx';
+  consumoDiarioPrevisto?: number; // Para itens de consumo recorrente (ex: 5 kg/dia)
+  sobraDiaAnterior?: number;      // Ajustado na abertura do caixa
+  estoqueMinimo: number;
+  estoqueIdeal: number;
+  precoCusto: number;             // Preço de custo unitário mais recente
+  precoVenda?: number;            // Para produtos vendidos diretamente (ex: cervejas)
+  statusDisponibilidade: StatusDisponibilidade;
+  fornecedorHabitual?: string;
+}
+
+export interface RegistroCompra {
+  id: string;
+  data: string;
+  fornecedorOuLocal: string;
+  produtoNome: string;
+  categoria: CategoriaEstoque;
+  quantidade: number;
+  unidadeMedida: string;
+  precoTotal: number;
+  precoUnitario: number;
+}
+
+export interface ComponenteFichaTecnica {
+  ingredienteId: string;
+  ingredienteNome: string;
+  pesoGramas: number;
+  custoPorGrama: number;
+  custoTotalComponente: number;
+}
+
+export interface FichaTecnica {
+  id: string;
+  produtoId: string;
+  nomePrato: string;
+  componentes: ComponenteFichaTecnica[];
+  custoTotalEstimado: number;
+  precoVenda: number;
+  margemBrutaPercentual: number;
+}
+
+// -------------------------------------------------------------
+// GESTÃO DE FUNCIONÁRIOS & RH (SEÇÃO 2)
+// -------------------------------------------------------------
+export interface VeiculoEntregador {
+  modelo: string;
+  ano: number;
+  cor: string;
+  placa: string;
+}
+
+export interface FuncionarioCompleto {
+  id: string;
+  foto?: string;
+  nome: string;
+  sobrenome: string;
+  telefoneWhatsApp: string;
+  dataNascimento: string;
+  dataAdmissao: string;
+  email: string;
+  cargo: CargoUsuario;
+  salario?: number;
+  fgts?: number;
+  inss?: number;
+  periodoFerias?: string;
+  veiculo?: VeiculoEntregador;
+  ativo: boolean;
+  pin: string;
+}
+
+// -------------------------------------------------------------
+// DELIVERY & ENTREGAS (SEÇÕES 3.6 - 3.13, 8)
+// -------------------------------------------------------------
+export type StatusDelivery = 'preparando' | 'pronto' | 'retirado' | 'a_caminho' | 'entregue';
+export type StatusRetirada = 'preparando' | 'pronto' | 'retirado';
+
+export interface EnderecoEntrega {
+  cep?: string;
+  rua: string;
+  numero: string;
+  complemento?: string;
+  bairro: string;
+  cidade: string;
+  pontoReferencia?: string;
+  obs?: string;
+  distanciaKm?: number;
+}
+
+export interface PedidoDelivery {
+  id: string;
+  numero: number;
+  clienteNome: string;
+  clienteTelefone: string;
+  tipo: 'delivery' | 'retirada';
+  endereco?: EnderecoEntrega;
+  itens: {
+    nome: string;
+    quantidade: number;
+    preco: number;
+    observacoes?: string;
+  }[];
+  subtotal: number;
+  taxaEntrega: number;
+  total: number;
+  formaPagamento: 'pix' | 'maquininha_entrega' | 'dinheiro';
+  status: StatusDelivery;
+  horario: string;
+  entregadorNome?: string;
+  pago: boolean;
+}
+
+export interface ClienteDelivery {
+  id: string;
+  nome: string;
+  telefone: string;
+  dataNascimento: string;
+  dataUltimoPedido: string;
+  descricaoUltimoPedido: string;
+  valorUltimoPedido: number;
+  totalPedidos: number;
+  totalGasto: number;
+  enderecos: string[];
+}
+
+export interface FaixaTaxaEntrega {
+  ateKm: number;
+  taxa: number;
+}
+
+// -------------------------------------------------------------
+// FORNECEDORES & RELATÓRIOS (SEÇÃO 12)
+// -------------------------------------------------------------
+export interface Fornecedor {
+  id: string;
+  nomeOuEmpresa: string;
+  pessoaContato: string;
+  telefone: string;
+  email: string;
+  cnpj: string;
+  endereco: string;
+  categoriaPrincipal: string;
+}
+
+// -------------------------------------------------------------
+// CAIXA DETALHADO & QUESTIONÁRIO DE FECHAMENTO (SEÇÕES 6 E 14.4)
+// -------------------------------------------------------------
+export interface ContagemDinheiroFisico {
+  moedas050: number;
+  moedas100: number;
+  cedulas002: number;
+  cedulas005: number;
+  cedulas010: number;
+  cedulas020: number;
+  cedulas050: number;
+  cedulas100: number;
+}
+
+export interface QuestionarioFechamentoCaixa {
+  avaliacaoDia: 'otimo' | 'bom' | 'regular' | 'dificil';
+  fluxoClientes: 'alto' | 'medio' | 'baixo';
+  teveOcorrencia: boolean;
+  descricaoOcorrencia?: string;
+  valorEsperadoDinheiro: number;
+  valorContadoDinheiro: number;
+  divergencia: number;
+  justificativaDivergencia?: string;
+  fechadoEm: string;
+  responsavel: string;
 }

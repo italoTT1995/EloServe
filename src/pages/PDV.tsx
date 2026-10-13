@@ -21,6 +21,7 @@ import {
 import { useCartStore } from '../store/useCartStore';
 import { useAppStore } from '../store/useAppStore';
 import { useProductStore } from '../store/useProductStore';
+import { useEstoqueStore } from '../store/useEstoqueStore';
 import { useWindowFocus } from '../hooks/useWindowFocus';
 import { audio } from '../lib/audio';
 
@@ -54,6 +55,7 @@ export default function PDV() {
 
   const { registrarVendaCaixa } = useAppStore();
   const { produtos, categorias } = useProductStore();
+  const { baixarEstoquePorVenda } = useEstoqueStore();
 
   // Filtragem rápida
   const produtosFiltrados = useMemo(() => {
@@ -89,6 +91,12 @@ export default function PDV() {
 
   function finalizarVenda() {
     if (itens.length === 0) return;
+
+    // Baixa automática no estoque para produtos vendidos (Seção 1.5 e 1.9 do documento)
+    itens.forEach((it) => {
+      baixarEstoquePorVenda(it.produto.nome, it.quantidade);
+    });
+
     registrarVendaCaixa(totalLiquido);
     audio.tocarSucessoVenda();
     setVendaSucesso(true);

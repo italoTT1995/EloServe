@@ -11,6 +11,9 @@ import Relatorios from './pages/Relatorios';
 import EloBot from './pages/EloBot';
 import SaaSMaster from './pages/SaaSMaster';
 import MinhaAssinatura from './pages/MinhaAssinatura';
+import Estoque from './pages/Estoque';
+import Delivery from './pages/Delivery';
+import Funcionarios from './pages/Funcionarios';
 
 export default function App() {
   return (
@@ -46,12 +49,42 @@ export default function App() {
                     }
                   />
 
+                  {/* Delivery & Entregas */}
+                  <Route
+                    path="/delivery"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante', 'caixa', 'entregador']}>
+                        <Delivery />
+                      </RotaProtegida>
+                    }
+                  />
+
                   {/* Cozinha KDS */}
                   <Route
                     path="/kds"
                     element={
                       <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante', 'cozinha']}>
                         <KDS />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Estoque Inteligente & Compras */}
+                  <Route
+                    path="/estoque"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <Estoque />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Funcionários & Gestão de Equipe */}
+                  <Route
+                    path="/funcionarios"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <Funcionarios />
                       </RotaProtegida>
                     }
                   />

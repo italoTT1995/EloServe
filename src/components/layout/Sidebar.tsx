@@ -15,6 +15,9 @@ import {
   Sliders,
   Layers,
   ShieldCheck,
+  Bike,
+  Package,
+  Users,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { CargoUsuario } from '../../types';
@@ -32,8 +35,11 @@ interface MenuItemDef {
 const menuItemsOperacao: MenuItemDef[] = [
   { path: '/', label: 'Frente de Caixa (PDV)', icon: Store, badge: 'F1', cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
   { path: '/mesas', label: 'Mesas & Salão', icon: LayoutGrid, badge: 'F2', cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
-  { path: '/kds', label: 'Cozinha (KDS)', icon: ChefHat, badge: 'F3', cargos: ['super_admin', 'admin_restaurante', 'cozinha'] },
+  { path: '/delivery', label: 'Delivery & Entregas', icon: Bike, badge: 'F3', cargos: ['super_admin', 'admin_restaurante', 'caixa', 'entregador'] },
+  { path: '/kds', label: 'Cozinha (KDS)', icon: ChefHat, badge: 'F4', cargos: ['super_admin', 'admin_restaurante', 'cozinha'] },
+  { path: '/estoque', label: 'Estoque Inteligente', icon: Package, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/cardapio', label: 'Cardápio & Itens', icon: BookOpen, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/funcionarios', label: 'Funcionários & RH', icon: Users, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/caixa', label: 'Controle de Caixa', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante', 'caixa'] },
   { path: '/relatorios', label: 'Faturamento & DRE', icon: TrendingUp, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/elobot', label: 'EloBot (WhatsApp IA)', icon: Bot, highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
