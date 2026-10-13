@@ -22,6 +22,7 @@ import { useCartStore } from '../store/useCartStore';
 import { useAppStore } from '../store/useAppStore';
 import { useProductStore } from '../store/useProductStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
+import { useSaaSStore } from '../store/useSaaSStore';
 import { useWindowFocus } from '../hooks/useWindowFocus';
 import { audio } from '../lib/audio';
 
@@ -54,7 +55,11 @@ export default function PDV() {
   } = useCartStore();
 
   const { registrarVendaCaixa } = useAppStore();
-  const { produtos, categorias } = useProductStore();
+  const { tenantAtivoId } = useSaaSStore();
+  const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
+  const idLoja = tenantAtivoId === 'global' ? 'tenant-03' : tenantAtivoId;
+  const produtos = getProdutosPorTenant(idLoja);
+  const categorias = getCategoriasPorTenant(idLoja);
   const { baixarEstoquePorVenda } = useEstoqueStore();
 
   // Filtragem rápida

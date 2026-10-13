@@ -86,8 +86,8 @@ export default function SaaSMaster() {
   } = useSaaSStore();
 
   const {
-    produtos,
-    categorias,
+    getProdutosPorTenant,
+    getCategoriasPorTenant,
     adicionarProduto,
     editarProduto,
     removerProduto,
@@ -117,6 +117,8 @@ export default function SaaSMaster() {
   // Estados do Ambiente de Edição da Loja (editor_loja)
   const [subAbaEditor, setSubAbaEditor] = useState<'dados_loja' | 'cardapio_precos'>('dados_loja');
   const tenantEmEdicao = tenants.find((t) => t.id === (tenantEmEdicaoId || tenants[0]?.id)) || tenants[0];
+  const produtos = getProdutosPorTenant(tenantEmEdicao?.id || 'tenant-01');
+  const categorias = getCategoriasPorTenant(tenantEmEdicao?.id || 'tenant-01');
 
   const [formEdicao, setFormEdicao] = useState({
     nomeFantasia: '',
@@ -894,6 +896,77 @@ export default function SaaSMaster() {
       {/* CONTEÚDO DA ABA 1: RESTAURANTES ASSINANTES */}
       {abaAtiva === 'restaurantes' && (
         <div className="space-y-4">
+          {/* Card de Destaque / Raio-X do Restaurante Selecionado */}
+          {tenantAtivoId !== 'global' && (() => {
+            const tFoco = tenants.find((t) => t.id === tenantAtivoId);
+            if (!tFoco) return null;
+            const emoji = tFoco.id === 'tenant-05' ? '🍣' : tFoco.id === 'tenant-02' ? '🍕' : tFoco.id === 'tenant-03' ? '🍔' : tFoco.id === 'tenant-04' ? '🍢' : '🥩';
+
+            return (
+              <div className="bg-gradient-to-r from-purple-950/90 via-slate-900 to-indigo-950 border border-purple-500/50 p-5 rounded-3xl shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-3xl shrink-0 shadow-inner">
+                    {emoji}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 uppercase tracking-wider">
+                        Restaurante Selecionado para Inspeção
+                      </span>
+                      <span
+                        className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                          tFoco.statusAssinatura === 'ativo'
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
+                            : tFoco.statusAssinatura === 'trial'
+                            ? 'bg-amber-950 text-amber-400 border border-amber-500/30'
+                            : 'bg-rose-950 text-rose-400 border border-rose-500/30'
+                        }`}
+                      >
+                        {tFoco.statusAssinatura}
+                      </span>
+                    </div>
+                    <h2 className="text-xl font-black text-white mt-1">
+                      {tFoco.nomeFantasia}
+                    </h2>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      {tFoco.cidadeUf} • CNPJ: {tFoco.documento} • Responsável: <strong className="text-white">{tFoco.responsavelNome}</strong> ({tFoco.telefoneWhatsApp})
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    onClick={() => handleEntrarNaLoja(tFoco.id)}
+                    className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/30 cursor-pointer active:scale-95 transition-all"
+                    title="Abrir o PDV com o cardápio real deste restaurante"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Inspecionar PDV (Ver Cardápio)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setTenantEmEdicaoId(tFoco.id);
+                      handleMudarAba('editor_loja');
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+                    title="Editar os pratos, preços e dados desta loja"
+                  >
+                    <Sliders className="w-4 h-4" />
+                    <span>Editar Cardápio & Loja</span>
+                  </button>
+
+                  <button
+                    onClick={() => selecionarTenant('global')}
+                    className="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 font-bold text-xs transition-all cursor-pointer"
+                  >
+                    <span>Voltar p/ Visão Global</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Barra de Filtros e Busca */}
           <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
             <div className="relative flex-1 max-w-md">

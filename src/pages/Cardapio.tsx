@@ -17,13 +17,15 @@ import {
 } from 'lucide-react';
 import { useProductStore } from '../store/useProductStore';
 import { useAppStore } from '../store/useAppStore';
+import { useSaaSStore } from '../store/useSaaSStore';
 import { AdminAuthModal } from '../components/common/AdminAuthModal';
 import { Produto } from '../types';
 
 export default function Cardapio() {
+  const { tenantAtivoId, getTenantAtivo } = useSaaSStore();
   const {
-    produtos,
-    categorias,
+    getProdutosPorTenant,
+    getCategoriasPorTenant,
     adicionarProduto,
     editarProduto,
     removerProduto,
@@ -32,6 +34,11 @@ export default function Cardapio() {
     adicionarCategoria,
     removerCategoria,
   } = useProductStore();
+
+  const idLoja = tenantAtivoId === 'global' ? 'tenant-03' : tenantAtivoId;
+  const produtos = getProdutosPorTenant(idLoja);
+  const categorias = getCategoriasPorTenant(idLoja);
+  const tenantAtual = getTenantAtivo();
 
   const { perfilAtivo } = useAppStore();
 

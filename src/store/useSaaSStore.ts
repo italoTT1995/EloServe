@@ -365,7 +365,10 @@ export const useSaaSStore = create<SaaSState>()(
       setTenantEmEdicaoId: (id) => set({ tenantEmEdicaoId: id }),
 
       selecionarTenant: (tenantId: string) => {
-        set({ tenantAtivoId: tenantId });
+        set({
+          tenantAtivoId: tenantId,
+          tenantEmEdicaoId: tenantId === 'global' ? 'tenant-01' : tenantId,
+        });
       },
 
       adicionarTenant: (novo) => {
