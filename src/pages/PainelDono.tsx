@@ -39,6 +39,7 @@ export default function PainelDono() {
   const { usuarioLogado } = useAuthStore();
   const { caixaAtual, mesas, pedidosKDS } = useAppStore();
   const { tema, alternarTema } = useThemeStore();
+  const isWhite = tema === 'light';
   const { getProdutosPorTenant, alternarDisponibilidade, atualizarPreco } = useProductStore();
   const produtos = getProdutosPorTenant(currentTenantId);
   const { pedidos: pedidosDelivery } = useDeliveryStore();
@@ -111,7 +112,9 @@ export default function PainelDono() {
     {
       id: '#M24-2305',
       status: 'Concluído',
-      statusCor: 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
+      statusCor: isWhite
+        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
       origem: 'Mesa 24 • 3 itens',
       valor: 'R$ 85,97',
       hora: '13:42',
@@ -119,7 +122,9 @@ export default function PainelDono() {
     {
       id: '#M4-9359',
       status: 'Concluído',
-      statusCor: 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
+      statusCor: isWhite
+        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
       origem: 'Mesa 4 • 2 itens',
       valor: 'R$ 32,99',
       hora: '13:35',
@@ -127,7 +132,9 @@ export default function PainelDono() {
     {
       id: '#M26-2378',
       status: 'Concluído',
-      statusCor: 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
+      statusCor: isWhite
+        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
       origem: 'Mesa 26 • 3 itens',
       valor: 'R$ 138,94',
       hora: '13:20',
@@ -135,7 +142,9 @@ export default function PainelDono() {
     {
       id: '#M21-2576',
       status: 'Novo',
-      statusCor: 'bg-orange-950/80 text-orange-400 border border-orange-500/30',
+      statusCor: isWhite
+        ? 'bg-orange-100 text-orange-800 border border-orange-200'
+        : 'bg-orange-950/80 text-orange-400 border border-orange-500/30',
       origem: 'Mesa 21 • 3 itens',
       valor: 'R$ 99,96',
       hora: '13:14',
@@ -143,7 +152,9 @@ export default function PainelDono() {
     {
       id: '##2607033RAJ',
       status: 'Concluído',
-      statusCor: 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
+      statusCor: isWhite
+        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
       origem: 'Nuane Cabral Queiroz - Delivery • 1 item',
       valor: 'R$ 27,49',
       hora: '12:58',
@@ -528,21 +539,25 @@ export default function PainelDono() {
       </div>
 
       {/* 4. CARDÁPIO EXPRESS: COM TOGGLE DE DISPONIBILIDADE (Exatamente como o Print 2) */}
-      <div className="bg-[#141416] border border-slate-800/80 rounded-2xl p-6 shadow-lg space-y-5">
+      <div className={`border rounded-2xl p-6 shadow-lg space-y-5 transition-all ${
+        isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#141416] border-slate-800/80'
+      }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-base font-black text-white flex items-center gap-2">
+            <h3 className={`text-base font-black flex items-center gap-2 ${isWhite ? 'text-slate-900' : 'text-white'}`}>
               <Tag className="w-4 h-4 text-orange-500" />
               <span>Cardápio & Controle de Disponibilidade</span>
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
               Clique no toggle para pausar itens esgotados instantaneamente no PDV e WhatsApp.
             </p>
           </div>
 
           <Link
             to="/cardapio"
-            className="text-xs font-bold text-orange-400 hover:text-orange-300 transition-colors"
+            className={`text-xs font-bold transition-colors ${
+              isWhite ? 'text-orange-600 hover:text-orange-500' : 'text-orange-400 hover:text-orange-300'
+            }`}
           >
             Abrir Gestor de Cardápio Completo &rarr;
           </Link>
@@ -551,13 +566,17 @@ export default function PainelDono() {
         {/* Barra de Filtros e Busca (Estilo Print 2) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-xs">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search className={`w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 ${isWhite ? 'text-slate-400' : 'text-slate-500'}`} />
             <input
               type="text"
               value={buscaItem}
               onChange={(e) => setBuscaItem(e.target.value)}
               placeholder="Buscar item..."
-              className="w-full pl-8 pr-3 py-1.5 bg-[#0e0e10] border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500"
+              className={`w-full pl-8 pr-3 py-1.5 border rounded-xl text-xs focus:outline-none focus:border-orange-500 transition-colors ${
+                isWhite
+                  ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
+                  : 'bg-[#0e0e10] border-slate-800 text-white placeholder:text-slate-600'
+              }`}
             />
           </div>
 
@@ -575,6 +594,8 @@ export default function PainelDono() {
                 className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
                   categoriaCardapio === cat.id
                     ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
+                    : isWhite
+                    ? 'bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 hover:bg-slate-200'
                     : 'bg-[#0e0e10] text-slate-400 hover:text-white border border-slate-800'
                 }`}
               >
@@ -589,15 +610,31 @@ export default function PainelDono() {
           {produtosFiltrados.slice(0, 8).map((prod) => (
             <div
               key={prod.id}
-              className="p-3 rounded-2xl bg-[#0e0e10] border border-slate-800/80 flex items-center justify-between gap-3 text-xs hover:border-slate-700 transition-all"
+              className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs transition-all ${
+                isWhite
+                  ? 'bg-slate-50 hover:bg-slate-100/90 border-slate-200 shadow-sm'
+                  : 'bg-[#0e0e10] border-slate-800/80 hover:border-slate-700'
+              }`}
             >
               {/* Imagem Thumbnail e Nome */}
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="w-10 h-10 rounded-xl bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden ${
+                    isWhite
+                      ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                      : 'bg-slate-800 text-slate-300'
+                  }`}
+                >
                   {prod.nome.charAt(0)}
                 </div>
                 <div className="min-w-0">
-                  <span className="font-bold text-white truncate block">{prod.nome}</span>
+                  <span
+                    className={`font-bold truncate block ${
+                      isWhite ? 'text-slate-900' : 'text-white'
+                    }`}
+                  >
+                    {prod.nome}
+                  </span>
                   {/* Preço editável */}
                   {editandoPrecoId === prod.id ? (
                     <div className="flex items-center gap-1 mt-0.5">
@@ -607,19 +644,21 @@ export default function PainelDono() {
                         autoFocus
                         value={novoPrecoValor}
                         onChange={(e) => setNovoPrecoValor(e.target.value)}
-                        className="w-14 px-1 py-0.5 bg-slate-900 border border-orange-500 rounded text-white font-mono text-[10px]"
+                        className={`w-14 px-1 py-0.5 border border-orange-500 rounded font-mono text-[10px] ${
+                          isWhite ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'
+                        }`}
                       />
                       <button
                         type="button"
                         onClick={() => handleSalvarPreco(prod.id, prod.nome)}
-                        className="p-0.5 text-emerald-400 hover:text-emerald-300"
+                        className="p-0.5 text-emerald-500 hover:text-emerald-600"
                       >
                         <Check className="w-3 h-3" />
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditandoPrecoId(null)}
-                        className="p-0.5 text-slate-500 hover:text-slate-300"
+                        className="p-0.5 text-slate-400 hover:text-slate-600"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -631,10 +670,12 @@ export default function PainelDono() {
                         setEditandoPrecoId(prod.id);
                         setNovoPrecoValor(prod.precoVenda.toFixed(2).replace('.', ','));
                       }}
-                      className="text-[11px] font-mono text-orange-400 font-bold hover:underline flex items-center gap-1"
+                      className={`text-[11px] font-mono font-bold hover:underline flex items-center gap-1 cursor-pointer ${
+                        isWhite ? 'text-orange-600' : 'text-orange-400'
+                      }`}
                     >
                       <span>R$ {prod.precoVenda.toFixed(2).replace('.', ',')}</span>
-                      <Edit2 className="w-2.5 h-2.5 text-slate-600" />
+                      <Edit2 className="w-2.5 h-2.5 text-slate-400" />
                     </button>
                   )}
                 </div>
@@ -645,12 +686,16 @@ export default function PainelDono() {
                 type="button"
                 onClick={() => handleToggleProduto(prod.id, prod.nome, prod.disponivel)}
                 className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors cursor-pointer shrink-0 ${
-                  prod.disponivel ? 'bg-emerald-500' : 'bg-slate-700'
+                  prod.disponivel
+                    ? 'bg-emerald-500'
+                    : isWhite
+                    ? 'bg-slate-300'
+                    : 'bg-slate-700'
                 }`}
                 title={prod.disponivel ? 'Item disponível para venda' : 'Item esgotado / pausado'}
               >
                 <span
-                  className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${
+                  className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform shadow-sm ${
                     prod.disponivel ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
@@ -662,17 +707,21 @@ export default function PainelDono() {
 
       {/* MODAL: RESUMO / CUPOM DE FECHAMENTO DO DIA */}
       {modalImprimir && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#141416] border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className={`border rounded-3xl max-w-sm w-full shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 ${
+            isWhite ? 'bg-white border-slate-200' : 'bg-[#141416] border-slate-800'
+          }`}>
+            <div className={`flex items-center justify-between border-b pb-3 ${
+              isWhite ? 'border-slate-200' : 'border-slate-800'
+            }`}>
               <div className="flex items-center gap-2">
                 <Printer className="w-4 h-4 text-orange-500" />
-                <h3 className="text-sm font-bold text-white">Resumo do Dia (Fechamento)</h3>
+                <h3 className={`text-sm font-bold ${isWhite ? 'text-slate-900' : 'text-white'}`}>Resumo do Dia (Fechamento)</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setModalImprimir(false)}
-                className="p-1 text-slate-400 hover:text-white"
+                className={`p-1 ${isWhite ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'}`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -724,7 +773,9 @@ export default function PainelDono() {
               <button
                 type="button"
                 onClick={() => setModalImprimir(false)}
-                className="w-full py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold text-center"
+                className={`w-full py-2 rounded-xl text-xs font-semibold text-center cursor-pointer transition-colors ${
+                  isWhite ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'
+                }`}
               >
                 Fechar janela
               </button>

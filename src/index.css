@@ -136,9 +136,45 @@ html.theme-light .bg-slate-800\/90,
 html.theme-light .bg-slate-800\/80,
 html.theme-light .bg-slate-800\/60,
 html.theme-light .bg-slate-800\/50,
-html.theme-light .bg-slate-800\/40 {
-  background-color: #f1f5f9 !important;
-  color: #334155 !important;
+html.theme-light .bg-slate-800\/40,
+html.theme-light .bg-\[\#0e0e10\],
+html.theme-light .bg-\[\#0a0a0c\] {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+/* Badges e tags de status com fundo suave e texto de alto contraste no tema claro */
+html.theme-light [class*="bg-emerald-950"],
+html.theme-light [class*="bg-green-950"] {
+  background-color: #dcfce7 !important;
+  color: #166534 !important;
+  border-color: #bbf7d0 !important;
+}
+html.theme-light [class*="bg-emerald-950"] *,
+html.theme-light [class*="bg-green-950"] * {
+  color: #166534 !important;
+}
+
+html.theme-light [class*="bg-orange-950"],
+html.theme-light [class*="bg-amber-950"] {
+  background-color: #ffedd5 !important;
+  color: #9a3412 !important;
+  border-color: #fed7aa !important;
+}
+html.theme-light [class*="bg-orange-950"] *,
+html.theme-light [class*="bg-amber-950"] * {
+  color: #9a3412 !important;
+}
+
+html.theme-light [class*="bg-rose-950"],
+html.theme-light [class*="bg-red-950"] {
+  background-color: #ffe4e6 !important;
+  color: #9f1239 !important;
+  border-color: #fecdd3 !important;
+}
+html.theme-light [class*="bg-rose-950"] *,
+html.theme-light [class*="bg-red-950"] * {
+  color: #9f1239 !important;
 }
 
 /* Bordas sutis no tema claro */
