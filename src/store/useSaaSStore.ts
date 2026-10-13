@@ -109,7 +109,44 @@ export const PLANOS_DISPONIVEIS: PlanoAssinatura[] = [
   },
 ];
 
-export type AbaMasterSaaS = 'restaurantes' | 'financeiro' | 'editor_loja' | 'planos' | 'regras_planos' | 'whatsapp' | 'config' | 'dre_saas';
+export type AbaMasterSaaS =
+  | 'restaurantes'
+  | 'financeiro'
+  | 'editor_loja'
+  | 'planos'
+  | 'regras_planos'
+  | 'whatsapp'
+  | 'config'
+  | 'dre_saas'
+  | 'avisos_globais'
+  | 'auditoria';
+
+export interface CustosInfraSaaS {
+  cloudVps: number;
+  evolutionWhatsapp: number;
+  taxaGatewayPct: number;
+  impostoSimplesPct: number;
+  suporteMarketing: number;
+}
+
+export interface AvisoGlobalSaaS {
+  id: string;
+  titulo: string;
+  mensagem: string;
+  tipo: 'info' | 'alerta' | 'urgente' | 'novidade';
+  destinoTenantId: string; // 'todos' ou id de restaurante
+  ativo: boolean;
+  criadoEm: string;
+}
+
+export interface LogAuditoriaSaaS {
+  id: string;
+  dataHora: string;
+  usuarioNome: string;
+  acao: string;
+  categoria: 'restaurante' | 'plano' | 'financeiro' | 'sistema' | 'cobranca' | 'seguranca';
+  detalhes: string;
+}
 
 interface SaaSState {
   planos: PlanoAssinatura[];
@@ -117,6 +154,9 @@ interface SaaSState {
   tenantAtivoId: string;
   abaAtivaMaster: AbaMasterSaaS;
   tenantEmEdicaoId: string | null;
+  custosInfra: CustosInfraSaaS;
+  avisos: AvisoGlobalSaaS[];
+  logsAuditoria: LogAuditoriaSaaS[];
   setAbaAtivaMaster: (aba: AbaMasterSaaS) => void;
   setTenantEmEdicaoId: (id: string | null) => void;
   selecionarTenant: (tenantId: string) => void;
@@ -125,6 +165,12 @@ interface SaaSState {
   atualizarStatusAssinatura: (tenantId: string, status: StatusAssinatura) => void;
   mudarPlanoTenant: (tenantId: string, planoId: TipoPlanoSaaS) => void;
   atualizarPlano: (planoId: TipoPlanoSaaS, dados: Partial<PlanoAssinatura>, atualizarAssinantes?: boolean) => void;
+  atualizarCustosInfra: (novos: Partial<CustosInfraSaaS>) => void;
+  adicionarAviso: (aviso: Omit<AvisoGlobalSaaS, 'id' | 'criadoEm'>) => void;
+  alternarStatusAviso: (id: string) => void;
+  removerAviso: (id: string) => void;
+  registrarLogAuditoria: (acao: string, categoria: LogAuditoriaSaaS['categoria'], detalhes: string) => void;
+  getAvisosAtivosParaTenant: (tenantId: string) => AvisoGlobalSaaS[];
   getTenantAtivo: () => TenantRestaurante;
   getMRR: () => number;
   getTotalAtivos: () => number;
@@ -221,6 +267,70 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
   },
 ];
 
+const CUSTOS_INFRA_PADRAO: CustosInfraSaaS = {
+  cloudVps: 180.0,
+  evolutionWhatsapp: 120.0,
+  taxaGatewayPct: 2.9,
+  impostoSimplesPct: 6.0,
+  suporteMarketing: 350.0,
+};
+
+const AVISOS_INICIAIS: AvisoGlobalSaaS[] = [
+  {
+    id: 'aviso-01',
+    titulo: 'Novos Módulos: Estoque Inteligente & Delivery',
+    mensagem: 'Liberada a gestão com margem de segurança de 5 unidades, controle de sobras do dia anterior e rotas Google Maps.',
+    tipo: 'novidade',
+    destinoTenantId: 'todos',
+    ativo: true,
+    criadoEm: '13/10/2026 09:30',
+  },
+  {
+    id: 'aviso-02',
+    titulo: 'Otimização Preventiva na Madrugada',
+    mensagem: 'Hoje entre 03:00 e 03:15 os servidores passarão por otimização de rotina. Nenhuma perda de comanda ou dado ocorrerá.',
+    tipo: 'info',
+    destinoTenantId: 'todos',
+    ativo: true,
+    criadoEm: '12/10/2026 14:00',
+  },
+];
+
+const LOGS_INICIAIS: LogAuditoriaSaaS[] = [
+  {
+    id: 'log-01',
+    dataHora: '13/10/2026 10:15',
+    usuarioNome: 'Super Admin (Dono do SaaS)',
+    acao: 'Atualização do DRE Executivo',
+    categoria: 'financeiro',
+    detalhes: 'Configurada a apuração de ROL, COGS Cloud, Lucro Bruto e Projeção de Valuation.',
+  },
+  {
+    id: 'log-02',
+    dataHora: '13/10/2026 09:30',
+    usuarioNome: 'Super Admin (Dono do SaaS)',
+    acao: 'Publicação de Aviso Global',
+    categoria: 'sistema',
+    detalhes: 'Disparado comunicado geral de liberação dos módulos de Estoque Inteligente.',
+  },
+  {
+    id: 'log-03',
+    dataHora: '12/10/2026 16:10',
+    usuarioNome: 'Super Admin (Dono do SaaS)',
+    acao: 'Alteração de Regras de Plano',
+    categoria: 'plano',
+    detalhes: 'Plano Pro atualizado para permitir mesas ilimitadas e até 5 caixas simultâneos.',
+  },
+  {
+    id: 'log-04',
+    dataHora: '11/10/2026 11:20',
+    usuarioNome: 'Super Admin (Dono do SaaS)',
+    acao: 'Cadastro de Restaurante',
+    categoria: 'restaurante',
+    detalhes: 'Cadastrado cliente Smash Burguer Mania no plano Enterprise (Trial 7 dias).',
+  },
+];
+
 export const useSaaSStore = create<SaaSState>()(
   persist(
     (set, get) => ({
@@ -229,6 +339,9 @@ export const useSaaSStore = create<SaaSState>()(
       tenantAtivoId: 'tenant-01',
       abaAtivaMaster: 'restaurantes',
       tenantEmEdicaoId: 'tenant-01',
+      custosInfra: CUSTOS_INFRA_PADRAO,
+      avisos: AVISOS_INICIAIS,
+      logsAuditoria: LOGS_INICIAIS,
 
       setAbaAtivaMaster: (aba) => set({ abaAtivaMaster: aba }),
       setTenantEmEdicaoId: (id) => set({ tenantEmEdicaoId: id }),
@@ -336,6 +449,47 @@ export const useSaaSStore = create<SaaSState>()(
         return get().tenants.filter(
           (t) => t.statusAssinatura === 'atrasado' || t.statusAssinatura === 'bloqueado'
         ).length;
+      },
+
+      atualizarCustosInfra: (novos) => {
+        set((state) => ({ custosInfra: { ...state.custosInfra, ...novos } }));
+      },
+
+      adicionarAviso: (aviso) => {
+        const novo: AvisoGlobalSaaS = {
+          ...aviso,
+          id: `aviso-${Date.now().toString().slice(-4)}`,
+          criadoEm: new Date().toLocaleString('pt-BR'),
+        };
+        set((state) => ({ avisos: [novo, ...state.avisos] }));
+      },
+
+      alternarStatusAviso: (id) => {
+        set((state) => ({
+          avisos: state.avisos.map((a) => (a.id === id ? { ...a, ativo: !a.ativo } : a)),
+        }));
+      },
+
+      removerAviso: (id) => {
+        set((state) => ({ avisos: state.avisos.filter((a) => a.id !== id) }));
+      },
+
+      registrarLogAuditoria: (acao, categoria, detalhes) => {
+        const novoLog: LogAuditoriaSaaS = {
+          id: `log-${Date.now().toString().slice(-4)}`,
+          dataHora: new Date().toLocaleString('pt-BR'),
+          usuarioNome: 'Super Admin (Dono do SaaS)',
+          acao,
+          categoria,
+          detalhes,
+        };
+        set((state) => ({ logsAuditoria: [novoLog, ...state.logsAuditoria] }));
+      },
+
+      getAvisosAtivosParaTenant: (tenantId) => {
+        return get().avisos.filter(
+          (a) => a.ativo && (a.destinoTenantId === 'todos' || a.destinoTenantId === tenantId)
+        );
       },
     }),
     {

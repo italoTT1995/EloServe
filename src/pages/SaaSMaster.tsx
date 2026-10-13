@@ -45,6 +45,10 @@ import {
   Calculator,
   LineChart,
   Percent,
+  Download,
+  Megaphone,
+  History,
+  Send,
 } from 'lucide-react';
 import { useSaaSStore, AbaMasterSaaS } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
@@ -71,6 +75,14 @@ export default function SaaSMaster() {
     getTotalAtivos,
     getTotalTrials,
     getTotalAtrasados,
+    custosInfra,
+    avisos,
+    logsAuditoria,
+    atualizarCustosInfra,
+    adicionarAviso,
+    alternarStatusAviso,
+    removerAviso,
+    registrarLogAuditoria,
   } = useSaaSStore();
 
   const {
@@ -306,6 +318,11 @@ export default function SaaSMaster() {
     }
 
     const planoNovo = planos.find((p) => p.id === novoPlanoSelecionado);
+    registrarLogAuditoria(
+      'Migração de Plano',
+      'plano',
+      `Restaurante "${modalMigrarLoja.nomeFantasia}" migrado para o plano ${planoNovo?.nome || novoPlanoSelecionado}`
+    );
     setToastMigracao(`Plano do restaurante "${modalMigrarLoja.nomeFantasia}" atualizado com sucesso para ${planoNovo?.nome || novoPlanoSelecionado}!`);
     setModalMigrarLoja(null);
     setTimeout(() => setToastMigracao(null), 4500);
@@ -319,6 +336,11 @@ export default function SaaSMaster() {
       atualizarDadosTenant(tenantId, { instanciaWhatsAppConectada: true });
     }
     const planoNovo = planos.find((p) => p.id === novoPlano);
+    registrarLogAuditoria(
+      'Alteração Rápida de Plano',
+      'plano',
+      `Restaurante "${t.nomeFantasia}" alterado para o plano ${planoNovo?.nome || novoPlano}`
+    );
     setToastMigracao(`Plano de "${t.nomeFantasia}" alterado para ${planoNovo?.nome || novoPlano}!`);
     setTimeout(() => setToastMigracao(null), 4000);
   }
@@ -457,13 +479,106 @@ export default function SaaSMaster() {
   const [periodoDRE, setPeriodoDRE] = useState<'mensal' | 'anual'>('mensal');
   const [simulacaoClientes, setSimulacaoClientes] = useState<number>(100);
   const [simulacaoTicketMedio, setSimulacaoTicketMedio] = useState<number>(199.0);
-  const [custosInfraBase, setCustosInfraBase] = useState({
-    cloudVps: 180.0,
-    evolutionWhatsapp: 120.0,
-    taxaGatewayPct: 2.9,
-    impostoSimplesPct: 6.0,
-    suporteMarketing: 350.0,
+
+  // Modal e Formulário de Ajuste de Custos Reais da Infraestrutura
+  const [modalEditarCustos, setModalEditarCustos] = useState(false);
+  const [formCustos, setFormCustos] = useState({
+    cloudVps: custosInfra.cloudVps,
+    evolutionWhatsapp: custosInfra.evolutionWhatsapp,
+    taxaGatewayPct: custosInfra.taxaGatewayPct,
+    impostoSimplesPct: custosInfra.impostoSimplesPct,
+    suporteMarketing: custosInfra.suporteMarketing,
   });
+
+  // Modal e Formulário de Novo Comunicado / Aviso Global
+  const [modalNovoAviso, setModalNovoAviso] = useState(false);
+  const [formAviso, setFormAviso] = useState<{
+    titulo: string;
+    mensagem: string;
+    tipo: 'info' | 'alerta' | 'urgente' | 'novidade';
+    destinoTenantId: string;
+  }>({
+    titulo: '',
+    mensagem: '',
+    tipo: 'novidade',
+    destinoTenantId: 'todos',
+  });
+
+  // Filtro da Aba de Auditoria
+  const [filtroAuditoria, setFiltroAuditoria] = useState<string>('todos');
+
+  function handleSalvarCustosInfra(e: React.FormEvent) {
+    e.preventDefault();
+    atualizarCustosInfra(formCustos);
+    registrarLogAuditoria(
+      'Atualização de Parâmetros de Custos',
+      'financeiro',
+      `Custos atualizados: VPS R$ ${formCustos.cloudVps}, WhatsApp R$ ${formCustos.evolutionWhatsapp}, Gateway ${formCustos.taxaGatewayPct}%, Impostos ${formCustos.impostoSimplesPct}%`
+    );
+    setModalEditarCustos(false);
+  }
+
+  function handleCriarAviso(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formAviso.titulo || !formAviso.mensagem) {
+      alert('Preencha título e mensagem do comunicado.');
+      return;
+    }
+    adicionarAviso({
+      titulo: formAviso.titulo,
+      mensagem: formAviso.mensagem,
+      tipo: formAviso.tipo,
+      destinoTenantId: formAviso.destinoTenantId,
+      ativo: true,
+    });
+    registrarLogAuditoria(
+      'Publicação de Comunicado Global',
+      'sistema',
+      `Aviso publicado: "${formAviso.titulo}" para ${formAviso.destinoTenantId === 'todos' ? 'todos os restaurantes' : 'restaurante específico'}`
+    );
+    setFormAviso({ titulo: '', mensagem: '', tipo: 'novidade', destinoTenantId: 'todos' });
+    setModalNovoAviso(false);
+  }
+
+  function handleExportarDREImpressao() {
+    window.print();
+  }
+
+  function handleExportarRestaurantesCSV() {
+    const cabecalho = 'ID,Nome Fantasia,Razao Social,Documento,Responsavel,WhatsApp,Email,Cidade/UF,Plano,Status,Mensalidade (R$),Vencimento\n';
+    const linhas = tenants
+      .map(
+        (t) =>
+          `"${t.id}","${t.nomeFantasia}","${t.razaoSocial}","${t.documento}","${t.responsavelNome}","${t.telefoneWhatsApp}","${t.email}","${t.cidadeUf}","${t.planoId}","${t.statusAssinatura}",${t.valorMensalidade},"${t.proximoVencimento}"`
+      )
+      .join('\n');
+    const blob = new Blob([cabecalho + linhas], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `eloserve_restaurantes_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function handleExportarLogsCSV() {
+    const cabecalho = 'ID,Data/Hora,Usuario,Acao,Categoria,Detalhes\n';
+    const linhas = logsAuditoria
+      .map(
+        (l) =>
+          `"${l.id}","${l.dataHora}","${l.usuarioNome}","${l.acao}","${l.categoria}","${l.detalhes.replace(/"/g, '""')}"`
+      )
+      .join('\n');
+    const blob = new Blob([cabecalho + linhas], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `eloserve_auditoria_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   const mrr = getMRR();
   const arr = mrr * 12;
@@ -511,6 +626,12 @@ export default function SaaSMaster() {
       instanciaWhatsAppConectada: form.planoId === 'enterprise',
     });
 
+    registrarLogAuditoria(
+      'Cadastro de Novo Restaurante',
+      'restaurante',
+      `Restaurante "${form.nomeFantasia}" cadastrado no plano ${form.planoId.toUpperCase()} (${form.statusAssinatura})`
+    );
+
     setModalNovoTenant(false);
     setForm({
       nomeFantasia: '',
@@ -551,13 +672,24 @@ export default function SaaSMaster() {
           </div>
         </div>
 
-        <button
-          onClick={() => setModalNovoTenant(true)}
-          className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95 shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Cadastrar Novo Restaurante</span>
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <button
+            onClick={handleExportarRestaurantesCSV}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            title="Baixar planilha de todos os restaurantes em formato CSV"
+          >
+            <Download className="w-4 h-4 text-purple-400" />
+            <span>Exportar Clientes (CSV)</span>
+          </button>
+
+          <button
+            onClick={() => setModalNovoTenant(true)}
+            className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Cadastrar Novo Restaurante</span>
+          </button>
+        </div>
       </div>
 
       {/* Cards de Métricas SaaS no Topo */}
@@ -703,6 +835,35 @@ export default function SaaSMaster() {
           <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/30 uppercase font-black">
             Regras SaaS
           </span>
+        </button>
+
+        <button
+          onClick={() => handleMudarAba('avisos_globais')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            abaAtiva === 'avisos_globais'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'
+              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'
+          }`}
+        >
+          <Megaphone className="w-4 h-4 text-amber-400" />
+          <span>Avisos Globais</span>
+          {avisos.filter((a) => a.ativo).length > 0 && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/30 uppercase font-black">
+              {avisos.filter((a) => a.ativo).length} ativos
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => handleMudarAba('auditoria')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            abaAtiva === 'auditoria'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'
+              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'
+          }`}
+        >
+          <History className="w-4 h-4 text-purple-400" />
+          <span>Logs de Auditoria ({logsAuditoria.length})</span>
         </button>
 
         <button
@@ -928,7 +1089,14 @@ export default function SaaSMaster() {
                             {/* Bloquear / Desbloquear */}
                             {tenant.statusAssinatura === 'bloqueado' ? (
                               <button
-                                onClick={() => atualizarStatusAssinatura(tenant.id, 'ativo')}
+                                onClick={() => {
+                                  atualizarStatusAssinatura(tenant.id, 'ativo');
+                                  registrarLogAuditoria(
+                                    'Desbloqueio de Restaurante',
+                                    'seguranca',
+                                    `Acesso do restaurante "${tenant.nomeFantasia}" foi reativado (Desbloqueado)`
+                                  );
+                                }}
                                 title="Desbloquear Restaurante"
                                 className="p-1.5 rounded-xl bg-slate-800 hover:bg-emerald-500 text-emerald-400 hover:text-white transition-all cursor-pointer"
                               >
@@ -939,6 +1107,11 @@ export default function SaaSMaster() {
                                 onClick={() => {
                                   if (confirm(`Deseja suspender temporariamente o acesso do restaurante ${tenant.nomeFantasia}?`)) {
                                     atualizarStatusAssinatura(tenant.id, 'bloqueado');
+                                    registrarLogAuditoria(
+                                      'Bloqueio de Restaurante',
+                                      'seguranca',
+                                      `Acesso do restaurante "${tenant.nomeFantasia}" foi bloqueado temporariamente por inadimplência/administrativo`
+                                    );
                                   }
                                 }}
                                 title="Bloquear Acesso por Falta de Pagamento"
@@ -1476,18 +1649,18 @@ export default function SaaSMaster() {
         const receitaOnboarding = (150 * (tenants.length > 0 ? 1 : 0)) * fator;
         const receitaBruta = receitaAssinaturas + receitaOnboarding;
 
-        const deducoesImpostos = receitaBruta * (custosInfraBase.impostoSimplesPct / 100);
+        const deducoesImpostos = receitaBruta * (custosInfra.impostoSimplesPct / 100);
         const receitaLiquida = Math.max(0, receitaBruta - deducoesImpostos);
 
-        const custoCloud = custosInfraBase.cloudVps * fator;
-        const custoWhatsapp = custosInfraBase.evolutionWhatsapp * fator;
-        const custoGateway = receitaBruta * (custosInfraBase.taxaGatewayPct / 100);
+        const custoCloud = custosInfra.cloudVps * fator;
+        const custoWhatsapp = custosInfra.evolutionWhatsapp * fator;
+        const custoGateway = receitaBruta * (custosInfra.taxaGatewayPct / 100);
         const cogsTecnologia = custoCloud + custoWhatsapp + custoGateway;
 
         const lucroBruto = Math.max(0, receitaLiquida - cogsTecnologia);
         const margemBrutaPct = receitaLiquida > 0 ? (lucroBruto / receitaLiquida) * 100 : 0;
 
-        const despesasOpex = custosInfraBase.suporteMarketing * fator;
+        const despesasOpex = custosInfra.suporteMarketing * fator;
         const lucroLiquidoOperacional = lucroBruto - despesasOpex;
         const margemLiquidaPct = receitaLiquida > 0 ? (lucroLiquidoOperacional / receitaLiquida) * 100 : 0;
 
@@ -1495,7 +1668,7 @@ export default function SaaSMaster() {
         const simuladoMRR = simulacaoClientes * simulacaoTicketMedio;
         const simuladoARR = simuladoMRR * 12;
         const simuladoCustoServidor = (180 + (simulacaoClientes * 3.5)) * 12;
-        const simuladoImpostosGateway = simuladoARR * ((custosInfraBase.impostoSimplesPct + custosInfraBase.taxaGatewayPct) / 100);
+        const simuladoImpostosGateway = simuladoARR * ((custosInfra.impostoSimplesPct + custosInfra.taxaGatewayPct) / 100);
         const simuladoOpexAnual = (600 + (simulacaoClientes * 5.0)) * 12;
         const simuladoLucroLiquido = Math.max(0, simuladoARR - simuladoCustoServidor - simuladoImpostosGateway - simuladoOpexAnual);
         const valuationMinimo = simuladoARR * 4.5;
@@ -1534,30 +1707,55 @@ export default function SaaSMaster() {
                 </p>
               </div>
 
-              {/* Seletor Mensal / Anual */}
-              <div className="flex items-center bg-slate-950 p-1.5 rounded-2xl border border-slate-800 shrink-0 self-start lg:self-auto">
+              {/* Botões de Ação e Seletor Mensal / Anual */}
+              <div className="flex items-center gap-2.5 flex-wrap shrink-0 self-start lg:self-auto">
                 <button
                   type="button"
-                  onClick={() => setPeriodoDRE('mensal')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    periodoDRE === 'mensal'
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
+                  onClick={() => {
+                    setFormCustos({ ...custosInfra });
+                    setModalEditarCustos(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 text-xs font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                  title="Configurar custos reais da sua VPS, WhatsApp e impostos"
                 >
-                  Visão Mensal (MRR)
+                  <Sliders className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Ajustar Custos Reais</span>
                 </button>
+
                 <button
                   type="button"
-                  onClick={() => setPeriodoDRE('anual')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    periodoDRE === 'anual'
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
+                  onClick={handleExportarDREImpressao}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                  title="Imprimir ou Salvar DRE em PDF"
                 >
-                  Visão Anualizada (ARR)
+                  <Printer className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Imprimir / PDF</span>
                 </button>
+
+                <div className="flex items-center bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setPeriodoDRE('mensal')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      periodoDRE === 'mensal'
+                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Mensal (MRR)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPeriodoDRE('anual')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      periodoDRE === 'anual'
+                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Anual (ARR)
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1575,7 +1773,7 @@ export default function SaaSMaster() {
                   R$ {receitaLiquida.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
                 <span className="text-[10px] text-purple-400 font-semibold block">
-                  Após dedução tributária ({custosInfraBase.impostoSimplesPct}%)
+                  Após dedução tributária ({custosInfra.impostoSimplesPct}%)
                 </span>
               </div>
 
@@ -1856,7 +2054,7 @@ export default function SaaSMaster() {
                         - R$ {deducoesImpostos.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-slate-400">
-                        -{custosInfraBase.impostoSimplesPct.toFixed(1)}%
+                        -{custosInfra.impostoSimplesPct.toFixed(1)}%
                       </td>
                     </tr>
                     <tr className="text-slate-400">
@@ -1922,7 +2120,7 @@ export default function SaaSMaster() {
                         - R$ {custoGateway.toFixed(2)}
                       </td>
                       <td className="py-2.5 px-4 text-right font-mono text-slate-500">
-                        {custosInfraBase.taxaGatewayPct.toFixed(1)}%
+                        {custosInfra.taxaGatewayPct.toFixed(1)}%
                       </td>
                     </tr>
 
@@ -3251,6 +3449,255 @@ export default function SaaSMaster() {
         </div>
       )}
 
+      {/* CONTEÚDO DA ABA: CENTRAL DE AVISOS GLOBAIS (BROADCAST) */}
+      {abaAtiva === 'avisos_globais' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-purple-950/60 via-slate-900 to-slate-900 border border-purple-500/30 p-6 rounded-3xl shadow-xl">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 uppercase tracking-wider flex items-center gap-1">
+                  <Megaphone className="w-3.5 h-3.5" />
+                  <span>Broadcast Multi-Tenant</span>
+                </span>
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 font-mono">
+                  {avisos.filter((a) => a.ativo).length} no ar
+                </span>
+              </div>
+              <h3 className="text-xl font-black text-white flex items-center gap-2">
+                <Megaphone className="w-6 h-6 text-amber-400" />
+                <span>Central de Avisos Globais & Notificações</span>
+              </h3>
+              <p className="text-xs text-slate-400 max-w-2xl">
+                Publique mensagens que aparecem instantaneamente no topo da tela dos restaurantes clientes (manutenções, novidades de recursos, avisos comerciais ou feriados).
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setModalNovoAviso(true)}
+              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95 shrink-0 self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Publicar Novo Comunicado</span>
+            </button>
+          </div>
+
+          {/* Lista de Comunicados */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {avisos.length === 0 ? (
+              <div className="col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800 text-slate-500 mx-auto flex items-center justify-center">
+                  <Megaphone className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-white">Nenhum comunicado cadastrado</h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  Crie comunicados informativos para manter seus clientes atualizados sobre novidades e manutenções do sistema.
+                </p>
+              </div>
+            ) : (
+              avisos.map((aviso) => {
+                const tenantAlvo = tenants.find((t) => t.id === aviso.destinoTenantId);
+                return (
+                  <div
+                    key={aviso.id}
+                    className={`bg-slate-900 border rounded-3xl p-5 shadow-xl flex flex-col justify-between space-y-4 transition-all ${
+                      aviso.ativo
+                        ? aviso.tipo === 'novidade'
+                          ? 'border-emerald-500/40 bg-gradient-to-br from-slate-900 to-emerald-950/20'
+                          : aviso.tipo === 'urgente'
+                          ? 'border-rose-500/40 bg-gradient-to-br from-slate-900 to-rose-950/20'
+                          : aviso.tipo === 'alerta'
+                          ? 'border-amber-500/40 bg-gradient-to-br from-slate-900 to-amber-950/20'
+                          : 'border-blue-500/40 bg-gradient-to-br from-slate-900 to-blue-950/20'
+                        : 'border-slate-800 opacity-60'
+                    }`}
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 ${
+                            aviso.tipo === 'novidade'
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30'
+                              : aviso.tipo === 'urgente'
+                              ? 'bg-rose-950 text-rose-300 border border-rose-500/30'
+                              : aviso.tipo === 'alerta'
+                              ? 'bg-amber-950 text-amber-300 border border-amber-500/30'
+                              : 'bg-blue-950 text-blue-300 border border-blue-500/30'
+                          }`}
+                        >
+                          {aviso.tipo}
+                        </span>
+
+                        <span className="text-[10px] text-slate-400 font-mono">{aviso.criadoEm}</span>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-bold text-white">{aviso.titulo}</h4>
+                        <p className="text-xs text-slate-300 mt-1 leading-relaxed">{aviso.mensagem}</p>
+                      </div>
+
+                      <div className="pt-2 text-[10px] text-slate-400 flex items-center gap-1.5">
+                        <Store className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Destino:</span>
+                        <strong className="text-purple-300">
+                          {aviso.destinoTenantId === 'todos'
+                            ? 'Todos os Restaurantes da Base'
+                            : tenantAlvo?.nomeFantasia || 'Restaurante Específico'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-slate-800/80 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => alternarStatusAviso(aviso.id)}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                          aviso.ativo
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {aviso.ativo ? '🟢 No Ar (Ativo)' : '⏸️ Pausado'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Deseja excluir o comunicado "${aviso.titulo}"?`)) {
+                            removerAviso(aviso.id);
+                            registrarLogAuditoria(
+                              'Remoção de Comunicado',
+                              'sistema',
+                              `Comunicado "${aviso.titulo}" excluído`
+                            );
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                        title="Excluir comunicado"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CONTEÚDO DA ABA: LOGS DE AUDITORIA SAAS */}
+      {abaAtiva === 'auditoria' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-purple-950/60 via-slate-900 to-slate-900 border border-purple-500/30 p-6 rounded-3xl shadow-xl">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 uppercase tracking-wider flex items-center gap-1">
+                  <History className="w-3.5 h-3.5" />
+                  <span>Governança & Rastreabilidade</span>
+                </span>
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-bold border border-slate-700 font-mono">
+                  {logsAuditoria.length} registros gravados
+                </span>
+              </div>
+              <h3 className="text-xl font-black text-white flex items-center gap-2">
+                <History className="w-6 h-6 text-purple-400" />
+                <span>Logs de Auditoria e Atividades da Plataforma</span>
+              </h3>
+              <p className="text-xs text-slate-400 max-w-2xl">
+                Histórico imutável com data, hora, responsável e detalhes de todas as alterações feitas no SaaS (bloqueios, migração de planos, novos cadastros e mudanças financeiras).
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleExportarLogsCSV}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95 shrink-0 self-start sm:self-auto"
+              title="Baixar planilha de logs em formato CSV"
+            >
+              <Download className="w-4 h-4 text-purple-400" />
+              <span>Exportar Logs (CSV)</span>
+            </button>
+          </div>
+
+          {/* Filtros de Categoria */}
+          <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto scrollbar-none">
+            {[
+              { id: 'todos', label: 'Todas as Ações' },
+              { id: 'restaurante', label: 'Restaurantes' },
+              { id: 'plano', label: 'Planos & Limites' },
+              { id: 'financeiro', label: 'Financeiro & Custos' },
+              { id: 'sistema', label: 'Sistema & Broadcast' },
+              { id: 'cobranca', label: 'Cobranças WhatsApp' },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setFiltroAuditoria(cat.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  filtroAuditoria === cat.id
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/25'
+                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tabela de Logs */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-3 px-4">Data & Horário</th>
+                    <th className="py-3 px-4">Usuário</th>
+                    <th className="py-3 px-4">Categoria</th>
+                    <th className="py-3 px-4">Ação Realizada</th>
+                    <th className="py-3 px-4">Detalhes da Operação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/80 font-medium">
+                  {logsAuditoria
+                    .filter((l) => filtroAuditoria === 'todos' || l.categoria === filtroAuditoria)
+                    .map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3 px-4 font-mono text-slate-400 whitespace-nowrap">{log.dataHora}</td>
+                        <td className="py-3 px-4 text-white font-semibold flex items-center gap-1.5 whitespace-nowrap">
+                          <Crown className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                          <span>{log.usuarioNome}</span>
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                              log.categoria === 'restaurante'
+                                ? 'bg-blue-950 text-blue-300 border border-blue-500/30'
+                                : log.categoria === 'plano'
+                                ? 'bg-purple-950 text-purple-300 border border-purple-500/30'
+                                : log.categoria === 'financeiro'
+                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30'
+                                : log.categoria === 'cobranca'
+                                ? 'bg-amber-950 text-amber-300 border border-amber-500/30'
+                                : 'bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            {log.categoria}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-white font-bold whitespace-nowrap">{log.acao}</td>
+                        <td className="py-3 px-4 text-slate-300 leading-relaxed max-w-md">{log.detalhes}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CONTEÚDO DA ABA 4: INSTÂNCIAS WHATSAPP & IA */}
       {abaAtiva === 'whatsapp' && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
@@ -3946,6 +4393,233 @@ export default function SaaSMaster() {
                 >
                   <Sparkles className="w-4 h-4 text-amber-300" />
                   <span>Confirmar Migração de Plano</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: AJUSTAR CUSTOS REAIS DA INFRAESTRUTURA SAAS */}
+      {modalEditarCustos && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Ajustar Custos Reais do SaaS</h3>
+                  <p className="text-xs text-slate-400">Personalize com base nas notas fiscais e faturas reais da sua infraestrutura</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEditarCustos(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarCustosInfra} className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold block mb-1">
+                    Custo Servidor Cloud VPS & Banco de Dados (R$/mês):
+                  </label>
+                  <input
+                    type="number"
+                    step="5.0"
+                    value={formCustos.cloudVps}
+                    onChange={(e) => setFormCustos({ ...formCustos, cloudVps: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 focus:border-purple-400 rounded-xl text-white font-mono text-sm"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400">Ex: Hetzner, DigitalOcean, AWS ou Supabase</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold block mb-1">
+                    Custo Servidor de Conexão WhatsApp / Evolution API (R$/mês):
+                  </label>
+                  <input
+                    type="number"
+                    step="5.0"
+                    value={formCustos.evolutionWhatsapp}
+                    onChange={(e) => setFormCustos({ ...formCustos, evolutionWhatsapp: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 focus:border-purple-400 rounded-xl text-white font-mono text-sm"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400">Hospedagem das instâncias e conexões de WhatsApp</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-300 font-semibold block mb-1">
+                      Taxa do Gateway (%):
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={formCustos.taxaGatewayPct}
+                      onChange={(e) => setFormCustos({ ...formCustos, taxaGatewayPct: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 focus:border-purple-400 rounded-xl text-white font-mono text-sm"
+                      required
+                    />
+                    <span className="text-[10px] text-slate-400">Asaas, Stripe ou Mercado Pago</span>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-300 font-semibold block mb-1">
+                      Alíquota Impostos (%):
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={formCustos.impostoSimplesPct}
+                      onChange={(e) => setFormCustos({ ...formCustos, impostoSimplesPct: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 focus:border-purple-400 rounded-xl text-white font-mono text-sm"
+                      required
+                    />
+                    <span className="text-[10px] text-slate-400">Simples Nacional (padrão 6%)</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold block mb-1">
+                    Despesas de Suporte & Marketing Digital / CAC (R$/mês):
+                  </label>
+                  <input
+                    type="number"
+                    step="10.0"
+                    value={formCustos.suporteMarketing}
+                    onChange={(e) => setFormCustos({ ...formCustos, suporteMarketing: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 focus:border-purple-400 rounded-xl text-white font-mono text-sm"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400">Verba de anúncios no Google/Meta e ferramentas de suporte</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalEditarCustos(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer transition-colors text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Salvar & Recalcular DRE</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CRIAR NOVO COMUNICADO / AVISO GLOBAL */}
+      {modalNovoAviso && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <Megaphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Novo Comunicado para Restaurantes</h3>
+                  <p className="text-xs text-slate-400">Aparecerá instantaneamente no topo do painel das lojas selecionadas</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalNovoAviso(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCriarAviso} className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold block mb-1">Título do Comunicado:</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Manutenção Programada nesta Madrugada"
+                    value={formAviso.titulo}
+                    onChange={(e) => setFormAviso({ ...formAviso, titulo: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 focus:border-amber-400 rounded-xl text-white text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold block mb-1">Mensagem Completa:</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Descreva o comunicado com clareza para os operadores dos restaurantes..."
+                    value={formAviso.mensagem}
+                    onChange={(e) => setFormAviso({ ...formAviso, mensagem: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 focus:border-amber-400 rounded-xl text-white text-xs leading-relaxed"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-300 font-semibold block mb-1">Tipo de Comunicado:</label>
+                    <select
+                      value={formAviso.tipo}
+                      onChange={(e) => setFormAviso({ ...formAviso, tipo: e.target.value as any })}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs"
+                    >
+                      <option value="novidade">🟢 Novidade / Recurso</option>
+                      <option value="info">🔵 Informativo</option>
+                      <option value="alerta">🟡 Alerta / Manutenção</option>
+                      <option value="urgente">🔴 Urgente / Atenção</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-300 font-semibold block mb-1">Destinatário:</label>
+                    <select
+                      value={formAviso.destinoTenantId}
+                      onChange={(e) => setFormAviso({ ...formAviso, destinoTenantId: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs"
+                    >
+                      <option value="todos">Todos os Restaurantes</option>
+                      {tenants.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.nomeFantasia}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalNovoAviso(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer transition-colors text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-lg shadow-amber-600/30 cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Publicar Comunicado Agora</span>
                 </button>
               </div>
             </form>

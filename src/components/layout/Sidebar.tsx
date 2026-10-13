@@ -19,6 +19,8 @@ import {
   Package,
   Users,
   BarChart3,
+  Megaphone,
+  History,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { CargoUsuario } from '../../types';
@@ -117,6 +119,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 { id: 'dre_saas', label: 'DRE Executivo & Gráficos', icon: BarChart3, badge: 'DRE' },
                 { id: 'financeiro', label: 'Métricas Financeiras & MRR', icon: TrendingUp },
                 { id: 'planos', label: 'Planos & Mensalidades', icon: Layers },
+                { id: 'avisos_globais', label: 'Central de Avisos (Broadcast)', icon: Megaphone, badge: 'Avisos' },
+                { id: 'auditoria', label: 'Logs de Auditoria SaaS', icon: History, badge: 'Logs' },
                 { id: 'whatsapp', label: 'Instâncias WhatsApp & IA', icon: Bot },
                 { id: 'config', label: 'Configuração Franqueador', icon: ShieldCheck },
               ].map((item) => {
