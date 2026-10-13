@@ -178,6 +178,24 @@ interface SaaSState {
   getTotalAtrasados: () => number;
 }
 
+export const TENANT_GLOBAL: TenantRestaurante = {
+  id: 'global',
+  nomeFantasia: 'EloServe SaaS (Visão Global)',
+  razaoSocial: 'EloServe Tecnologia e Gestão SaaS LTDA',
+  documento: '45.123.890/0001-12',
+  responsavelNome: 'Italo Lemos (Super Admin)',
+  telefoneWhatsApp: '+55 (31) 97182-6083',
+  email: 'italo@eloserve.com.br',
+  cidadeUf: 'Brasil (Multi-Tenant)',
+  planoId: 'enterprise',
+  statusAssinatura: 'ativo',
+  valorMensalidade: 0,
+  dataInicio: '01/01/2026',
+  proximoVencimento: 'Recorrente',
+  instanciaWhatsAppConectada: true,
+  criadoEm: '2026-01-01',
+};
+
 const TENANTS_INICIAIS: TenantRestaurante[] = [
   {
     id: 'tenant-01',
@@ -336,7 +354,7 @@ export const useSaaSStore = create<SaaSState>()(
     (set, get) => ({
       planos: PLANOS_DISPONIVEIS,
       tenants: TENANTS_INICIAIS,
-      tenantAtivoId: 'tenant-01',
+      tenantAtivoId: 'global',
       abaAtivaMaster: 'restaurantes',
       tenantEmEdicaoId: 'tenant-01',
       custosInfra: CUSTOS_INFRA_PADRAO,
@@ -427,7 +445,10 @@ export const useSaaSStore = create<SaaSState>()(
 
       getTenantAtivo: () => {
         const { tenants, tenantAtivoId } = get();
-        return tenants.find((t) => t.id === tenantAtivoId) || tenants[0];
+        if (tenantAtivoId === 'global') {
+          return TENANT_GLOBAL;
+        }
+        return tenants.find((t) => t.id === tenantAtivoId) || TENANT_GLOBAL;
       },
 
       getMRR: () => {
@@ -493,7 +514,7 @@ export const useSaaSStore = create<SaaSState>()(
       },
     }),
     {
-      name: 'eloserve_saas_store_v2',
+      name: 'eloserve_saas_store_v3',
     }
   )
 );

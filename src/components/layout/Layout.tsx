@@ -15,7 +15,7 @@ export function Layout({ children }: LayoutProps) {
   const [avisosDispensados, setAvisosDispensados] = useState<string[]>([]);
   const location = useLocation();
   const { usuarioLogado } = useAuthStore();
-  const { getTenantAtivo, getAvisosAtivosParaTenant } = useSaaSStore();
+  const { getTenantAtivo, getAvisosAtivosParaTenant, tenantAtivoId, selecionarTenant } = useSaaSStore();
 
   const isSuperAdmin = usuarioLogado?.cargo === 'super_admin';
   const isNaTelaSaaS = location.pathname === '/saas';
@@ -41,22 +41,32 @@ export function Layout({ children }: LayoutProps) {
         <Header onToggleSidebar={() => setSidebarAberta((prev) => !prev)} />
 
         {/* Banner de Aviso de Modo Suporte do Super Admin */}
-        {isSuperAdmin && !isNaTelaSaaS && (
+        {isSuperAdmin && tenantAtivoId !== 'global' && (
           <div className="bg-gradient-to-r from-purple-950 via-purple-900 to-slate-900 border-b border-purple-500/40 px-4 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-purple-200 animate-in fade-in duration-150 z-20 shrink-0">
             <div className="flex items-center gap-2">
               <Crown className="w-4 h-4 text-purple-400 shrink-0 animate-pulse" />
               <span>
-                <strong>Modo Administrador Geral do SaaS:</strong> Inspecionando a operação da loja{' '}
-                <strong className="text-white underline">{tenantAtual.nomeFantasia}</strong>.
+                <strong>Modo Suporte / Inspeção de Loja:</strong> Você está visualizando o sistema como o restaurante{' '}
+                <strong className="text-white underline">{tenantAtual.nomeFantasia}</strong> ({tenantAtual.cidadeUf}).
               </span>
             </div>
-            <Link
-              to="/saas"
-              className="px-3 py-1 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all flex items-center gap-1.5 shadow-md shadow-purple-600/30 text-[11px] shrink-0"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Voltar ao Painel SaaS Master</span>
-            </Link>
+            <div className="flex items-center gap-2 shrink-0">
+              {!isNaTelaSaaS && (
+                <Link
+                  to="/saas"
+                  className="px-2.5 py-1 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all flex items-center gap-1.5 shadow-md shadow-purple-600/30 text-[11px]"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Painel SaaS</span>
+                </Link>
+              )}
+              <button
+                onClick={() => selecionarTenant('global')}
+                className="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-200 border border-purple-500/30 font-bold transition-all text-[11px] cursor-pointer"
+              >
+                <span>Voltar para Visão Global</span>
+              </button>
+            </div>
           </div>
         )}
 
