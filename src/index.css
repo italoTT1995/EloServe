@@ -120,7 +120,7 @@ html.theme-light .text-slate-500 {
   color: #64748b !important;
 }
 
-/* Preserva cor branca para textos dentro de botões coloridos de ação */
+/* Preserva cor branca para textos e ícones dentro de botões coloridos de ação */
 html.theme-light button.bg-orange-500,
 html.theme-light button.bg-orange-600,
 html.theme-light button.bg-emerald-500,
@@ -130,12 +130,26 @@ html.theme-light button.bg-purple-600,
 html.theme-light a.bg-orange-500,
 html.theme-light a.bg-emerald-500,
 html.theme-light a.bg-purple-600,
-html.theme-light .bg-orange-500 span,
-html.theme-light .bg-orange-600 span,
-html.theme-light .bg-emerald-500 span,
-html.theme-light .bg-emerald-600 span,
-html.theme-light .bg-rose-500 span,
-html.theme-light .bg-purple-600 span {
+html.theme-light [class*="from-purple-"],
+html.theme-light [class*="from-orange-"],
+html.theme-light [class*="from-indigo-"],
+html.theme-light [class*="from-emerald-"],
+html.theme-light [class*="from-rose-"],
+html.theme-light [class*="bg-purple-600"],
+html.theme-light [class*="bg-indigo-600"] {
+  color: #ffffff !important;
+}
+
+html.theme-light [class*="from-purple-"] *,
+html.theme-light [class*="from-orange-"] *,
+html.theme-light [class*="from-indigo-"] *,
+html.theme-light [class*="from-emerald-"] *,
+html.theme-light [class*="from-rose-"] *,
+html.theme-light button.bg-purple-600 *,
+html.theme-light button.bg-orange-500 *,
+html.theme-light button.bg-orange-600 *,
+html.theme-light button.bg-emerald-500 *,
+html.theme-light button.bg-emerald-600 * {
   color: #ffffff !important;
 }
 

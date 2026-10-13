@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Clock,
   Wifi,
@@ -33,6 +33,7 @@ interface HeaderProps {
 
 export function Header({ onToggleSidebar }: HeaderProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [time, setTime] = useState(new Date().toLocaleTimeString());
   const [menuPerfilAberto, setMenuPerfilAberto] = useState(false);
   const [menuTenantAberto, setMenuTenantAberto] = useState(false);
@@ -137,6 +138,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   onClick={() => {
                     selecionarTenant('global');
                     setMenuTenantAberto(false);
+                    navigate('/saas');
                   }}
                   className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
                     isModoGlobal
@@ -170,6 +172,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                       onClick={() => {
                         selecionarTenant(t.id);
                         setMenuTenantAberto(false);
+                        navigate('/painel-dono');
                       }}
                       className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
                         t.id === tenantAtivoId

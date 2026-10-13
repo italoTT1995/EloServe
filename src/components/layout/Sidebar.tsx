@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useSaaSStore } from '../../store/useSaaSStore';
 import { CargoUsuario } from '../../types';
 
 interface MenuItemDef {
@@ -82,6 +83,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const { usuarioLogado, logout, temPermissao, getDescricaoCargo } = useAuthStore();
   const { tema, alternarTema } = useThemeStore();
+  const { tenantAtivoId, getTenantAtivo, selecionarTenant } = useSaaSStore();
+  const tenantAtual = getTenantAtivo();
+  const isModoGlobal = tenantAtivoId === 'global';
   const infoCargo = getDescricaoCargo(usuarioLogado?.cargo);
 
   function handleLogout() {
@@ -98,19 +102,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div className="h-16 px-5 border-b border-slate-800 flex items-center justify-between">
         <Link
           to={
-            usuarioLogado?.cargo === 'super_admin'
+            usuarioLogado?.cargo === 'super_admin' && isModoGlobal
               ? '/saas'
-              : usuarioLogado?.cargo === 'admin_restaurante'
-              ? '/painel-dono'
-              : '/pdv'
+              : '/painel-dono'
           }
           className="flex items-center gap-3 group cursor-pointer"
         >
           <div
             className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-lg transition-transform group-hover:scale-105 ${
-              usuarioLogado?.cargo === 'super_admin'
+              usuarioLogado?.cargo === 'super_admin' && isModoGlobal
                 ? 'bg-gradient-to-tr from-purple-600 to-indigo-500 shadow-purple-500/25'
-                : 'bg-gradient-to-tr from-emerald-600 to-emerald-400 shadow-emerald-500/20'
+                : 'bg-gradient-to-tr from-orange-500 to-amber-500 shadow-orange-500/20'
             }`}
           >
             <Zap className="w-5 h-5 fill-white" />
@@ -121,18 +123,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </h1>
             <p
               className={`text-[10px] font-semibold tracking-wider uppercase ${
-                usuarioLogado?.cargo === 'super_admin'
+                usuarioLogado?.cargo === 'super_admin' && isModoGlobal
                   ? 'text-purple-400'
-                  : usuarioLogado?.cargo === 'admin_restaurante'
-                  ? 'text-emerald-400'
-                  : 'text-slate-400'
+                  : 'text-orange-400'
               }`}
             >
-              {usuarioLogado?.cargo === 'super_admin'
+              {usuarioLogado?.cargo === 'super_admin' && isModoGlobal
                 ? 'Gestão SaaS Master'
-                : usuarioLogado?.cargo === 'admin_restaurante'
-                ? 'Gestão da Loja'
-                : 'Frente de Loja'}
+                : 'Sistema PDV'}
             </p>
           </div>
         </Link>
@@ -148,8 +146,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Nav Menu */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {/* SE FOR SUPER ADMIN (DONO DO SAAS): MENU EXCLUSIVO DE ADMINISTRAÇÃO */}
-        {usuarioLogado?.cargo === 'super_admin' ? (
+        {/* SE FOR SUPER ADMIN EM VISÃO GLOBAL: MENU EXCLUSIVO DE ADMINISTRAÇÃO SAAS MASTER */}
+        {usuarioLogado?.cargo === 'super_admin' && isModoGlobal ? (
           <div className="space-y-1">
             <p className="px-3 text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <Crown className="w-3.5 h-3.5" />
@@ -201,9 +199,32 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               });
             })()}
           </div>
-        ) : usuarioLogado?.cargo === 'admin_restaurante' ? (
-          /* MENU PRINCIPAL DO DONO / GERENTE (EXATAMENTE COMO NO BENCHMARK DO PRINT) */
+        ) : usuarioLogado?.cargo === 'admin_restaurante' || (usuarioLogado?.cargo === 'super_admin' && !isModoGlobal) ? (
+          /* MENU PRINCIPAL DO DONO / GERENTE (EXATAMENTE COMO NO BENCHMARK DO PRINT OU MODO INSPEÇÃO) */
           <div className="space-y-1">
+            {usuarioLogado?.cargo === 'super_admin' && !isModoGlobal && (
+              <div className="px-3 py-2 mb-2 rounded-xl bg-purple-950/40 border border-purple-500/30 text-[11px] text-purple-300 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold flex items-center gap-1">
+                    <Crown className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Modo Suporte</span>
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.2 bg-purple-500/20 text-purple-200 rounded font-mono font-bold">LOJA</span>
+                </div>
+                <p className="text-[11px] text-white font-extrabold truncate">{tenantAtual.nomeFantasia}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    selecionarTenant('global');
+                    navigate('/saas');
+                  }}
+                  className="w-full mt-1 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-[10px] transition-colors cursor-pointer text-center flex items-center justify-center gap-1 shadow-sm"
+                >
+                  <span>↩ Voltar ao SaaS Master</span>
+                </button>
+              </div>
+            )}
+
             <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
               MENU PRINCIPAL
             </p>

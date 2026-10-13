@@ -57,12 +57,15 @@ import {
 import { useSaaSStore, AbaMasterSaaS } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
 import { useEloBotStore } from '../store/useEloBotStore';
+import { useThemeStore } from '../store/useThemeStore';
 import { TipoPlanoSaaS, StatusAssinatura, Produto, PlanoAssinatura, TenantRestaurante } from '../types';
 
 export default function SaaSMaster() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const abaParam = searchParams.get('aba') as AbaMasterSaaS | null;
+  const { tema } = useThemeStore();
+  const isWhite = tema === 'light';
 
   const {
     tenants,
@@ -122,6 +125,12 @@ export default function SaaSMaster() {
       setAbaAtiva(abaParam);
     }
   }, [abaParam]);
+
+  useEffect(() => {
+    if (tenantAtivoId !== 'global') {
+      navigate('/painel-dono', { replace: true });
+    }
+  }, [tenantAtivoId, navigate]);
 
   const handleMudarAba = (novaAba: AbaMasterSaaS) => {
     setAbaAtiva(novaAba);
@@ -773,44 +782,44 @@ export default function SaaSMaster() {
 
   if (!masterDesbloqueado) {
     return (
-      <div className="min-h-[85vh] flex items-center justify-center p-4 select-none">
-        <div className="w-full max-w-md bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-purple-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-purple-950/50 space-y-6 relative overflow-hidden backdrop-blur-xl">
+      <div className={`min-h-[85vh] flex items-center justify-center p-4 select-none ${isWhite ? 'bg-slate-50' : ''}`}>
+        <div className={`w-full max-w-md ${isWhite ? 'bg-white border-purple-200 shadow-2xl shadow-purple-500/10' : 'bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-purple-500/30 shadow-2xl shadow-purple-950/50'} border rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden backdrop-blur-xl`}>
           {/* Luz de fundo decorativa */}
-          <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+          <div className={`absolute -top-24 -right-24 w-48 h-48 ${isWhite ? 'bg-purple-200/40' : 'bg-purple-600/20'} rounded-full blur-3xl pointer-events-none`} />
+          <div className={`absolute -bottom-24 -left-24 w-48 h-48 ${isWhite ? 'bg-indigo-200/40' : 'bg-indigo-600/20'} rounded-full blur-3xl pointer-events-none`} />
 
           {/* Cabeçalho do Cofre */}
           <div className="text-center space-y-2 relative z-10">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 text-white shadow-xl shadow-purple-500/30 mb-1">
-              <Lock className="w-8 h-8" />
+              <Lock className="w-8 h-8 text-white" />
             </div>
             <div className="inline-block">
-              <span className="text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full ${isWhite ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'} border`}>
                 Acesso Restrito Franqueador
               </span>
             </div>
-            <h2 className="text-2xl font-black text-white tracking-tight">
+            <h2 className={`text-2xl font-black ${isWhite ? 'text-slate-900' : 'text-white'} tracking-tight`}>
               Cofre de Segurança Master
             </h2>
-            <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+            <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'} max-w-xs mx-auto leading-relaxed`}>
               Autentique-se com o PIN executivo de 6 dígitos para acessar dados fiscais, DRE, métricas financeiras e assinantes.
             </p>
           </div>
 
           {/* Banner de erro ou cooldown */}
           {cooldownSegundos > 0 ? (
-            <div className="bg-rose-500/15 border border-rose-500/40 rounded-2xl p-3.5 text-center text-xs text-rose-300 space-y-1 animate-pulse">
-              <div className="flex items-center justify-center gap-1.5 font-bold text-rose-200">
-                <ShieldAlert className="w-4 h-4 text-rose-400" />
+            <div className={`${isWhite ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-rose-500/15 border-rose-500/40 text-rose-300'} border rounded-2xl p-3.5 text-center text-xs space-y-1 animate-pulse`}>
+              <div className={`flex items-center justify-center gap-1.5 font-bold ${isWhite ? 'text-rose-800' : 'text-rose-200'}`}>
+                <ShieldAlert className="w-4 h-4 text-rose-500" />
                 <span>Cofre Bloqueado por Segurança</span>
               </div>
-              <p className="text-[11px] text-rose-300/90">
-                Muitas tentativas incorretas. Aguarde <strong className="text-white font-mono text-sm">{cooldownSegundos}s</strong> para tentar novamente.
+              <p className={`text-[11px] ${isWhite ? 'text-rose-600' : 'text-rose-300/90'}`}>
+                Muitas tentativas incorretas. Aguarde <strong className={`font-mono text-sm ${isWhite ? 'text-rose-900 font-bold' : 'text-white'}`}>{cooldownSegundos}s</strong> para tentar novamente.
               </p>
             </div>
           ) : erroPin ? (
-            <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-3 text-center text-xs text-rose-300 flex items-center justify-center gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <div className={`${isWhite ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-rose-500/10 border-rose-500/30 text-rose-300'} border rounded-2xl p-3 text-center text-xs flex items-center justify-center gap-2 animate-in fade-in`}>
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
               <span>{erroPin}</span>
             </div>
           ) : null}
@@ -824,7 +833,9 @@ export default function SaaSMaster() {
                   key={index}
                   className={`w-4 h-4 rounded-full transition-all duration-200 ${
                     preenchido
-                      ? 'bg-purple-500 shadow-md shadow-purple-500/50 scale-110'
+                      ? 'bg-purple-600 shadow-md shadow-purple-500/50 scale-110'
+                      : isWhite
+                      ? 'bg-slate-200 border border-slate-300'
                       : 'bg-slate-800 border border-slate-700'
                   }`}
                 />
@@ -857,13 +868,19 @@ export default function SaaSMaster() {
                   }
                 }}
                 placeholder="Ou digite o PIN aqui..."
-                className="w-full text-center tracking-widest text-lg font-mono font-bold py-2.5 px-10 bg-slate-950/80 border border-slate-800 focus:border-purple-500 rounded-2xl text-white placeholder:text-slate-600 focus:outline-none transition-all"
+                className={`w-full text-center tracking-widest text-lg font-mono font-bold py-2.5 px-10 rounded-2xl focus:outline-none transition-all ${
+                  isWhite
+                    ? 'bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-purple-600 focus:bg-white shadow-inner'
+                    : 'bg-slate-950/80 border border-slate-800 focus:border-purple-500 text-white placeholder:text-slate-600'
+                }`}
                 autoFocus
               />
               <button
                 type="button"
                 onClick={() => setMostrarPin(!mostrarPin)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 cursor-pointer"
+                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 cursor-pointer transition-colors ${
+                  isWhite ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'
+                }`}
                 title={mostrarPin ? 'Ocultar PIN' : 'Mostrar PIN'}
               >
                 {mostrarPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -878,7 +895,11 @@ export default function SaaSMaster() {
                   type="button"
                   disabled={cooldownSegundos > 0}
                   onClick={() => handleTecladoVirtual(num)}
-                  className="py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 active:bg-purple-600 text-white font-mono text-lg font-bold border border-slate-700/50 shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  className={`py-3 rounded-2xl font-mono text-lg font-bold shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isWhite
+                      ? 'bg-slate-100 hover:bg-slate-200 active:bg-purple-600 active:text-white text-slate-800 border border-slate-200'
+                      : 'bg-slate-800/80 hover:bg-slate-700/80 active:bg-purple-600 text-white border border-slate-700/50'
+                  }`}
                 >
                   {num}
                 </button>
@@ -887,7 +908,11 @@ export default function SaaSMaster() {
                 type="button"
                 disabled={cooldownSegundos > 0 || !pinDigitado}
                 onClick={handleLimparPin}
-                className="py-3 rounded-2xl bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-white font-semibold text-xs border border-slate-700/40 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className={`py-3 rounded-2xl font-semibold text-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                  isWhite
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200'
+                    : 'bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700/40'
+                }`}
               >
                 Limpar
               </button>
@@ -895,7 +920,11 @@ export default function SaaSMaster() {
                 type="button"
                 disabled={cooldownSegundos > 0}
                 onClick={() => handleTecladoVirtual('0')}
-                className="py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 active:bg-purple-600 text-white font-mono text-lg font-bold border border-slate-700/50 shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className={`py-3 rounded-2xl font-mono text-lg font-bold shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                  isWhite
+                    ? 'bg-slate-100 hover:bg-slate-200 active:bg-purple-600 active:text-white text-slate-800 border border-slate-200'
+                    : 'bg-slate-800/80 hover:bg-slate-700/80 active:bg-purple-600 text-white border border-slate-700/50'
+                }`}
               >
                 0
               </button>
@@ -903,7 +932,11 @@ export default function SaaSMaster() {
                 type="button"
                 disabled={cooldownSegundos > 0 || !pinDigitado}
                 onClick={handleBackspaceVirtual}
-                className="py-3 rounded-2xl bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-white font-semibold text-sm border border-slate-700/40 transition-all cursor-pointer flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                className={`py-3 rounded-2xl font-semibold text-sm transition-all cursor-pointer flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed ${
+                  isWhite
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200'
+                    : 'bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700/40'
+                }`}
                 title="Apagar último dígito"
               >
                 ⌫
@@ -914,18 +947,20 @@ export default function SaaSMaster() {
             <button
               type="submit"
               disabled={cooldownSegundos > 0 || !pinDigitado}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-purple-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 !text-white font-bold text-sm shadow-xl shadow-purple-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
             >
-              <Unlock className="w-4 h-4" />
-              <span>Desbloquear Painel Master</span>
+              <Unlock className="w-4 h-4 !text-white" />
+              <span className="!text-white">Desbloquear Painel Master</span>
             </button>
           </form>
 
           {/* Dica de Código Padrão */}
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+          <div className={`pt-2 border-t flex items-center justify-between text-xs ${
+            isWhite ? 'border-slate-200 text-slate-500' : 'border-slate-800/80 text-slate-400'
+          }`}>
             <div className="flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-              <span>Código Padrão: <strong className="text-purple-300 font-mono">889900</strong></span>
+              <KeyRound className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+              <span>Código Padrão: <strong className={`font-mono ${isWhite ? 'text-purple-700 font-bold' : 'text-purple-300'}`}>889900</strong></span>
             </div>
             <button
               type="button"
@@ -937,7 +972,9 @@ export default function SaaSMaster() {
                   setPinDigitado('');
                 }
               }}
-              className="text-[11px] font-bold text-purple-400 hover:text-purple-300 hover:underline cursor-pointer"
+              className={`text-[11px] font-bold hover:underline cursor-pointer ${
+                isWhite ? 'text-purple-600 hover:text-purple-800' : 'text-purple-400 hover:text-purple-300'
+              }`}
             >
               Autopreencher & Entrar
             </button>
@@ -948,7 +985,9 @@ export default function SaaSMaster() {
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="text-xs text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+              className={`text-xs transition-colors cursor-pointer ${
+                isWhite ? 'text-slate-500 hover:text-slate-800' : 'text-slate-500 hover:text-slate-300'
+              }`}
             >
               ← Voltar ao Terminal de Atendimento (PDV)
             </button>
