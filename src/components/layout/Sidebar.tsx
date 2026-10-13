@@ -1,4 +1,4 @@
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Store,
   LayoutGrid,
@@ -76,19 +76,32 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     >
       {/* Brand Header */}
       <div className="h-16 px-5 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+        <Link
+          to={usuarioLogado?.cargo === 'super_admin' ? '/saas' : '/'}
+          className="flex items-center gap-3 group cursor-pointer"
+        >
+          <div
+            className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-lg transition-transform group-hover:scale-105 ${
+              usuarioLogado?.cargo === 'super_admin'
+                ? 'bg-gradient-to-tr from-purple-600 to-indigo-500 shadow-purple-500/25'
+                : 'bg-gradient-to-tr from-emerald-600 to-emerald-400 shadow-emerald-500/20'
+            }`}
+          >
             <Zap className="w-5 h-5 fill-white" />
           </div>
           <div>
             <h1 className="text-base font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
               EloServe
             </h1>
-            <p className="text-[10px] text-emerald-400 font-semibold tracking-wider uppercase">
-              PDV Inteligente
+            <p
+              className={`text-[10px] font-semibold tracking-wider uppercase ${
+                usuarioLogado?.cargo === 'super_admin' ? 'text-purple-400' : 'text-emerald-400'
+              }`}
+            >
+              {usuarioLogado?.cargo === 'super_admin' ? 'Gestão SaaS Master' : 'PDV Inteligente'}
             </p>
           </div>
-        </div>
+        </Link>
 
         {/* Botão fechar apenas no mobile */}
         <button

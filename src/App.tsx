@@ -14,6 +14,26 @@ import MinhaAssinatura from './pages/MinhaAssinatura';
 import Estoque from './pages/Estoque';
 import Delivery from './pages/Delivery';
 import Funcionarios from './pages/Funcionarios';
+import { useAuthStore } from './store/useAuthStore';
+import { useSaaSStore } from './store/useSaaSStore';
+
+function RotaInicialInteligente() {
+  const { usuarioLogado } = useAuthStore();
+  const { tenantAtivoId } = useSaaSStore();
+
+  // Super Admin em Visão Global vai direto para o Painel de Gestão SaaS Master
+  if (usuarioLogado?.cargo === 'super_admin' && tenantAtivoId === 'global') {
+    return <Navigate to="/saas" replace />;
+  }
+
+  // Cozinha vai direto para o KDS
+  if (usuarioLogado?.cargo === 'cozinha') {
+    return <Navigate to="/kds" replace />;
+  }
+
+  // Equipe de restaurante ou Super Admin inspecionando uma loja específica
+  return <PDV />;
+}
 
 export default function App() {
   return (
@@ -29,12 +49,12 @@ export default function App() {
             <RotaProtegida>
               <Layout>
                 <Routes>
-                  {/* PDV / Frente de Caixa */}
+                  {/* Rota Raiz Inteligente */}
                   <Route
                     path="/"
                     element={
-                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante', 'caixa', 'garcom']}>
-                        <PDV />
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante', 'caixa', 'garcom', 'cozinha', 'entregador']}>
+                        <RotaInicialInteligente />
                       </RotaProtegida>
                     }
                   />

@@ -14,7 +14,7 @@ const produtosIniciais: Produto[] = [
   {
     id: 'p1',
     categoriaId: 'c1',
-    nome: 'EloBurger Smash Bacon',
+    nome: 'Smash Burguer Bacon Artesanal',
     descricao: 'Dois blends de 90g prensados, queijo cheddar inglês, fatias crocantes de bacon e maionese defumada.',
     precoVenda: 34.9,
     precoCusto: 11.2,
@@ -25,7 +25,7 @@ const produtosIniciais: Produto[] = [
   {
     id: 'p2',
     categoriaId: 'c1',
-    nome: 'EloBurger Clássico Salada',
+    nome: 'Burger Clássico & Salada Fresca',
     descricao: 'Blend 160g, queijo prato derretido, alface americana, tomate fresco e picles artesanal.',
     precoVenda: 29.9,
     precoCusto: 9.8,
@@ -206,7 +206,7 @@ export const useProductStore = create<ProductState>()(
       },
     }),
     {
-      name: 'eloserve_produtos_v1',
+      name: 'eloserve_produtos_v2',
     }
   )
 );

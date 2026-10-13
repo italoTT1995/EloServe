@@ -1,5 +1,5 @@
 import { useState, ReactNode } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { Crown, ArrowLeft, Megaphone, X, Sparkles, AlertTriangle, Info } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
@@ -14,6 +14,7 @@ export function Layout({ children }: LayoutProps) {
   const [sidebarAberta, setSidebarAberta] = useState(false);
   const [avisosDispensados, setAvisosDispensados] = useState<string[]>([]);
   const location = useLocation();
+  const navigate = useNavigate();
   const { usuarioLogado } = useAuthStore();
   const { getTenantAtivo, getAvisosAtivosParaTenant, tenantAtivoId, selecionarTenant } = useSaaSStore();
 
@@ -61,7 +62,10 @@ export function Layout({ children }: LayoutProps) {
                 </Link>
               )}
               <button
-                onClick={() => selecionarTenant('global')}
+                onClick={() => {
+                  selecionarTenant('global');
+                  navigate('/saas');
+                }}
                 className="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-200 border border-purple-500/30 font-bold transition-all text-[11px] cursor-pointer"
               >
                 <span>Voltar para Visão Global</span>

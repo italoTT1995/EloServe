@@ -199,12 +199,12 @@ export const TENANT_GLOBAL: TenantRestaurante = {
 const TENANTS_INICIAIS: TenantRestaurante[] = [
   {
     id: 'tenant-01',
-    nomeFantasia: 'Restaurante EloServe (Matriz)',
-    razaoSocial: 'EloServe Gastronomia e Tecnologia LTDA',
+    nomeFantasia: 'Churrascaria & Parrilla Fogo de Minas',
+    razaoSocial: 'Fogo de Minas Carnes Nobres LTDA',
     documento: '45.123.890/0001-12',
-    responsavelNome: 'Italo Lemos',
-    telefoneWhatsApp: '+55 (31) 97182-6083',
-    email: 'italo@eloserve.com.br',
+    responsavelNome: 'Rodrigo Alvarenga',
+    telefoneWhatsApp: '+55 (31) 98112-9900',
+    email: 'gerencia@fogodeminas.com.br',
     cidadeUf: 'Belo Horizonte / MG',
     planoId: 'enterprise',
     statusAssinatura: 'ativo',
@@ -514,7 +514,7 @@ export const useSaaSStore = create<SaaSState>()(
       },
     }),
     {
-      name: 'eloserve_saas_store_v3',
+      name: 'eloserve_saas_store_v4',
     }
   )
 );
