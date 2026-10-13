@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import { useSaaSStore, AbaMasterSaaS } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
+import { useEloBotStore } from '../store/useEloBotStore';
 import { TipoPlanoSaaS, StatusAssinatura, Produto, PlanoAssinatura, TenantRestaurante } from '../types';
 
 export default function SaaSMaster() {
@@ -106,6 +107,13 @@ export default function SaaSMaster() {
     alternarDisponibilidade,
     adicionarCategoria,
   } = useProductStore();
+
+  const {
+    getConfig: getEloBotConfig,
+    getConversas: getEloBotConversas,
+    conectarInstancia: conectarEloBot,
+    desconectarInstancia: desconectarEloBot,
+  } = useEloBotStore();
 
   const [abaAtiva, setAbaAtiva] = useState<AbaMasterSaaS>(abaParam || 'restaurantes');
 
@@ -4079,44 +4087,131 @@ export default function SaaSMaster() {
 
       {/* CONTEÚDO DA ABA 4: INSTÂNCIAS WHATSAPP & IA */}
       {abaAtiva === 'whatsapp' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div>
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Bot className="w-5 h-5 text-emerald-400" />
-                <span>Instâncias de WhatsApp IA Conectadas nos Restaurantes</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Acompanhe o status dos robôs de atendimento conectados por restaurante.
-              </p>
+        <div className="space-y-6">
+          {/* Header da aba e Gateway */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Bot className="w-5 h-5 text-emerald-400" />
+                  <span>Central de Instâncias WhatsApp & Atendentes IA (EloBot)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Monitore e controle a conexão dos robôs de atendimento em cada restaurante assinante.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Cluster Evolution API v2 Online</span>
+                </span>
+              </div>
             </div>
-            <span className="text-xs font-mono font-bold px-3 py-1 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-              Gateway Ativo (Baileys / Evolution)
-            </span>
+
+            {/* Métricas do Cluster IA */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Instâncias Ativas</span>
+                <p className="text-xl font-black text-emerald-400 font-mono mt-1">
+                  {tenants.filter((t) => t.instanciaWhatsAppConectada).length} / {tenants.length}
+                </p>
+                <span className="text-[10px] text-slate-500">Lojas com robô operando</span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Motor de IA Padrão</span>
+                <p className="text-sm font-black text-white font-mono mt-1">Google Gemini 1.5</p>
+                <span className="text-[10px] text-purple-400">Latência média: 1.2s</span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Atendimentos / Dia</span>
+                <p className="text-xl font-black text-white font-mono mt-1">~148</p>
+                <span className="text-[10px] text-emerald-400">95.8% resolvidos por IA</span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Transbordo Humano</span>
+                <p className="text-xl font-black text-amber-400 font-mono mt-1">4.2%</p>
+                <span className="text-[10px] text-slate-500">Casos que chamam garçom/caixa</span>
+              </div>
+            </div>
           </div>
 
+          {/* Cards dos Restaurantes e suas Instâncias */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {tenants.map((t) => (
-              <div key={t.id} className="bg-slate-950/70 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-white">{t.nomeFantasia}</h4>
-                  <p className="text-xs text-slate-400 font-mono mt-0.5">{t.telefoneWhatsApp}</p>
-                  <span className="text-[10px] text-purple-400 font-semibold block mt-1">Plano: {t.planoId.toUpperCase()}</span>
+            {tenants.map((t) => {
+              const eloConfig = getEloBotConfig(t.id);
+              const convs = getEloBotConversas(t.id);
+              const isConectado = t.instanciaWhatsAppConectada;
+
+              return (
+                <div key={t.id} className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4 shadow-lg hover:border-slate-700 transition-all">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-extrabold text-white">{t.nomeFantasia}</h4>
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold uppercase">
+                          {t.planoId}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 font-mono mt-1">{t.telefoneWhatsApp}</p>
+                      <span className="text-xs text-emerald-400 font-medium block mt-0.5">
+                        Agente: <strong>{eloConfig.nomeAgente || 'EloBot IA'}</strong>
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      {isConectado ? (
+                        <span className="px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold inline-flex items-center gap-1.5 shadow-sm">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          <span>WhatsApp Conectado</span>
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 text-[10px] font-bold">
+                          Desconectado
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-500 block mt-1 font-mono">
+                        {convs.length} conversa{convs.length !== 1 ? 's' : ''} no histórico
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => {
+                        selecionarTenant(t.id);
+                        navigate('/elobot');
+                      }}
+                      className="flex-1 py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                    >
+                      <Bot className="w-3.5 h-3.5" />
+                      <span>Abrir Painel EloBot</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const novoStatus = !isConectado;
+                        atualizarDadosTenant(t.id, { instanciaWhatsAppConectada: novoStatus });
+                        if (novoStatus) {
+                          conectarEloBot(t.id);
+                        } else {
+                          desconectarEloBot(t.id);
+                        }
+                      }}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                        isConectado
+                          ? 'border-rose-500/30 text-rose-300 hover:bg-rose-500/10'
+                          : 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10'
+                      }`}
+                    >
+                      {isConectado ? 'Desconectar' : 'Conectar Bot'}
+                    </button>
+                  </div>
                 </div>
-                <div className="text-right">
-                  {t.instanciaWhatsAppConectada ? (
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      <span>Bot Conectado</span>
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 text-[10px] font-bold">
-                      Desconectado
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

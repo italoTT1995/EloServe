@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Bot,
   Send,
@@ -9,180 +9,1166 @@ import {
   Phone,
   QrCode,
   ShieldCheck,
+  User,
+  Users,
+  MessageSquare,
+  AlertCircle,
+  ShoppingBag,
+  Plus,
+  Trash2,
+  Search,
+  ArrowRight,
+  Check,
+  CheckCheck,
+  RefreshCw,
+  Cpu,
+  Zap,
+  Wifi,
+  WifiOff,
+  FileText,
+  ExternalLink,
+  Settings,
+  Battery,
+  X,
+  CreditCard,
+  MessageCircle,
 } from 'lucide-react';
+import { useEloBotStore, ConversaWhatsApp, MensagemWhatsApp, ConfigEloBot } from '../store/useEloBotStore';
+import { useSaaSStore } from '../store/useSaaSStore';
+import { useProductStore } from '../store/useProductStore';
+import { useDeliveryStore } from '../store/useDeliveryStore';
 
 export default function EloBot() {
-  const [mensagens, setMensagens] = useState([
-    { remetente: 'cliente', texto: 'Boa noite! Vocês têm opções vegetarianas no cardápio de hoje?', hora: '19:42' },
-    { remetente: 'bot', texto: 'Olá! Sou o EloBot do restaurante. Temos sim! Nossa Pizza Margherita Especial e o EloBurger Veggie com blend de grão-de-bico são opções maravilhosas. Deseja que eu te envie o link do cardápio completo com fotos?', hora: '19:42' },
-  ]);
-  const [inputTexto, setInputTexto] = useState('');
+  const { tenantAtivoId, getTenantAtivo, planos } = useSaaSStore();
+  const tenantAtual = getTenantAtivo();
+  const { getProdutosPorTenant } = useProductStore();
+  const produtosLoja = getProdutosPorTenant(tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId);
+  const { adicionarPedidoDelivery } = useDeliveryStore();
 
-  const enviar = (e: React.FormEvent) => {
+  const {
+    getConfig,
+    atualizarConfig,
+    conectarInstancia,
+    desconectarInstancia,
+    gerarNovoQrCode,
+    concluirLeituraQrCode,
+    getConversas,
+    selecionarConversa,
+    conversaAtivaId,
+    enviarMensagemCliente,
+    enviarMensagemHumana,
+    alternarModoAtendimento,
+    criarNovaConversa,
+    finalizarConversa,
+    removerConversa,
+  } = useEloBotStore();
+
+  const currentTenantId = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
+  const config = getConfig(currentTenantId);
+  const conversas = getConversas(currentTenantId);
+
+  // Selecionar primeira conversa se nenhuma estiver ativa
+  useEffect(() => {
+    if (!conversaAtivaId && conversas.length > 0) {
+      selecionarConversa(conversas[0].id);
+    }
+  }, [conversaAtivaId, conversas]);
+
+  const conversaAtiva = conversas.find((c) => c.id === conversaAtivaId) || conversas[0];
+
+  // Estados locais da UI
+  const [filtroConversas, setFiltroConversas] = useState<'todas' | 'ia' | 'humano' | 'finalizado'>('todas');
+  const [buscaConversa, setBuscaConversa] = useState('');
+  const [inputMensagem, setInputMensagem] = useState('');
+  const [modoEnvio, setModoEnvio] = useState<'cliente' | 'humano'>('cliente');
+  const [abaLateral, setAbaLateral] = useState<'instancia' | 'regras' | 'cardapio' | 'gatilhos'>('instancia');
+  const [modalNovoChat, setModalNovoChat] = useState(false);
+  const [modalQrCode, setModalQrCode] = useState(false);
+  const [novoClienteForm, setNovoClienteForm] = useState({
+    nome: '',
+    telefone: '',
+    mensagemInicial: '',
+  });
+
+  // Form de Configuração da IA
+  const [formConfig, setFormConfig] = useState<ConfigEloBot>(config);
+  const [toastConfigSalva, setToastConfigSalva] = useState(false);
+  const [toastPedidoCriado, setToastPedidoCriado] = useState<string | null>(null);
+
+  // Sincronizar form de config com o tenant
+  useEffect(() => {
+    setFormConfig(config);
+  }, [config.nomeAgente, config.statusInstancia, currentTenantId]);
+
+  // Rolar automaticamente para o fim do chat
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversaAtiva?.mensagens?.length]);
+
+  // Filtragem de conversas
+  const conversasFiltradas = conversas.filter((c) => {
+    const matchStatus = filtroConversas === 'todas' || c.status === filtroConversas;
+    const matchBusca =
+      c.clienteNome.toLowerCase().includes(buscaConversa.toLowerCase()) ||
+      c.clienteTelefone.includes(buscaConversa) ||
+      c.ultimaMensagem.toLowerCase().includes(buscaConversa.toLowerCase());
+    return matchStatus && matchBusca;
+  });
+
+  const totalIA = conversas.filter((c) => c.status === 'ia').length;
+  const totalHumano = conversas.filter((c) => c.status === 'humano').length;
+
+  // Envio de mensagem
+  function handleEnviar(e: React.FormEvent) {
     e.preventDefault();
-    if (!inputTexto.trim()) return;
+    if (!inputMensagem.trim() || !conversaAtiva) return;
 
-    const nova = { remetente: 'cliente', texto: inputTexto, hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    setMensagens([...mensagens, nova]);
-    setInputTexto('');
+    if (modoEnvio === 'humano' || conversaAtiva.status === 'humano') {
+      enviarMensagemHumana(currentTenantId, conversaAtiva.id, inputMensagem);
+    } else {
+      enviarMensagemCliente(
+        currentTenantId,
+        conversaAtiva.id,
+        inputMensagem,
+        produtosLoja,
+        tenantAtual.nomeFantasia
+      );
+    }
+    setInputMensagem('');
+  }
 
+  // Disparo de simulação rápida do cliente via chips
+  function handleDispararChipRapido(texto: string) {
+    if (!conversaAtiva) return;
+    enviarMensagemCliente(
+      currentTenantId,
+      conversaAtiva.id,
+      texto,
+      produtosLoja,
+      tenantAtual.nomeFantasia
+    );
+  }
+
+  // Enviar Cardápio com 1 clique
+  function handleEnviarCardapioRapido() {
+    if (!conversaAtiva) return;
+    enviarMensagemCliente(
+      currentTenantId,
+      conversaAtiva.id,
+      'Por favor, pode me enviar o cardápio completo com opções e preços?',
+      produtosLoja,
+      tenantAtual.nomeFantasia
+    );
+  }
+
+  // Enviar Chave PIX com 1 clique
+  function handleEnviarPixRapido() {
+    if (!conversaAtiva) return;
+    enviarMensagemCliente(
+      currentTenantId,
+      conversaAtiva.id,
+      'Qual a chave PIX de vocês para pagamento?',
+      produtosLoja,
+      tenantAtual.nomeFantasia
+    );
+  }
+
+  // Salvar configurações do Robô
+  function handleSalvarConfig(e: React.FormEvent) {
+    e.preventDefault();
+    atualizarConfig(currentTenantId, formConfig);
+    setToastConfigSalva(true);
+    setTimeout(() => setToastConfigSalva(false), 3000);
+  }
+
+  // Criar Pedido no Delivery a partir do Rascunho da Conversa
+  function handleConfirmarPedidoNoDelivery() {
+    if (!conversaAtiva || !conversaAtiva.pedidoRascunho) return;
+    const rascunho = conversaAtiva.pedidoRascunho;
+
+    adicionarPedidoDelivery({
+      clienteNome: conversaAtiva.clienteNome,
+      clienteTelefone: conversaAtiva.clienteTelefone,
+      tipo: 'delivery',
+      endereco: {
+        rua: rascunho.endereco || 'Endereço informado via WhatsApp',
+        numero: 'S/N',
+        bairro: 'Centro',
+        cidade: 'Belo Horizonte',
+        obs: 'Pedido feito automaticamente via EloBot WhatsApp',
+      },
+      itens: rascunho.itens.map((it) => ({
+        nome: it.nome,
+        quantidade: it.quantidade,
+        preco: it.preco,
+      })),
+      subtotal: rascunho.subtotal,
+      taxaEntrega: rascunho.taxaEntrega,
+      total: rascunho.total,
+      formaPagamento: (rascunho.formaPagamento as any) || 'pix',
+      status: 'preparando',
+      pago: rascunho.formaPagamento === 'pix',
+    });
+
+    enviarMensagemHumana(
+      currentTenantId,
+      conversaAtiva.id,
+      '✅ Pedido registrado com sucesso no sistema de Delivery! Nossa cozinha já recebeu a comanda e iniciou a preparação.'
+    );
+
+    setToastPedidoCriado(`Pedido de ${conversaAtiva.clienteNome} despachado para a Cozinha e Delivery!`);
+    setTimeout(() => setToastPedidoCriado(null), 4000);
+  }
+
+  // Criar novo chat
+  function handleCriarNovoChat(e: React.FormEvent) {
+    e.preventDefault();
+    if (!novoClienteForm.nome || !novoClienteForm.telefone) {
+      alert('Informe o nome e telefone do cliente.');
+      return;
+    }
+    const novoId = criarNovaConversa(
+      currentTenantId,
+      novoClienteForm.nome,
+      novoClienteForm.telefone,
+      novoClienteForm.mensagemInicial || 'Olá! Gostaria de fazer um pedido.'
+    );
+    setModalNovoChat(false);
+    setNovoClienteForm({ nome: '', telefone: '', mensagemInicial: '' });
+
+    // Resposta automática da IA
     setTimeout(() => {
-      setMensagens((prev) => [
-        ...prev,
-        {
-          remetente: 'bot',
-          texto: 'Recebi sua mensagem! O EloBot está conectado ao cardápio em tempo real e pode responder dúvidas, confirmar pedidos de delivery ou chamar um atendente humano a qualquer momento.',
-          hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
-    }, 1000);
-  };
+      enviarMensagemCliente(
+        currentTenantId,
+        novoId,
+        novoClienteForm.mensagemInicial || 'Olá! Gostaria de fazer um pedido.',
+        produtosLoja,
+        tenantAtual.nomeFantasia
+      );
+    }, 600);
+  }
+
+  // Simular conexão via QR Code
+  function handleSimularLeituraQrCode() {
+    concluirLeituraQrCode(currentTenantId);
+    setModalQrCode(false);
+  }
 
   return (
-    <div className="space-y-6 max-w-5xl select-none">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-5 rounded-3xl">
+    <div className="space-y-5 max-w-7xl mx-auto select-none pb-10">
+      {/* Top Banner do EloBot */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40 border border-slate-800 p-5 rounded-3xl shadow-xl">
         <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-            <Bot className="w-5 h-5" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+            <Bot className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-              <span>EloBot — Atendente IA 24h no WhatsApp</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 font-semibold border border-emerald-500/20">
-                Ativo
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-black text-white">EloBot — Atendente Inteligente 24h no WhatsApp</h2>
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 uppercase tracking-wider flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>{config.statusInstancia === 'conectado' ? 'IA Online' : 'Desconectado'}</span>
               </span>
-            </h2>
+            </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Inspirado no atendente "Mark" do iSolver: responde clientes, tira dúvidas e envia status de pedidos.
+              Atendimento autônomo com cardápio dinâmico do restaurante <strong className="text-white">{tenantAtual.nomeFantasia}</strong>, fechamento de pedidos e transbordo humano.
             </p>
           </div>
         </div>
 
-        <a
-          href="https://wa.me/5531971826083"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Abrir no WhatsApp Web"
-          className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-950/70 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 hover:border-emerald-500/60 transition-all shadow-sm"
-        >
-          <Phone className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="text-xs font-mono font-bold">+55 (31) 97182-6083</span>
-        </a>
+        {/* Status da Instância & Ações Rápidas */}
+        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          {config.statusInstancia === 'conectado' ? (
+            <div className="flex items-center gap-2 bg-slate-950/80 border border-emerald-500/30 px-3.5 py-2 rounded-2xl">
+              <Phone className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-xs font-mono font-bold text-emerald-300">{config.telefoneInstancia}</span>
+              <span className="text-[10px] text-slate-500">|</span>
+              <Battery className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-[11px] font-mono text-slate-300">{config.bateriaPct}%</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                gerarNovoQrCode(currentTenantId);
+                setModalQrCode(true);
+              }}
+              className="px-3.5 py-2 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Conectar WhatsApp (QR Code)</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setModalNovoChat(true)}
+            className="px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Novo Chat de Cliente</span>
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Simulador de WhatsApp */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl flex flex-col h-[520px] overflow-hidden shadow-2xl">
-          {/* Header WhatsApp */}
-          <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold text-xs">
-                EB
+      {/* Grid Principal: 3 Colunas (Lista Conversas | Chat Ao Vivo | Painel IA) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[640px]">
+        {/* COLUNA 1: Lista de Conversas do WhatsApp (4 cols) */}
+        <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-3xl flex flex-col overflow-hidden shadow-xl">
+          {/* Header e Busca */}
+          <div className="p-4 border-b border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-bold text-white">Conversas WhatsApp</h3>
               </div>
-              <div>
-                <p className="text-xs font-bold text-white">EloBot • Atendimento Automático</p>
-                <p className="text-[10px] text-emerald-400">Online 24h</p>
-              </div>
+              <span className="text-xs text-slate-400 font-mono">
+                {conversas.length} cliente{conversas.length !== 1 ? 's' : ''}
+              </span>
             </div>
-            <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">Simulador de Testes</span>
+
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                value={buscaConversa}
+                onChange={(e) => setBuscaConversa(e.target.value)}
+                placeholder="Buscar cliente, telefone ou texto..."
+                className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
+              />
+            </div>
+
+            {/* Filtros por tipo de atendimento */}
+            <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl text-[11px] font-semibold text-center">
+              <button
+                onClick={() => setFiltroConversas('todas')}
+                className={`py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  filtroConversas === 'todas' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Todas
+              </button>
+              <button
+                onClick={() => setFiltroConversas('ia')}
+                className={`py-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                  filtroConversas === 'ia' ? 'bg-emerald-950 text-emerald-300 font-bold border border-emerald-500/30' : 'text-slate-400 hover:text-emerald-300'
+                }`}
+              >
+                <span>IA</span>
+                <span className="text-[9px] px-1 rounded bg-emerald-500/20">{totalIA}</span>
+              </button>
+              <button
+                onClick={() => setFiltroConversas('humano')}
+                className={`py-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                  filtroConversas === 'humano' ? 'bg-amber-950 text-amber-300 font-bold border border-amber-500/30' : 'text-slate-400 hover:text-amber-300'
+                }`}
+              >
+                <span>Humano</span>
+                {totalHumano > 0 && (
+                  <span className="text-[9px] px-1 rounded bg-amber-500 text-black font-extrabold animate-pulse">{totalHumano}</span>
+                )}
+              </button>
+              <button
+                onClick={() => setFiltroConversas('finalizado')}
+                className={`py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  filtroConversas === 'finalizado' ? 'bg-slate-800 text-slate-300 font-bold' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                Fim
+              </button>
+            </div>
           </div>
 
-          {/* Área de Mensagens */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-950/40">
-            {mensagens.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex flex-col ${msg.remetente === 'cliente' ? 'items-end' : 'items-start'}`}
-              >
-                <div
-                  className={`max-w-md rounded-2xl px-4 py-2.5 text-xs leading-relaxed ${
-                    msg.remetente === 'cliente'
-                      ? 'bg-emerald-600 text-white rounded-br-none'
-                      : 'bg-slate-800 border border-slate-700/60 text-slate-100 rounded-bl-none'
-                  }`}
+          {/* Lista com Scroll */}
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 max-h-[520px]">
+            {conversasFiltradas.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 space-y-2">
+                <MessageCircle className="w-8 h-8 mx-auto opacity-40 text-slate-400" />
+                <p className="text-xs">Nenhuma conversa encontrada neste filtro.</p>
+                <button
+                  onClick={() => setModalNovoChat(true)}
+                  className="text-xs font-bold text-emerald-400 hover:underline cursor-pointer"
                 >
-                  <p>{msg.texto}</p>
-                  <span className="text-[9px] opacity-70 block text-right mt-1 font-mono">{msg.hora}</span>
+                  + Iniciar um novo chat de teste
+                </button>
+              </div>
+            ) : (
+              conversasFiltradas.map((conv) => {
+                const isAtivo = conv.id === conversaAtiva?.id;
+                return (
+                  <div
+                    key={conv.id}
+                    onClick={() => selecionarConversa(conv.id)}
+                    className={`p-3.5 transition-all cursor-pointer flex items-start gap-3 relative hover:bg-slate-800/40 ${
+                      isAtivo ? 'bg-slate-800/80 border-l-4 border-emerald-500' : ''
+                    }`}
+                  >
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-slate-700 to-slate-800 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-inner">
+                      {conv.clienteNome
+                        .split(' ')
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join('')}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-bold text-white truncate">{conv.clienteNome}</span>
+                        <span className="text-[10px] text-slate-500 font-mono shrink-0">{conv.ultimaHora}</span>
+                      </div>
+
+                      <p className="text-[11px] text-slate-400 truncate mb-1.5">{conv.ultimaMensagem}</p>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          {conv.status === 'humano' ? (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                              <span>Transbordo Humano</span>
+                            </span>
+                          ) : conv.status === 'ia' ? (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/20 flex items-center gap-1">
+                              <Bot className="w-2.5 h-2.5" />
+                              <span>EloBot Atendendo</span>
+                            </span>
+                          ) : (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                              Finalizado
+                            </span>
+                          )}
+
+                          {conv.pedidoRascunho && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-0.5">
+                              <ShoppingBag className="w-2.5 h-2.5" />
+                              <span>Pedido em Rascunho</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {conv.naoLidas > 0 && (
+                          <span className="w-4 h-4 rounded-full bg-emerald-500 text-black font-extrabold text-[9px] flex items-center justify-center shrink-0">
+                            {conv.naoLidas}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* COLUNA 2: Janela de Atendimento do WhatsApp (5 cols) */}
+        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-3xl flex flex-col overflow-hidden shadow-2xl h-[640px]">
+          {conversaAtiva ? (
+            <>
+              {/* Header do Chat WhatsApp */}
+              <div className="p-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-500 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-md">
+                    {conversaAtiva.clienteNome
+                      .split(' ')
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join('')}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-xs font-bold text-white truncate">{conversaAtiva.clienteNome}</h4>
+                      <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+                        {conversaAtiva.clienteTelefone}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      <span className="text-[10px] text-emerald-400 font-medium">
+                        {conversaAtiva.status === 'humano'
+                          ? '👤 Aguardando Atendente Humano'
+                          : '🤖 EloBot IA Respondendo'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botões de Ação do Chat */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {conversaAtiva.status === 'humano' ? (
+                    <button
+                      onClick={() => alternarModoAtendimento(currentTenantId, conversaAtiva.id, 'ia')}
+                      className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                      title="Devolver atendimento para o robô de IA responder automaticamente"
+                    >
+                      <Bot className="w-3.5 h-3.5" />
+                      <span>Ativar IA</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => alternarModoAtendimento(currentTenantId, conversaAtiva.id, 'humano')}
+                      className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                      title="Pausar a IA e assumir a conversa como humano"
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      <span>Assumir</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => removerConversa(currentTenantId, conversaAtiva.id)}
+                    className="p-1.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                    title="Excluir histórico de conversa"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Input de Envio */}
-          <form onSubmit={enviar} className="p-3 border-t border-slate-800 bg-slate-950 flex gap-2">
-            <input
-              type="text"
-              value={inputTexto}
-              onChange={(e) => setInputTexto(e.target.value)}
-              placeholder="Digite uma mensagem como se fosse um cliente..."
-              className="flex-1 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
-            />
-            <button
-              type="submit"
-              className="p-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+              {/* Feed de Mensagens (Estilo WhatsApp) */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-950/70">
+                {/* Linha de Criptografia / Conexão */}
+                <div className="text-center">
+                  <span className="text-[10px] text-slate-500 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800 inline-flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                    <span>Mensagens sincronizadas via Evolution API WhatsApp Oficial</span>
+                  </span>
+                </div>
+
+                {conversaAtiva.mensagens.map((msg) => {
+                  const isCliente = msg.remetente === 'cliente';
+                  const isBot = msg.remetente === 'bot';
+                  const isHumano = msg.remetente === 'humano';
+                  const isSistema = msg.remetente === 'sistema';
+
+                  if (isSistema) {
+                    return (
+                      <div key={msg.id} className="text-center py-1">
+                        <span className="text-[10px] text-purple-300 bg-purple-950/40 border border-purple-500/30 px-3 py-1 rounded-full font-semibold">
+                          {msg.texto}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex flex-col ${isCliente ? 'items-start' : 'items-end'}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs shadow-md space-y-2 leading-relaxed ${
+                          isCliente
+                            ? 'bg-slate-800 border border-slate-700/60 text-white rounded-tl-none'
+                            : isBot
+                            ? 'bg-emerald-950/90 border border-emerald-500/40 text-emerald-50 rounded-tr-none'
+                            : 'bg-purple-950/90 border border-purple-500/40 text-purple-50 rounded-tr-none'
+                        }`}
+                      >
+                        {/* Header do Balão com Tag */}
+                        <div className="flex items-center justify-between gap-3 text-[10px] font-bold opacity-80 border-b border-white/10 pb-1">
+                          <span>
+                            {isCliente
+                              ? conversaAtiva.clienteNome
+                              : isBot
+                              ? `🤖 ${config.nomeAgente}`
+                              : '👤 Atendente da Loja'}
+                          </span>
+                          <span className="font-mono text-[9px]">{msg.hora}</span>
+                        </div>
+
+                        {/* Texto da Mensagem */}
+                        <p className="whitespace-pre-line leading-relaxed">{msg.texto}</p>
+
+                        {/* Card de Destaque de Cardápio */}
+                        {msg.cardapioItensDestaque && msg.cardapioItensDestaque.length > 0 && (
+                          <div className="bg-slate-900/80 border border-emerald-500/30 rounded-xl p-2.5 space-y-1.5 mt-2">
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
+                              Sugestões do Cardápio:
+                            </span>
+                            {msg.cardapioItensDestaque.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800">
+                                <span className="font-bold text-white">{item.nome}</span>
+                                <span className="text-emerald-400 font-mono font-bold">
+                                  R$ {item.preco.toFixed(2).replace('.', ',')}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Card de Resumo de Pedido Delivery */}
+                        {msg.resumoPedido && (
+                          <div className="bg-slate-900/90 border border-purple-500/40 rounded-xl p-3 space-y-2 mt-2">
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                              <span className="text-[11px] font-black text-purple-300 flex items-center gap-1">
+                                <ShoppingBag className="w-3.5 h-3.5" />
+                                <span>Resumo do Pedido Delivery</span>
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">
+                                WhatsApp
+                              </span>
+                            </div>
+
+                            <div className="space-y-1 text-[11px]">
+                              {msg.resumoPedido.itens.map((it, idx) => (
+                                <div key={idx} className="flex items-center justify-between text-slate-300">
+                                  <span>{it.quantidade}x {it.nome}</span>
+                                  <span className="font-mono">R$ {(it.preco * it.quantidade).toFixed(2).replace('.', ',')}</span>
+                                </div>
+                              ))}
+                              <div className="flex items-center justify-between text-slate-400 text-[10px] pt-1 border-t border-slate-800">
+                                <span>Taxa de Entrega:</span>
+                                <span>R$ {msg.resumoPedido.taxaEntrega.toFixed(2).replace('.', ',')}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs font-black text-emerald-400 pt-1">
+                                <span>Total do Pedido:</span>
+                                <span>R$ {msg.resumoPedido.total.toFixed(2).replace('.', ',')}</span>
+                              </div>
+                            </div>
+
+                            {/* Botão para Confirmar no Delivery Store */}
+                            <button
+                              type="button"
+                              onClick={handleConfirmarPedidoNoDelivery}
+                              className="w-full py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Enviar Comanda para Cozinha & Delivery</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Status de Envio */}
+                        <div className="flex items-center justify-end gap-1 text-[9px] opacity-70">
+                          <span>{msg.hora}</span>
+                          <CheckCheck className="w-3 h-3 text-sky-400" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Barra de Sugestões de Teste Rápido (Chips do Cliente) */}
+              <div className="px-3 py-2 bg-slate-950 border-t border-slate-800/80 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[11px]">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider shrink-0 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-emerald-400" />
+                  <span>Testar IA:</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleDispararChipRapido('Quais pratos vocês recomendam no cardápio de hoje?')}
+                  className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 whitespace-nowrap transition-colors cursor-pointer"
+                >
+                  📋 Ver Cardápio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDispararChipRapido('Quero pedir o prato principal com uma bebida para entrega.')}
+                  className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 whitespace-nowrap transition-colors cursor-pointer"
+                >
+                  🥩 Fazer Pedido
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDispararChipRapido('Qual a chave PIX e quanto tempo demora a entrega?')}
+                  className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 whitespace-nowrap transition-colors cursor-pointer"
+                >
+                  🔑 Chave PIX & Prazo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDispararChipRapido('Gostaria de falar com um atendente humano')}
+                  className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-amber-950/40 text-amber-300 border border-amber-500/20 whitespace-nowrap transition-colors cursor-pointer"
+                >
+                  👤 Falar com Humano
+                </button>
+              </div>
+
+              {/* Barra de Digitação */}
+              <form onSubmit={handleEnviar} className="p-3 bg-slate-950 border-t border-slate-800 flex items-center gap-2">
+                {/* Seletor de Modo de Envio (Cliente ou Humano) */}
+                <div className="flex bg-slate-900 rounded-xl p-0.5 border border-slate-800 text-[10px] font-bold shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setModoEnvio('cliente')}
+                    className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
+                      modoEnvio === 'cliente'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Digitar como se fosse o cliente do WhatsApp"
+                  >
+                    Cliente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModoEnvio('humano')}
+                    className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
+                      modoEnvio === 'humano'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Digitar como o atendente humano da loja"
+                  >
+                    Loja
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  value={inputMensagem}
+                  onChange={(e) => setInputMensagem(e.target.value)}
+                  placeholder={
+                    modoEnvio === 'humano' || conversaAtiva.status === 'humano'
+                      ? 'Responder cliente como Atendente Humano...'
+                      : 'Simular mensagem do cliente (IA responderá)...'
+                  }
+                  className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                />
+
+                <button
+                  type="submit"
+                  disabled={!inputMensagem.trim()}
+                  className={`p-2.5 rounded-xl text-white transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md ${
+                    modoEnvio === 'humano' || conversaAtiva.status === 'humano'
+                      ? 'bg-purple-600 hover:bg-purple-500'
+                      : 'bg-emerald-600 hover:bg-emerald-500'
+                  }`}
+                  title="Enviar mensagem"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center p-8 text-center text-slate-500">
+              <p className="text-xs">Selecione uma conversa para iniciar o atendimento.</p>
+            </div>
+          )}
         </div>
 
-        {/* Configurações do Agente */}
-        <div className="space-y-4">
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Sliders className="w-4 h-4 text-emerald-400" />
-              <span>Configuração da IA</span>
-            </h3>
+        {/* COLUNA 3: Painel de Controle da IA & Loja (3 cols) */}
+        <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col space-y-4 shadow-xl">
+          {/* Navegação entre Abas Laterais */}
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-2xl text-[11px] font-bold">
+            <button
+              onClick={() => setAbaLateral('instancia')}
+              className={`flex-1 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+                abaLateral === 'instancia'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              WhatsApp
+            </button>
+            <button
+              onClick={() => setAbaLateral('regras')}
+              className={`flex-1 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+                abaLateral === 'regras'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Regras IA
+            </button>
+            <button
+              onClick={() => setAbaLateral('cardapio')}
+              className={`flex-1 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+                abaLateral === 'cardapio'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Memória
+            </button>
+          </div>
 
-            <div className="space-y-3 text-xs">
+          {/* Toast de Confirmação */}
+          {toastConfigSalva && (
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-300 flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Configurações do EloBot salvas com sucesso!</span>
+            </div>
+          )}
+
+          {toastPedidoCriado && (
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-2.5 text-xs text-purple-300 flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0" />
+              <span>{toastPedidoCriado}</span>
+            </div>
+          )}
+
+          {/* CONTEÚDO 1: STATUS DA INSTÂNCIA WHATSAPP */}
+          {abaLateral === 'instancia' && (
+            <div className="space-y-4 text-xs">
+              <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Gateway Ativo:</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono text-[10px] font-bold">
+                    Baileys / Evolution v2
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Status da Sessão:</span>
+                  <span className="font-bold text-white flex items-center gap-1.5">
+                    {config.statusInstancia === 'conectado' ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span className="text-emerald-400">Conectado Oficial</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+                        <span className="text-rose-400">Desconectado</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Número Conectado:</span>
+                  <span className="font-mono font-bold text-slate-200">{config.telefoneInstancia}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Tempo Médio Resposta:</span>
+                  <span className="font-mono text-emerald-400 font-bold">{config.tempoRespostaMedioSeg}s</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Mensagens Hoje:</span>
+                  <span className="font-mono font-bold text-white">{config.totalMensagensHoje} envios</span>
+                </div>
+              </div>
+
+              {/* Botões de Conexão */}
+              <div className="space-y-2">
+                {config.statusInstancia === 'conectado' ? (
+                  <button
+                    onClick={() => desconectarInstancia(currentTenantId)}
+                    className="w-full py-2.5 rounded-xl border border-rose-500/30 text-rose-300 hover:bg-rose-500/10 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <WifiOff className="w-3.5 h-3.5" />
+                    <span>Desconectar Instância</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      gerarNovoQrCode(currentTenantId);
+                      setModalQrCode(true);
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-600/20 active:scale-95"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Parear WhatsApp com QR Code</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={handleEnviarCardapioRapido}
+                  className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Enviar Cardápio Atualizado</span>
+                </button>
+
+                <button
+                  onClick={handleEnviarPixRapido}
+                  className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Disparar Chave PIX</span>
+                </button>
+              </div>
+
+              {/* Transbordo Humano Box */}
+              <div className="bg-slate-950/60 border border-slate-800 p-3.5 rounded-2xl space-y-1.5">
+                <div className="flex items-center gap-2 text-white font-bold">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Transbordo Humano Inteligente</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Quando o cliente digita "atendente", "falar com humano" ou relata um problema, a IA transfere o chat automaticamente para você assumir.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* CONTEÚDO 2: REGRAS E PERSONALIDADE DA IA */}
+          {abaLateral === 'regras' && (
+            <form onSubmit={handleSalvarConfig} className="space-y-3.5 text-xs overflow-y-auto max-h-[500px] pr-1">
               <div>
-                <label className="text-slate-400 block mb-1">Nome do Agente:</label>
+                <label className="text-slate-300 font-semibold block mb-1">Nome do Robô / Agente:</label>
                 <input
                   type="text"
-                  defaultValue="EloBot"
-                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-medium"
+                  value={formConfig.nomeAgente}
+                  onChange={(e) => setFormConfig({ ...formConfig, nomeAgente: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-medium focus:border-emerald-500 focus:outline-none"
+                  required
                 />
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Tom de Voz:</label>
-                <input
-                  type="text"
-                  defaultValue="Simpático, ágil e acolhedor"
-                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">WhatsApp Conectado:</label>
-                <input
-                  type="text"
-                  defaultValue="+55 (31) 97182-6083"
-                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono text-xs font-semibold"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Modelo de IA:</label>
-                <select className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-medium">
-                  <option>Google Gemini 1.5 Flash (Ultrarrápido)</option>
-                  <option>OpenAI GPT-4o-mini</option>
+                <label className="text-slate-300 font-semibold block mb-1">Tom de Voz:</label>
+                <select
+                  value={formConfig.tomDeVoz}
+                  onChange={(e) => setFormConfig({ ...formConfig, tomDeVoz: e.target.value as any })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="acolhedor">Acolhedor, caloroso e simpático</option>
+                  <option value="formal">Formal e executivo</option>
+                  <option value="descontraido">Descontraído e moderno</option>
+                  <option value="vendedor">Foco em Vendas e Upsell de pratos</option>
                 </select>
               </div>
-            </div>
-          </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold text-white">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Transbordo Humano</span>
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Modelo de IA:</label>
+                <select
+                  value={formConfig.modeloIA}
+                  onChange={(e) => setFormConfig({ ...formConfig, modeloIA: e.target.value as any })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="gemini-1.5-flash">Google Gemini 1.5 Flash (Ultrarrápido • Padrão)</option>
+                  <option value="gpt-4o-mini">OpenAI GPT-4o-mini</option>
+                  <option value="claude-3-haiku">Anthropic Claude 3 Haiku</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Chave PIX do Restaurante:</label>
+                <input
+                  type="text"
+                  value={formConfig.chavePix}
+                  onChange={(e) => setFormConfig({ ...formConfig, chavePix: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono text-xs font-bold focus:border-emerald-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Prazo Entrega (min):</label>
+                  <input
+                    type="number"
+                    value={formConfig.tempoMedioEntregaMin}
+                    onChange={(e) => setFormConfig({ ...formConfig, tempoMedioEntregaMin: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Taxa Fixa (R$):</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={formConfig.taxaEntregaFixa}
+                    onChange={(e) => setFormConfig({ ...formConfig, taxaEntregaFixa: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Instruções Customizadas do Restaurante:</label>
+                <textarea
+                  rows={3}
+                  value={formConfig.instrucoesCustomizadas}
+                  onChange={(e) => setFormConfig({ ...formConfig, instrucoesCustomizadas: e.target.value })}
+                  placeholder="Ex: Ofereça sobremesa, destaque a promoção de chopp na quinta..."
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none leading-relaxed"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Salvar Configurações da IA</span>
+              </button>
+            </form>
+          )}
+
+          {/* CONTEÚDO 3: CARDÁPIO NA MEMÓRIA DA IA */}
+          {abaLateral === 'cardapio' && (
+            <div className="space-y-3 text-xs overflow-y-auto max-h-[500px] pr-1">
+              <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
+                  Cardápio em Tempo Real:
+                </span>
+                <p className="text-[11px] text-slate-300">
+                  O EloBot lê em tempo real os <strong className="text-white">{produtosLoja.length} produtos</strong> da loja ativa (<strong>{tenantAtual.nomeFantasia}</strong>).
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {produtosLoja.map((prod) => (
+                  <div
+                    key={prod.id}
+                    className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between text-xs"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <span className="font-bold text-white truncate block">{prod.nome}</span>
+                      <span className="text-[10px] text-slate-500 truncate block">{prod.descricao || 'Sem descrição'}</span>
+                    </div>
+                    <span className="font-mono font-bold text-emerald-400 shrink-0">
+                      R$ {prod.precoVenda.toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Se o cliente digitar "falar com atendente", a IA pausa automaticamente e emite um alerta sonoro na Frente de Caixa.
-            </p>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* MODAL: NOVO CHAT DE TESTE / CLIENTE */}
+      {modalNovoChat && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-white">Simular Novo Chat de Cliente</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalNovoChat(false)}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCriarNovoChat} className="space-y-3.5 text-xs">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Nome do Cliente:</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Gabriela Duarte"
+                  value={novoClienteForm.nome}
+                  onChange={(e) => setNovoClienteForm({ ...novoClienteForm, nome: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-emerald-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">WhatsApp / Telefone:</label>
+                <input
+                  type="text"
+                  placeholder="(31) 99888-7766"
+                  value={novoClienteForm.telefone}
+                  onChange={(e) => setNovoClienteForm({ ...novoClienteForm, telefone: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Primeira Mensagem do Cliente:</label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Boa noite! Gostaria de saber quais são os pratos do dia."
+                  value={novoClienteForm.mensagemInicial}
+                  onChange={(e) => setNovoClienteForm({ ...novoClienteForm, mensagemInicial: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-emerald-500 focus:outline-none text-xs"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalNovoChat(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white text-xs font-bold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Iniciar Conversa</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: QR CODE EVOLUTION API */}
+      {modalQrCode && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-bold text-white">Conexão WhatsApp Evolution</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalQrCode(false)}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl inline-block shadow-inner">
+              {/* QR Code SVG / Visual realista */}
+              <div className="w-48 h-48 bg-slate-100 flex flex-col items-center justify-center border-4 border-slate-900 rounded-xl relative p-2">
+                <div className="grid grid-cols-6 gap-1 w-full h-full">
+                  {Array.from({ length: 36 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-xs ${
+                        (i % 2 === 0 && i % 3 === 0) || i < 8 || i > 28
+                          ? 'bg-slate-900'
+                          : 'bg-emerald-600'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-10 h-10 rounded-xl bg-white p-1 shadow-lg flex items-center justify-center">
+                    <Bot className="w-6 h-6 text-emerald-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1 text-xs text-slate-400">
+              <p className="font-semibold text-slate-200">1. Abra o WhatsApp no celular</p>
+              <p>2. Vá em <strong>Aparelhos Conectados &gt; Conectar um Aparelho</strong></p>
+              <p>3. Aponte a câmera para o QR Code acima</p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={handleSimularLeituraQrCode}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Simular Leitura com o Celular</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModalQrCode(false)}
+                className="text-xs text-slate-500 hover:text-slate-300 cursor-pointer"
+              >
+                Fechar janela
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

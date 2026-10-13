@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { PedidoDelivery, ClienteDelivery, FaixaTaxaEntrega, StatusDelivery } from '../types';
+import { useEloBotStore } from './useEloBotStore';
 
 const FAIXAS_TAXA_PADRAO: FaixaTaxaEntrega[] = [
   { ateKm: 1.5, taxa: 3.0 },
@@ -178,22 +179,41 @@ export const useDeliveryStore = create<DeliveryState>()(
       },
 
       avancarStatusDelivery: (pedidoId) => {
+        let pedidoAlterado: PedidoDelivery | undefined;
+        let novoStatusCalc: StatusDelivery | undefined;
+
         set((state) => ({
           pedidos: state.pedidos.map((p) => {
             if (p.id !== pedidoId) return p;
-            if (p.tipo === 'retirada') {
-              const proxRetirada = p.status === 'preparando' ? 'pronto' : 'retirado';
-              return { ...p, status: proxRetirada as StatusDelivery };
-            }
-            // Delivery padrão
             let prox: StatusDelivery = p.status;
-            if (p.status === 'preparando') prox = 'pronto';
-            else if (p.status === 'pronto') prox = 'retirado';
-            else if (p.status === 'retirado') prox = 'a_caminho';
-            else if (p.status === 'a_caminho') prox = 'entregue';
+            if (p.tipo === 'retirada') {
+              prox = p.status === 'preparando' ? 'pronto' : 'retirado';
+            } else {
+              if (p.status === 'preparando') prox = 'pronto';
+              else if (p.status === 'pronto') prox = 'retirado';
+              else if (p.status === 'retirado') prox = 'a_caminho';
+              else if (p.status === 'a_caminho') prox = 'entregue';
+            }
+            pedidoAlterado = p;
+            novoStatusCalc = prox;
             return { ...p, status: prox };
           }),
         }));
+
+        if (pedidoAlterado && novoStatusCalc) {
+          try {
+            const { notificarStatusPedidoWhatsApp } = useEloBotStore.getState();
+            notificarStatusPedidoWhatsApp(
+              'tenant-01',
+              pedidoAlterado.clienteTelefone,
+              pedidoAlterado.clienteNome,
+              pedidoAlterado.numero,
+              novoStatusCalc
+            );
+          } catch (e) {
+            console.error('Erro ao disparar notificação WhatsApp:', e);
+          }
+        }
       },
 
       marcarComoPago: (pedidoId) => {
