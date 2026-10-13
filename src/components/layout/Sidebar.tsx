@@ -18,6 +18,7 @@ import {
   Bike,
   Package,
   Users,
+  BarChart3,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { CargoUsuario } from '../../types';
@@ -113,6 +114,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               return [
                 { id: 'restaurantes', label: 'Restaurantes Assinantes', icon: Store, badge: 'Clientes' },
                 { id: 'editor_loja', label: 'Ambiente de Edição das Lojas', icon: Sliders, badge: 'Editar', highlight: true },
+                { id: 'dre_saas', label: 'DRE Executivo & Gráficos', icon: BarChart3, badge: 'DRE' },
                 { id: 'financeiro', label: 'Métricas Financeiras & MRR', icon: TrendingUp },
                 { id: 'planos', label: 'Planos & Mensalidades', icon: Layers },
                 { id: 'whatsapp', label: 'Instâncias WhatsApp & IA', icon: Bot },

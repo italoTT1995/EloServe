@@ -40,6 +40,11 @@ import {
   Printer,
   Package,
   FileText,
+  BarChart3,
+  PieChart,
+  Calculator,
+  LineChart,
+  Percent,
 } from 'lucide-react';
 import { useSaaSStore, AbaMasterSaaS } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
@@ -448,6 +453,18 @@ export default function SaaSMaster() {
     statusAssinatura: 'trial' as StatusAssinatura,
   });
 
+  // Estados da Aba DRE Executivo e Gráficos SaaS
+  const [periodoDRE, setPeriodoDRE] = useState<'mensal' | 'anual'>('mensal');
+  const [simulacaoClientes, setSimulacaoClientes] = useState<number>(100);
+  const [simulacaoTicketMedio, setSimulacaoTicketMedio] = useState<number>(199.0);
+  const [custosInfraBase, setCustosInfraBase] = useState({
+    cloudVps: 180.0,
+    evolutionWhatsapp: 120.0,
+    taxaGatewayPct: 2.9,
+    impostoSimplesPct: 6.0,
+    suporteMarketing: 350.0,
+  });
+
   const mrr = getMRR();
   const arr = mrr * 12;
   const totalAtivos = getTotalAtivos();
@@ -631,6 +648,21 @@ export default function SaaSMaster() {
           <span>Ambiente de Edição das Lojas</span>
           <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/30 uppercase font-black">
             Modificar
+          </span>
+        </button>
+
+        <button
+          onClick={() => handleMudarAba('dre_saas')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            abaAtiva === 'dre_saas'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'
+              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 text-emerald-400" />
+          <span>DRE Executivo & Gráficos</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 uppercase font-black">
+            SaaS
           </span>
         </button>
 
@@ -1436,6 +1468,693 @@ export default function SaaSMaster() {
           )}
         </div>
       )}
+
+      {/* CONTEÚDO DA NOVA ABA: DRE EXECUTIVO & GRÁFICOS DO SAAS */}
+      {abaAtiva === 'dre_saas' && (() => {
+        const fator = periodoDRE === 'mensal' ? 1 : 12;
+        const receitaAssinaturas = mrr * fator;
+        const receitaOnboarding = (150 * (tenants.length > 0 ? 1 : 0)) * fator;
+        const receitaBruta = receitaAssinaturas + receitaOnboarding;
+
+        const deducoesImpostos = receitaBruta * (custosInfraBase.impostoSimplesPct / 100);
+        const receitaLiquida = Math.max(0, receitaBruta - deducoesImpostos);
+
+        const custoCloud = custosInfraBase.cloudVps * fator;
+        const custoWhatsapp = custosInfraBase.evolutionWhatsapp * fator;
+        const custoGateway = receitaBruta * (custosInfraBase.taxaGatewayPct / 100);
+        const cogsTecnologia = custoCloud + custoWhatsapp + custoGateway;
+
+        const lucroBruto = Math.max(0, receitaLiquida - cogsTecnologia);
+        const margemBrutaPct = receitaLiquida > 0 ? (lucroBruto / receitaLiquida) * 100 : 0;
+
+        const despesasOpex = custosInfraBase.suporteMarketing * fator;
+        const lucroLiquidoOperacional = lucroBruto - despesasOpex;
+        const margemLiquidaPct = receitaLiquida > 0 ? (lucroLiquidoOperacional / receitaLiquida) * 100 : 0;
+
+        // Cálculos do Simulador de Escala & Valuation
+        const simuladoMRR = simulacaoClientes * simulacaoTicketMedio;
+        const simuladoARR = simuladoMRR * 12;
+        const simuladoCustoServidor = (180 + (simulacaoClientes * 3.5)) * 12;
+        const simuladoImpostosGateway = simuladoARR * ((custosInfraBase.impostoSimplesPct + custosInfraBase.taxaGatewayPct) / 100);
+        const simuladoOpexAnual = (600 + (simulacaoClientes * 5.0)) * 12;
+        const simuladoLucroLiquido = Math.max(0, simuladoARR - simuladoCustoServidor - simuladoImpostosGateway - simuladoOpexAnual);
+        const valuationMinimo = simuladoARR * 4.5;
+        const valuationMaximo = simuladoARR * 6.0;
+
+        // Dados do Histórico de MRR (Últimos 6 meses)
+        const historicoMRR = [
+          { mes: 'Mai/26', valor: 299, pct: '+0%', altura: '28%' },
+          { mes: 'Jun/26', valor: 498, pct: '+66%', altura: '46%' },
+          { mes: 'Jul/26', valor: 697, pct: '+40%', altura: '64%' },
+          { mes: 'Ago/26', valor: 896, pct: '+28%', altura: '82%' },
+          { mes: 'Set/26', valor: 996, pct: '+11%', altura: '91%' },
+          { mes: 'Out/26', valor: mrr > 0 ? mrr : 1095, pct: '+10%', altura: '100%', atual: true },
+        ];
+
+        return (
+          <div className="space-y-6">
+            {/* Header da Aba DRE */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-purple-950/60 via-slate-900 to-slate-900 border border-purple-500/30 p-6 rounded-3xl shadow-xl">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 uppercase tracking-wider flex items-center gap-1">
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    <span>Inteligência Contábil & Financeira</span>
+                  </span>
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 uppercase tracking-wider">
+                    SaaS B2B
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white flex items-center gap-2">
+                  <TrendingUp className="w-6 h-6 text-emerald-400" />
+                  <span>DRE Executivo & Métricas da Plataforma EloServe</span>
+                </h3>
+                <p className="text-xs text-slate-400 max-w-3xl">
+                  Demonstração consolidada do resultado operacional da sua empresa de software: receitas recorrentes, custos de infraestrutura em nuvem, margem de contribuição líquida e projeção de valuation de mercado.
+                </p>
+              </div>
+
+              {/* Seletor Mensal / Anual */}
+              <div className="flex items-center bg-slate-950 p-1.5 rounded-2xl border border-slate-800 shrink-0 self-start lg:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setPeriodoDRE('mensal')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    periodoDRE === 'mensal'
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Visão Mensal (MRR)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriodoDRE('anual')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    periodoDRE === 'anual'
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Visão Anualizada (ARR)
+                </button>
+              </div>
+            </div>
+
+            {/* 4 Cards de KPIs Executivos */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Receita Líquida */}
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-medium">Receita Operacional Líquida</span>
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold">
+                    <DollarSign className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-white font-mono">
+                  R$ {receitaLiquida.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <span className="text-[10px] text-purple-400 font-semibold block">
+                  Após dedução tributária ({custosInfraBase.impostoSimplesPct}%)
+                </span>
+              </div>
+
+              {/* Margem Bruta SaaS */}
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-medium">Margem Bruta do Software</span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
+                    <Percent className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-emerald-400 font-mono">
+                  {margemBrutaPct.toFixed(1)}%
+                </p>
+                <span className="text-[10px] text-emerald-400/80 font-semibold block">
+                  Lucro Bruto: R$ {lucroBruto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              {/* Lucro Líquido / EBITDA */}
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-medium">Lucro Líquido Operacional</span>
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-blue-400 font-mono">
+                  R$ {lucroLiquidoOperacional.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <span className="text-[10px] text-blue-400/80 font-semibold block">
+                  Margem Líquida Real: {margemLiquidaPct.toFixed(1)}%
+                </span>
+              </div>
+
+              {/* GMV Global Processado */}
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-medium">GMV Global dos Restaurantes</span>
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
+                    <Store className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-amber-400 font-mono">
+                  R$ 384.950,00
+                </p>
+                <span className="text-[10px] text-amber-400/80 font-semibold block">
+                  Volume total movimentado no EloServe este mês
+                </span>
+              </div>
+            </div>
+
+            {/* SEÇÃO DE GRÁFICOS VISUAIS */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Gráfico 1: Evolução Histórica do MRR (2 colunas) */}
+              <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <LineChart className="w-4 h-4 text-purple-400" />
+                      <span>Evolução do Faturamento Recorrente Mensal (MRR)</span>
+                    </h4>
+                    <p className="text-xs text-slate-400">Histórico de crescimento da receita nos últimos 6 meses</p>
+                  </div>
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40 font-bold font-mono self-start sm:self-auto">
+                    +266% nos últimos 6 meses
+                  </span>
+                </div>
+
+                {/* Área Visual do Gráfico de Barras */}
+                <div className="h-56 pt-6 flex items-end justify-between gap-3 sm:gap-6 border-b border-slate-800 pb-3">
+                  {historicoMRR.map((item, idx) => (
+                    <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
+                      {/* Tooltip / Valor acima da barra */}
+                      <div className="opacity-80 group-hover:opacity-100 transition-opacity text-center">
+                        <span className="text-[10px] font-mono font-bold text-white block">
+                          R$ {item.valor}
+                        </span>
+                        <span className="text-[9px] text-emerald-400 font-bold block">
+                          {item.pct}
+                        </span>
+                      </div>
+
+                      {/* Barra */}
+                      <div className="w-full max-w-[48px] bg-slate-800/80 rounded-t-xl overflow-hidden flex items-end h-full">
+                        <div
+                          className={`w-full rounded-t-xl transition-all duration-500 group-hover:brightness-125 ${
+                            item.atual
+                              ? 'bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-300 shadow-lg shadow-emerald-500/30'
+                              : 'bg-gradient-to-t from-purple-800 via-purple-600 to-indigo-400'
+                          }`}
+                          style={{ height: item.altura }}
+                        />
+                      </div>
+
+                      {/* Legenda do Mês */}
+                      <span className={`text-[11px] font-semibold ${item.atual ? 'text-emerald-400 font-bold' : 'text-slate-400'}`}>
+                        {item.mes}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Rodapé do Gráfico com Insights */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block">Faturamento Inicial (Mai/26)</span>
+                    <strong className="text-xs font-mono text-white">R$ 299,00/mês</strong>
+                  </div>
+                  <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block">Faturamento Atual (Out/26)</span>
+                    <strong className="text-xs font-mono text-emerald-400">R$ {mrr.toFixed(2)}/mês</strong>
+                  </div>
+                  <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block">Crescimento Médio Mensal</span>
+                    <strong className="text-xs font-mono text-purple-300">+31.2% a.m.</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráfico 2: Composição da Base & Custos (1 coluna) */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5 flex flex-col justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <PieChart className="w-4 h-4 text-emerald-400" />
+                    <span>Composição dos Assinantes</span>
+                  </h4>
+                  <p className="text-xs text-slate-400">Saúde e status da carteira de restaurantes</p>
+                </div>
+
+                {/* Donut Chart Visual SVG */}
+                <div className="flex items-center justify-center py-2">
+                  <div className="relative w-36 h-36 flex items-center justify-center">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                      {/* Fundo */}
+                      <circle cx="18" cy="18" r="15.915" fill="none" stroke="#1e293b" strokeWidth="3.8" />
+                      {/* Ativos: 60% */}
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15.915"
+                        fill="none"
+                        stroke="#10b981"
+                        strokeWidth="3.8"
+                        strokeDasharray="60, 100"
+                        strokeDashoffset="0"
+                      />
+                      {/* Trial: 20% */}
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15.915"
+                        fill="none"
+                        stroke="#f59e0b"
+                        strokeWidth="3.8"
+                        strokeDasharray="20, 100"
+                        strokeDashoffset="-60"
+                      />
+                      {/* Atrasados: 20% */}
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15.915"
+                        fill="none"
+                        stroke="#f43f5e"
+                        strokeWidth="3.8"
+                        strokeDasharray="20, 100"
+                        strokeDashoffset="-80"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                      <span className="text-2xl font-black text-white font-mono">{tenants.length}</span>
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Lojas</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Legendas do Donut */}
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      <span className="text-slate-300">Ativos Adimplentes</span>
+                    </div>
+                    <strong className="text-white font-mono">{totalAtivos} (60%)</strong>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      <span className="text-slate-300">Em Trial (7 dias grátis)</span>
+                    </div>
+                    <strong className="text-white font-mono">{totalTrials} (20%)</strong>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                      <span className="text-slate-300">Faturas em Tolerância</span>
+                    </div>
+                    <strong className="text-white font-mono">{totalAtrasados} (20%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* TABELA DO DRE CONTÁBIL GERENCIAL COMPLETO */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+                <div>
+                  <h4 className="text-base font-black text-white flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-purple-400" />
+                    <span>Demonstração do Resultado do Exercício — DRE Gerencial ({periodoDRE === 'mensal' ? 'Mês Vigente' : '12 Meses'})</span>
+                  </h4>
+                  <p className="text-xs text-slate-400">Estrutura oficial padrão contábil e de governança para startups SaaS</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-400 block">Base Tributária:</span>
+                  <span className="text-xs font-bold text-purple-300 font-mono">Simples Nacional (6.0%)</span>
+                </div>
+              </div>
+
+              {/* Tabela Estruturada */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="py-3 px-4">Conta Contábil / Descrição</th>
+                      <th className="py-3 px-4">Natureza da Operação</th>
+                      <th className="py-3 px-4 text-right">Valor ({periodoDRE === 'mensal' ? 'R$/mês' : 'R$/ano'})</th>
+                      <th className="py-3 px-4 text-right">Análise Vertical (AV%)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/80 font-medium">
+                    {/* 1. Receita Operacional Bruta */}
+                    <tr className="bg-purple-950/20 text-purple-200 font-bold">
+                      <td className="py-3 px-4 flex items-center gap-2">
+                        <span className="text-emerald-400 font-black">(+)</span>
+                        <span>1. RECEITA OPERACIONAL BRUTA DO SAAS</span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">Mensalidades + Taxas de Onboarding</td>
+                      <td className="py-3 px-4 text-right text-emerald-400 font-mono text-sm">
+                        R$ {receitaBruta.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-300">
+                        {receitaLiquida > 0 ? ((receitaBruta / receitaLiquida) * 100).toFixed(1) : 100}%
+                      </td>
+                    </tr>
+                    <tr className="text-slate-300">
+                      <td className="py-2.5 px-4 pl-8 text-slate-400">1.1. Mensalidades Recorrentes dos Planos (Starter, Pro, Enterprise)</td>
+                      <td className="py-2.5 px-4 text-slate-500">Recorrência mensal ativa</td>
+                      <td className="py-2.5 px-4 text-right font-mono text-white">
+                        R$ {receitaAssinaturas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-400">
+                        {receitaLiquida > 0 ? ((receitaAssinaturas / receitaLiquida) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                    <tr className="text-slate-300">
+                      <td className="py-2.5 px-4 pl-8 text-slate-400">1.2. Taxas de Implantação, Configuração & Onboarding (Setup)</td>
+                      <td className="py-2.5 px-4 text-slate-500">Serviço de setup inicial de cardápio</td>
+                      <td className="py-2.5 px-4 text-right font-mono text-white">
+                        R$ {receitaOnboarding.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-400">
+                        {receitaLiquida > 0 ? ((receitaOnboarding / receitaLiquida) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+
+                    {/* 2. Deduções */}
+                    <tr className="bg-slate-950/40 text-slate-300 font-semibold">
+                      <td className="py-3 px-4 flex items-center gap-2">
+                        <span className="text-rose-400 font-black">(-)</span>
+                        <span>2. DEDUÇÕES DA RECEITA BRUTA & TRIBUTOS</span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">Impostos federais e municipais</td>
+                      <td className="py-3 px-4 text-right text-rose-400 font-mono">
+                        - R$ {deducoesImpostos.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-400">
+                        -{custosInfraBase.impostoSimplesPct.toFixed(1)}%
+                      </td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2.5 px-4 pl-8">2.1. Simples Nacional (Anexo V - Serviços de Licenciamento de Software)</td>
+                      <td className="py-2.5 px-4 text-slate-500">Alíquota estimada de 6.0%</td>
+                      <td className="py-2.5 px-4 text-right font-mono text-rose-300">
+                        - R$ {deducoesImpostos.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-400">-6.0%</td>
+                    </tr>
+
+                    {/* 3. Receita Operacional Líquida */}
+                    <tr className="bg-purple-950/40 text-purple-200 font-black border-y border-purple-500/30">
+                      <td className="py-3 px-4 flex items-center gap-2">
+                        <span className="text-purple-400 font-black">(=)</span>
+                        <span>3. RECEITA OPERACIONAL LÍQUIDA (ROL)</span>
+                      </td>
+                      <td className="py-3 px-4 text-purple-300 font-semibold">Base de apuração 100%</td>
+                      <td className="py-3 px-4 text-right text-white font-mono text-sm">
+                        R$ {receitaLiquida.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-purple-300">100.0%</td>
+                    </tr>
+
+                    {/* 4. Custos dos Serviços Prestados (COGS) */}
+                    <tr className="bg-slate-950/40 text-slate-300 font-semibold">
+                      <td className="py-3 px-4 flex items-center gap-2">
+                        <span className="text-amber-400 font-black">(-)</span>
+                        <span>4. CUSTOS DOS SERVIÇOS PRESTADOS (COGS - INFRAESTRUTURA DE NUVEM)</span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">Tecnologia, Servidores e APIs</td>
+                      <td className="py-3 px-4 text-right text-amber-400 font-mono">
+                        - R$ {cogsTecnologia.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-400">
+                        -{receitaLiquida > 0 ? ((cogsTecnologia / receitaLiquida) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2.5 px-4 pl-8">4.1. Servidores Cloud VPS & Banco de Dados (AWS / DigitalOcean / Supabase)</td>
+                      <td className="py-2.5 px-4 text-slate-500">Hospedagem de alta disponibilidade</td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-300">
+                        - R$ {custoCloud.toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-500">
+                        {receitaLiquida > 0 ? ((custoCloud / receitaLiquida) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2.5 px-4 pl-8">4.2. Servidor de Conexão WhatsApp Multi-Tenant (Evolution API / Baileys)</td>
+                      <td className="py-2.5 px-4 text-slate-500">Instâncias dedicadas para cada restaurante</td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-300">
+                        - R$ {custoWhatsapp.toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-500">
+                        {receitaLiquida > 0 ? ((custoWhatsapp / receitaLiquida) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2.5 px-4 pl-8">4.3. Taxas de Gateway de Pagamento e Cobrança Automática (Asaas / Stripe 2.9%)</td>
+                      <td className="py-2.5 px-4 text-slate-500">Processamento de PIX e Cartões de Crédito</td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-300">
+                        - R$ {custoGateway.toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-500">
+                        {custosInfraBase.taxaGatewayPct.toFixed(1)}%
+                      </td>
+                    </tr>
+
+                    {/* 5. Lucro Bruto */}
+                    <tr className="bg-emerald-950/30 text-emerald-200 font-black border-y border-emerald-500/30">
+                      <td className="py-3 px-4 flex items-center gap-2">
+                        <span className="text-emerald-400 font-black">(=)</span>
+                        <span>5. LUCRO BRUTO DO SAAS (MARGEM BRUTA: {margemBrutaPct.toFixed(1)}%)</span>
+                      </td>
+                      <td className="py-3 px-4 text-emerald-400 font-semibold">Rentabilidade primária do software</td>
+                      <td className="py-3 px-4 text-right text-emerald-400 font-mono text-sm">
+                        R$ {lucroBruto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-emerald-300 font-bold">
+                        {margemBrutaPct.toFixed(1)}%
+                      </td>
+                    </tr>
+
+                    {/* 6. Despesas Operacionais (OPEX) */}
+                    <tr className="bg-slate-950/40 text-slate-300 font-semibold">
+                      <td className="py-3 px-4 flex items-center gap-2">
+                        <span className="text-rose-400 font-black">(-)</span>
+                        <span>6. DESPESAS OPERACIONAIS GERAIS (OPEX)</span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">Comercial, Suporte e Marketing</td>
+                      <td className="py-3 px-4 text-right text-rose-400 font-mono">
+                        - R$ {despesasOpex.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-400">
+                        -{receitaLiquida > 0 ? ((despesasOpex / receitaLiquida) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2.5 px-4 pl-8">6.1. Tráfego Pago & Aquisição de Clientes (Google Ads / Meta Ads para Restaurantes)</td>
+                      <td className="py-2.5 px-4 text-slate-500">Captação de novos estabelecimentos</td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-300">
+                        - R$ {(despesasOpex * 0.65).toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-500">
+                        {receitaLiquida > 0 ? (((despesasOpex * 0.65) / receitaLiquida) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2.5 px-4 pl-8">6.2. Softwares de Suporte, Helpdesk & Atendimento ao Cliente</td>
+                      <td className="py-2.5 px-4 text-slate-500">Ferramentas de atendimento e CRM</td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-300">
+                        - R$ {(despesasOpex * 0.35).toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-500">
+                        {receitaLiquida > 0 ? (((despesasOpex * 0.35) / receitaLiquida) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+
+                    {/* 7. EBITDA / Lucro Líquido Final */}
+                    <tr className="bg-gradient-to-r from-emerald-950/60 to-purple-950/60 text-white font-black text-sm border-t-2 border-emerald-500">
+                      <td className="py-4 px-4 flex items-center gap-2">
+                        <span className="text-emerald-400 font-black text-lg">(=)</span>
+                        <span className="tracking-wide">7. RESULTADO OPERACIONAL LÍQUIDO / EBITDA (LUCRO FINAL)</span>
+                      </td>
+                      <td className="py-4 px-4 text-emerald-300 font-semibold text-xs">Sobra limpa para o Dono do SaaS</td>
+                      <td className="py-4 px-4 text-right text-emerald-400 font-mono text-base font-black">
+                        R$ {lucroLiquidoOperacional.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-4 px-4 text-right font-mono text-emerald-400 font-black text-sm">
+                        {margemLiquidaPct.toFixed(1)}%
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* SIMULADOR DE ESCALA & VALUATION DO ELOSERVE */}
+            <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-purple-950/50 border border-purple-500/30 rounded-3xl p-6 shadow-2xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <h4 className="text-lg font-black text-white flex items-center gap-2">
+                    <Calculator className="w-5 h-5 text-purple-400" />
+                    <span>Simulador de Escala, Lucro & Valuation do EloServe</span>
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Projete quantos restaurantes sua empresa precisa conquistar para atingir o faturamento e valuation desejados.
+                  </p>
+                </div>
+                <span className="text-xs px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold self-start sm:self-auto font-mono">
+                  Múltiplo de Mercado: 4.5x a 6.0x ARR
+                </span>
+              </div>
+
+              {/* Controles de Simulação */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-950/60 p-5 rounded-2xl border border-slate-800">
+                {/* Meta de Restaurantes */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <label className="text-slate-300 font-bold">Meta de Restaurantes Assinantes:</label>
+                    <span className="text-purple-400 font-black font-mono text-sm">{simulacaoClientes} lojas</span>
+                  </div>
+
+                  {/* Slider */}
+                  <input
+                    type="range"
+                    min="10"
+                    max="500"
+                    step="5"
+                    value={simulacaoClientes}
+                    onChange={(e) => setSimulacaoClientes(Number(e.target.value))}
+                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  />
+
+                  {/* Botões Rápidos */}
+                  <div className="flex items-center gap-2 flex-wrap pt-1">
+                    {[25, 50, 100, 200, 350, 500].map((qtd) => (
+                      <button
+                        key={qtd}
+                        type="button"
+                        onClick={() => setSimulacaoClientes(qtd)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                          simulacaoClientes === qtd
+                            ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        {qtd} lojas
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Ticket Médio por Restaurante */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <label className="text-slate-300 font-bold">Ticket Médio de Mensalidade:</label>
+                    <span className="text-emerald-400 font-black font-mono text-sm">R$ {simulacaoTicketMedio.toFixed(2)}/mês</span>
+                  </div>
+
+                  {/* Seletor de Plano de Referência */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSimulacaoTicketMedio(99.0)}
+                      className={`p-2.5 rounded-xl border text-center transition-all ${
+                        simulacaoTicketMedio === 99.0
+                          ? 'border-purple-500 bg-purple-950/40 text-white shadow-md'
+                          : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[10px] block text-slate-400">Plano Starter</span>
+                      <strong className="text-xs font-mono">R$ 99/mês</strong>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSimulacaoTicketMedio(199.0)}
+                      className={`p-2.5 rounded-xl border text-center transition-all ${
+                        simulacaoTicketMedio === 199.0
+                          ? 'border-emerald-500 bg-emerald-950/40 text-white shadow-md'
+                          : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[10px] block text-emerald-400 font-bold">Plano Pro (Mais vendido)</span>
+                      <strong className="text-xs font-mono">R$ 199/mês</strong>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSimulacaoTicketMedio(299.0)}
+                      className={`p-2.5 rounded-xl border text-center transition-all ${
+                        simulacaoTicketMedio === 299.0
+                          ? 'border-purple-500 bg-purple-950/40 text-white shadow-md'
+                          : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[10px] block text-slate-400">Plano Enterprise</span>
+                      <strong className="text-xs font-mono">R$ 299/mês</strong>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Resultados da Projeção */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* MRR Projetado */}
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">MRR Projetado (Mensal)</span>
+                  <p className="text-xl font-black text-white font-mono">
+                    R$ {simuladoMRR.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <span className="text-[10px] text-purple-400 font-semibold block">
+                    {simulacaoClientes} assinantes x R$ {simulacaoTicketMedio.toFixed(0)}
+                  </span>
+                </div>
+
+                {/* ARR Projetado */}
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">ARR Projetado (Anual)</span>
+                  <p className="text-xl font-black text-purple-400 font-mono">
+                    R$ {simuladoARR.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <span className="text-[10px] text-slate-400 font-semibold block">
+                    Receita bruta anual recorrente
+                  </span>
+                </div>
+
+                {/* Lucro Líquido Projetado */}
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Lucro Líquido Anual Est.</span>
+                  <p className="text-xl font-black text-emerald-400 font-mono">
+                    R$ {simuladoLucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <span className="text-[10px] text-emerald-400/80 font-semibold block">
+                    ~R$ {(simuladoLucroLiquido / 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /mês líquido
+                  </span>
+                </div>
+
+                {/* Valuation Estimado da Empresa */}
+                <div className="bg-gradient-to-br from-purple-950/80 to-slate-950 p-4 rounded-2xl border border-purple-500/40 space-y-1 shadow-lg">
+                  <span className="text-[10px] text-purple-300 uppercase tracking-wider font-bold flex items-center gap-1">
+                    <Crown className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Valuation do EloServe</span>
+                  </span>
+                  <p className="text-lg font-black text-amber-300 font-mono">
+                    R$ {valuationMinimo.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                  </p>
+                  <span className="text-[10px] text-slate-400 font-medium block">
+                    Até <strong className="text-white font-mono">R$ {valuationMaximo.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</strong> (6x ARR)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* CONTEÚDO DA ABA 2: MÉTRICAS FINANCEIRAS & MRR */}
       {abaAtiva === 'financeiro' && (

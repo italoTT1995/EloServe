@@ -109,7 +109,7 @@ export const PLANOS_DISPONIVEIS: PlanoAssinatura[] = [
   },
 ];
 
-export type AbaMasterSaaS = 'restaurantes' | 'financeiro' | 'editor_loja' | 'planos' | 'regras_planos' | 'whatsapp' | 'config';
+export type AbaMasterSaaS = 'restaurantes' | 'financeiro' | 'editor_loja' | 'planos' | 'regras_planos' | 'whatsapp' | 'config' | 'dre_saas';
 
 interface SaaSState {
   planos: PlanoAssinatura[];
