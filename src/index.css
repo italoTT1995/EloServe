@@ -26,3 +26,186 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
+
+/* ==========================================================================
+   TEMA CLARO / WHITE COLOR THEME (iSolver Light Mode)
+   ========================================================================== */
+html.theme-light,
+body.theme-light {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Telas principais e fundos */
+html.theme-light .bg-slate-950,
+html.theme-light .bg-slate-950\/90,
+html.theme-light .bg-slate-950\/80,
+html.theme-light .bg-slate-950\/70,
+html.theme-light .bg-slate-950\/60,
+html.theme-light .bg-slate-950\/50,
+html.theme-light .bg-slate-950\/40,
+html.theme-light .bg-slate-950\/20 {
+  background-color: #f1f5f9 !important;
+}
+
+/* Cards, Tabelas, Modais e Containers Brancos */
+html.theme-light .bg-slate-900,
+html.theme-light .bg-slate-900\/90,
+html.theme-light .bg-slate-900\/80,
+html.theme-light .bg-slate-900\/60,
+html.theme-light .bg-slate-900\/40,
+html.theme-light .bg-\[\#141416\],
+html.theme-light .bg-\[\#0d0e12\] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+}
+
+/* Sidebar e Header em Branco */
+html.theme-light header,
+html.theme-light aside {
+  background-color: #ffffff !important;
+}
+
+/* Sub-superfícies, chips e botões secundários */
+html.theme-light .bg-slate-800,
+html.theme-light .bg-slate-800\/90,
+html.theme-light .bg-slate-800\/80,
+html.theme-light .bg-slate-800\/60,
+html.theme-light .bg-slate-800\/50,
+html.theme-light .bg-slate-800\/40 {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+}
+
+/* Bordas sutis no tema claro */
+html.theme-light .border-slate-800,
+html.theme-light .border-slate-800\/80,
+html.theme-light .border-slate-800\/70,
+html.theme-light .border-slate-800\/60,
+html.theme-light .border-slate-800\/40,
+html.theme-light .border-slate-800\/30,
+html.theme-light .border-slate-700,
+html.theme-light .border-slate-700\/60 {
+  border-color: #e2e8f0 !important;
+}
+
+html.theme-light .divide-slate-800,
+html.theme-light .divide-slate-800\/70,
+html.theme-light .divide-slate-800\/60 {
+  border-color: #f1f5f9 !important;
+}
+
+/* Textos e Títulos */
+html.theme-light h1,
+html.theme-light h2,
+html.theme-light h3,
+html.theme-light h4,
+html.theme-light h5,
+html.theme-light h6,
+html.theme-light .text-white {
+  color: #0f172a !important;
+}
+
+html.theme-light .text-slate-200,
+html.theme-light .text-slate-300 {
+  color: #1e293b !important;
+}
+
+html.theme-light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.theme-light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Preserva cor branca para textos dentro de botões coloridos de ação */
+html.theme-light button.bg-orange-500,
+html.theme-light button.bg-orange-600,
+html.theme-light button.bg-emerald-500,
+html.theme-light button.bg-emerald-600,
+html.theme-light button.bg-rose-500,
+html.theme-light button.bg-purple-600,
+html.theme-light a.bg-orange-500,
+html.theme-light a.bg-emerald-500,
+html.theme-light a.bg-purple-600,
+html.theme-light .bg-orange-500 span,
+html.theme-light .bg-orange-600 span,
+html.theme-light .bg-emerald-500 span,
+html.theme-light .bg-emerald-600 span,
+html.theme-light .bg-rose-500 span,
+html.theme-light .bg-purple-600 span {
+  color: #ffffff !important;
+}
+
+/* Badges e tags com fundo suave no tema claro */
+html.theme-light .bg-orange-950,
+html.theme-light .bg-orange-950\/80,
+html.theme-light .bg-orange-950\/40,
+html.theme-light .bg-orange-950\/30 {
+  background-color: #ffedd5 !important;
+}
+
+html.theme-light .bg-emerald-950,
+html.theme-light .bg-emerald-950\/80,
+html.theme-light .bg-emerald-950\/40,
+html.theme-light .bg-emerald-950\/30 {
+  background-color: #dcfce7 !important;
+}
+
+html.theme-light .bg-rose-950,
+html.theme-light .bg-rose-950\/80,
+html.theme-light .bg-rose-950\/40,
+html.theme-light .bg-rose-950\/30 {
+  background-color: #ffe4e6 !important;
+}
+
+html.theme-light .bg-amber-950,
+html.theme-light .bg-amber-950\/80,
+html.theme-light .bg-amber-950\/40,
+html.theme-light .bg-amber-950\/30 {
+  background-color: #fef3c7 !important;
+}
+
+html.theme-light .bg-blue-950,
+html.theme-light .bg-blue-950\/80,
+html.theme-light .bg-blue-950\/40 {
+  background-color: #dbeafe !important;
+}
+
+html.theme-light .bg-purple-950,
+html.theme-light .bg-purple-950\/80,
+html.theme-light .bg-purple-950\/40 {
+  background-color: #f3e8ff !important;
+}
+
+/* Inputs, Selects e Textareas */
+html.theme-light input,
+html.theme-light select,
+html.theme-light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.theme-light input::placeholder,
+html.theme-light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Hover de linhas de tabela e botões neutros */
+html.theme-light tr:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Scrollbars no tema claro */
+html.theme-light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+html.theme-light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+html.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

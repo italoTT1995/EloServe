@@ -23,8 +23,11 @@ import {
   History,
   LayoutDashboard,
   Settings,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useThemeStore } from '../../store/useThemeStore';
 import { CargoUsuario } from '../../types';
 
 interface MenuItemDef {
@@ -78,6 +81,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { usuarioLogado, logout, temPermissao, getDescricaoCargo } = useAuthStore();
+  const { tema, alternarTema } = useThemeStore();
   const infoCargo = getDescricaoCargo(usuarioLogado?.cargo);
 
   function handleLogout() {
@@ -294,8 +298,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         )}
       </nav>
 
-      {/* Configurações (exatamente como no Print 3) */}
-      <div className="px-3 py-1.5 border-t border-slate-800/80">
+      {/* Configurações & White Color (Aparência) */}
+      <div className="px-3 py-1.5 border-t border-slate-800/80 space-y-1">
         <NavLink
           to="/minha-assinatura"
           onClick={() => {
@@ -312,6 +316,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <Settings className="w-4 h-4 text-slate-400" />
           <span>Configurações</span>
         </NavLink>
+
+        <button
+          type="button"
+          onClick={alternarTema}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all cursor-pointer"
+          title={tema === 'light' ? 'Mudar para Dark Mode' : 'Mudar para White Color (Tema Claro)'}
+        >
+          <div className="flex items-center gap-2.5">
+            {tema === 'light' ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-slate-400" />}
+            <span>{tema === 'light' ? 'Tema Claro' : 'White Color'}</span>
+          </div>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+            tema === 'light' ? 'bg-amber-100 text-amber-900' : 'bg-slate-800 text-slate-300'
+          }`}>
+            {tema === 'light' ? 'Ativo' : 'Ativar'}
+          </span>
+        </button>
       </div>
 
       {/* Bottom Info: Usuário Logado & Logout */}

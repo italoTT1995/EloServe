@@ -21,6 +21,8 @@ import {
   X,
   Edit2,
   Search,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -28,6 +30,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useProductStore } from '../store/useProductStore';
 import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useEloBotStore } from '../store/useEloBotStore';
+import { useThemeStore } from '../store/useThemeStore';
 
 export default function PainelDono() {
   const { tenantAtivoId, getTenantAtivo } = useSaaSStore();
@@ -35,6 +38,7 @@ export default function PainelDono() {
   const currentTenantId = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
   const { usuarioLogado } = useAuthStore();
   const { caixaAtual, mesas, pedidosKDS } = useAppStore();
+  const { tema, alternarTema } = useThemeStore();
   const { getProdutosPorTenant, alternarDisponibilidade, atualizarPreco } = useProductStore();
   const produtos = getProdutosPorTenant(currentTenantId);
   const { pedidos: pedidosDelivery } = useDeliveryStore();
@@ -207,6 +211,21 @@ export default function PainelDono() {
             title="Imprimir Fechamento do Dia"
           >
             <Printer className="w-4 h-4" />
+          </button>
+
+          {/* Alternar White Color / Dark Mode */}
+          <button
+            type="button"
+            onClick={alternarTema}
+            className={`px-3 py-2 rounded-2xl border transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer shadow-sm ${
+              tema === 'light'
+                ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title={tema === 'light' ? 'Mudar para Dark Mode' : 'Mudar para White Color (Tema Claro)'}
+          >
+            {tema === 'light' ? <Sun className="w-4 h-4 text-amber-600" /> : <Moon className="w-4 h-4 text-slate-400" />}
+            <span className="hidden sm:inline">{tema === 'light' ? 'Tema Claro' : 'White Color'}</span>
           </button>
         </div>
       </div>

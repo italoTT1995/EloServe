@@ -17,11 +17,14 @@ import {
   Globe,
   Crown,
   TrendingUp,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useSaaSStore } from '../../store/useSaaSStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useEloBotStore } from '../../store/useEloBotStore';
+import { useThemeStore } from '../../store/useThemeStore';
 import { useWindowFocus } from '../../hooks/useWindowFocus';
 
 interface HeaderProps {
@@ -46,6 +49,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const mrr = getMRR();
   const { getTotalTransbordosPendentes } = useEloBotStore();
   const pendentesTransbordo = getTotalTransbordosPendentes(tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId);
+  const { tema, alternarTema, setTema } = useThemeStore();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -282,6 +286,29 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </span>
         </div>
 
+        {/* Botão Rápido White Color / Dark Mode */}
+        <button
+          onClick={alternarTema}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all text-xs font-bold cursor-pointer shadow-sm ${
+            tema === 'light'
+              ? 'bg-amber-100/90 text-amber-900 border-amber-300 hover:bg-amber-200'
+              : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white hover:bg-slate-700'
+          }`}
+          title={tema === 'light' ? 'Mudar para Dark Mode (Tema Escuro)' : 'Mudar para White Color (Tema Claro)'}
+        >
+          {tema === 'light' ? (
+            <>
+              <Sun className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden sm:inline text-[11px]">Tema Claro</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-3.5 h-3.5 text-slate-300" />
+              <span className="hidden sm:inline text-[11px]">White Color</span>
+            </>
+          )}
+        </button>
+
         {/* Seletor de Perfil / Usuário Logado */}
         <div className="relative">
           <button
@@ -306,6 +333,34 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 <span className={`inline-block mt-1 text-[9px] px-2 py-0.5 rounded font-bold border uppercase ${infoCargo.cor}`}>
                   {infoCargo.nivel}
                 </span>
+              </div>
+
+              {/* Opção de White Color / Dark Mode dentro do menu */}
+              <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                  {tema === 'light' ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-slate-400" />}
+                  <span>Aparência</span>
+                </span>
+                <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setTema('light')}
+                    className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                      tema === 'light' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    White
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTema('dark')}
+                    className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                      tema === 'dark' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Dark
+                  </button>
+                </div>
               </div>
 
               <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
