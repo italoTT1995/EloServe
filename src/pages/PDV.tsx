@@ -462,6 +462,11 @@ export default function PDV() {
                   className="group bg-slate-900/90 border border-slate-800 hover:border-emerald-500/60 rounded-2xl p-3 sm:p-4 flex flex-col justify-between cursor-pointer transition-all duration-150 hover:shadow-xl hover:shadow-emerald-950/30 hover:-translate-y-0.5 active:scale-[0.98]"
                 >
                   <div>
+                    {prod.fotoUrl && (
+                      <div className="w-full h-24 mb-2.5 rounded-xl overflow-hidden bg-slate-800">
+                        <img src={prod.fotoUrl} alt={prod.nome} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                      </div>
+                    )}
                     <div className="flex items-start justify-between gap-1.5 mb-1.5 sm:mb-2">
                       <span className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 uppercase tracking-wider">
                         {prod.setorPreparo}

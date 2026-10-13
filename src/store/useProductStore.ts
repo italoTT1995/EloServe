@@ -48,14 +48,20 @@ export const CATEGORIAS_POR_TENANT: Record<string, Categoria[]> = {
 export const PRODUTOS_POR_TENANT: Record<string, Produto[]> = {
   // Churrascaria & Parrilla Fogo de Minas
   'tenant-01': [
-    { id: 'p_fg_1', categoriaId: 'c_fg_1', nome: 'Picanha Angus na Brasa (2 pessoas)', descricao: '600g de picanha importada maturada com sal de parrilla e chimichurri.', precoVenda: 128.0, precoCusto: 46.0, setorPreparo: 'cozinha', disponivel: true, destaque: true },
-    { id: 'p_fg_2', categoriaId: 'c_fg_1', nome: 'Bife Ancho com Chimichurri Uruguaio', descricao: '400g de corte nobre ancho grelhado na brasa viva ao ponto do cliente.', precoVenda: 79.0, precoCusto: 28.0, setorPreparo: 'cozinha', disponivel: true, destaque: true },
-    { id: 'p_fg_3', categoriaId: 'c_fg_2', nome: 'Costela no Bafo com Mandioca na Manteiga', descricao: 'Costela bovina desmanchando, marinada 12h na cerveja preta e ervas.', precoVenda: 84.0, precoCusto: 30.0, setorPreparo: 'cozinha', disponivel: true },
-    { id: 'p_fg_4', categoriaId: 'c_fg_2', nome: 'Linguiça Artesanal de Pernil na Brasa', descricao: 'Feita na casa com pimenta biquinho, servida com pão de alho crocante.', precoVenda: 34.0, precoCusto: 10.0, setorPreparo: 'cozinha', disponivel: true },
-    { id: 'p_fg_5', categoriaId: 'c_fg_3', nome: 'Farofa de Ovos com Bacon & Couve Crocante', descricao: 'Farofa crocante na manteiga de garrafa.', precoVenda: 19.0, precoCusto: 4.5, setorPreparo: 'cozinha', disponivel: true },
-    { id: 'p_fg_6', categoriaId: 'c_fg_4', nome: 'Chopp Brahma 500ml', descricao: 'Chopp claro tirado com colarinho cremoso a -2°C.', precoVenda: 15.0, precoCusto: 5.5, setorPreparo: 'bar', disponivel: true },
-    { id: 'p_fg_7', categoriaId: 'c_fg_4', nome: 'Vinho Tinto Malbec Reserva 750ml', descricao: 'Vinho argentino encorpado de Mendoza, ideal para carnes.', precoVenda: 95.0, precoCusto: 42.0, setorPreparo: 'bar', disponivel: true },
-    { id: 'p_fg_8', categoriaId: 'c_fg_5', nome: 'Pudim de Leite com Calda de Queijo Canastra', descricao: 'Receita mineira tradicional cremosa sem furinhos.', precoVenda: 16.0, precoCusto: 4.0, setorPreparo: 'cozinha', disponivel: true },
+    { id: 'p_fg_1', categoriaId: 'c_fg_1', nome: 'Picanha Angus na Brasa (2 pessoas)', descricao: '600g de picanha importada maturada com sal de parrilla e chimichurri.', precoVenda: 128.0, precoCusto: 46.0, fotoUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300&auto=format&fit=crop&q=80', setorPreparo: 'cozinha', disponivel: true, destaque: true },
+    { id: 'p_fg_2', categoriaId: 'c_fg_1', nome: 'Bife Ancho com Chimichurri Uruguaio', descricao: '400g de corte nobre ancho grelhado na brasa viva ao ponto do cliente.', precoVenda: 79.0, precoCusto: 28.0, fotoUrl: 'https://images.unsplash.com/photo-1558030006-450675393462?w=300&auto=format&fit=crop&q=80', setorPreparo: 'cozinha', disponivel: true, destaque: true },
+    { id: 'p_fg_9', categoriaId: 'c_fg_1', nome: 'Filé Mignon com Manteiga de Ervas', descricao: '350g de medalhão grelhado na manteiga clarificada.', precoVenda: 89.0, precoCusto: 32.0, fotoUrl: 'https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=300&auto=format&fit=crop&q=80', setorPreparo: 'cozinha', disponivel: true },
+    { id: 'p_fg_3', categoriaId: 'c_fg_2', nome: 'Costela no Bafo com Mandioca na Manteiga', descricao: 'Costela bovina desmanchando, marinada 12h na cerveja preta e ervas.', precoVenda: 84.0, precoCusto: 30.0, fotoUrl: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=300&auto=format&fit=crop&q=80', setorPreparo: 'cozinha', disponivel: false },
+    { id: 'p_fg_4', categoriaId: 'c_fg_2', nome: 'Linguiça Artesanal de Pernil na Brasa', descricao: 'Feita na casa com pimenta biquinho, servida com pão de alho crocante.', precoVenda: 34.0, precoCusto: 10.0, fotoUrl: 'https://images.unsplash.com/photo-1597393353415-b3730f3719fe?w=300&auto=format&fit=crop&q=80', setorPreparo: 'cozinha', disponivel: true },
+    { id: 'p_fg_10', categoriaId: 'c_fg_2', nome: 'Frango Grelhado na Brasa com Limão', descricao: 'Sobrecoxa desossada marinada com ervas frescas.', precoVenda: 42.0, precoCusto: 14.0, fotoUrl: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=300&auto=format&fit=crop&q=80', setorPreparo: 'cozinha', disponivel: true },
+    { id: 'p_fg_5', categoriaId: 'c_fg_3', nome: 'Farofa de Ovos com Bacon & Couve Crocante', descricao: 'Farofa crocante na manteiga de garrafa.', precoVenda: 19.0, precoCusto: 4.5, fotoUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&auto=format&fit=crop&q=80', setorPreparo: 'cozinha', disponivel: false },
+    { id: 'p_fg_11', categoriaId: 'c_fg_3', nome: 'Batata Rústica com Alecrim e Alho', descricao: 'Batatas douradas com casca e molho aioli.', precoVenda: 24.0, precoCusto: 5.5, fotoUrl: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=300&auto=format&fit=crop&q=80', setorPreparo: 'cozinha', disponivel: true },
+    { id: 'p_fg_6', categoriaId: 'c_fg_4', nome: 'Chopp Brahma 500ml', descricao: 'Chopp claro tirado com colarinho cremoso a -2°C.', precoVenda: 15.0, precoCusto: 5.5, fotoUrl: 'https://images.unsplash.com/photo-1608270546103-976214151a56?w=300&auto=format&fit=crop&q=80', setorPreparo: 'bar', disponivel: true },
+    { id: 'p_fg_12', categoriaId: 'c_fg_4', nome: 'Cerveja Heineken 600ml Garrafa', descricao: 'Puro malte estupidamente gelada no balde.', precoVenda: 18.0, precoCusto: 8.5, fotoUrl: 'https://images.unsplash.com/photo-1618886614638-80e3c153d31a?w=300&auto=format&fit=crop&q=80', setorPreparo: 'bar', disponivel: true },
+    { id: 'p_fg_7', categoriaId: 'c_fg_4', nome: 'Vinho Tinto Malbec Reserva 750ml', descricao: 'Vinho argentino encorpado de Mendoza, ideal para carnes.', precoVenda: 95.0, precoCusto: 42.0, fotoUrl: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=300&auto=format&fit=crop&q=80', setorPreparo: 'bar', disponivel: true },
+    { id: 'p_fg_13', categoriaId: 'c_fg_4', nome: 'Refrigerante Lata 350ml', descricao: 'Coca-Cola, Guaraná Antarctica ou Zero.', precoVenda: 8.0, precoCusto: 3.0, fotoUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop&q=80', setorPreparo: 'bar', disponivel: true },
+    { id: 'p_fg_8', categoriaId: 'c_fg_5', nome: 'Pudim de Leite com Calda de Queijo Canastra', descricao: 'Receita mineira tradicional cremosa sem furinhos.', precoVenda: 16.0, precoCusto: 4.0, fotoUrl: 'https://images.unsplash.com/photo-1587314168485-3236d6710814?w=300&auto=format&fit=crop&q=80', setorPreparo: 'cozinha', disponivel: true },
+    { id: 'p_fg_14', categoriaId: 'c_fg_5', nome: 'Petit Gâteau de Chocolate com Sorvete', descricao: 'Bolo quente com recheio cremoso e sorvete de creme.', precoVenda: 24.0, precoCusto: 7.0, fotoUrl: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=300&auto=format&fit=crop&q=80', setorPreparo: 'cozinha', disponivel: false },
   ],
   // Pizzaria & Trattoria Bella Napoli
   'tenant-02': [
@@ -124,19 +130,19 @@ export const useProductStore = create<ProductState>()(
       categoriasPorTenant: CATEGORIAS_POR_TENANT,
 
       // Fallbacks globais para retrocompatibilidade
-      produtos: PRODUTOS_POR_TENANT['tenant-03'],
-      categorias: CATEGORIAS_POR_TENANT['tenant-03'],
+      produtos: PRODUTOS_POR_TENANT['tenant-01'],
+      categorias: CATEGORIAS_POR_TENANT['tenant-01'],
 
       getProdutosPorTenant: (tenantId?: string) => {
         const state = get();
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-03' : tenantId;
-        return state.produtosPorTenant[idAlvo] || PRODUTOS_POR_TENANT[idAlvo] || state.produtosPorTenant['tenant-03'];
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        return state.produtosPorTenant[idAlvo] || PRODUTOS_POR_TENANT[idAlvo] || state.produtosPorTenant['tenant-01'];
       },
 
       getCategoriasPorTenant: (tenantId?: string) => {
         const state = get();
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-03' : tenantId;
-        return state.categoriasPorTenant[idAlvo] || CATEGORIAS_POR_TENANT[idAlvo] || state.categoriasPorTenant['tenant-03'];
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        return state.categoriasPorTenant[idAlvo] || CATEGORIAS_POR_TENANT[idAlvo] || state.categoriasPorTenant['tenant-01'];
       },
 
       adicionarProduto: (novo, tenantId) => {

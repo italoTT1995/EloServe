@@ -625,7 +625,11 @@ export default function PainelDono() {
                       : 'bg-slate-800 text-slate-300'
                   }`}
                 >
-                  {prod.nome.charAt(0)}
+                  {prod.fotoUrl ? (
+                    <img src={prod.fotoUrl} alt={prod.nome} className="w-full h-full object-cover" />
+                  ) : (
+                    prod.nome.charAt(0)
+                  )}
                 </div>
                 <div className="min-w-0">
                   <span
