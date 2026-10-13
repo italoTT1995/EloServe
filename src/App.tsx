@@ -14,6 +14,7 @@ import MinhaAssinatura from './pages/MinhaAssinatura';
 import Estoque from './pages/Estoque';
 import Delivery from './pages/Delivery';
 import Funcionarios from './pages/Funcionarios';
+import PainelDono from './pages/PainelDono';
 import { useAuthStore } from './store/useAuthStore';
 import { useSaaSStore } from './store/useSaaSStore';
 
@@ -31,7 +32,12 @@ function RotaInicialInteligente() {
     return <Navigate to="/kds" replace />;
   }
 
-  // Equipe de restaurante ou Super Admin inspecionando uma loja específica
+  // Dono e Gerente da Loja (ou Super Admin inspecionando uma loja específica) vai direto para o Painel do Dono!
+  if (usuarioLogado?.cargo === 'admin_restaurante' || (usuarioLogado?.cargo === 'super_admin' && tenantAtivoId !== 'global')) {
+    return <PainelDono />;
+  }
+
+  // Equipe operacional de frente de caixa
   return <PDV />;
 }
 
@@ -55,6 +61,26 @@ export default function App() {
                     element={
                       <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante', 'caixa', 'garcom', 'cozinha', 'entregador']}>
                         <RotaInicialInteligente />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Painel do Dono & Gerente (Nível 2) */}
+                  <Route
+                    path="/painel-dono"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <PainelDono />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Frente de Caixa (PDV) */}
+                  <Route
+                    path="/pdv"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante', 'caixa', 'garcom']}>
+                        <PDV />
                       </RotaProtegida>
                     }
                   />

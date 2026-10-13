@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Clock,
   Wifi,
@@ -29,6 +29,7 @@ interface HeaderProps {
 }
 
 export function Header({ onToggleSidebar }: HeaderProps) {
+  const location = useLocation();
   const [time, setTime] = useState(new Date().toLocaleTimeString());
   const [menuPerfilAberto, setMenuPerfilAberto] = useState(false);
   const [menuTenantAberto, setMenuTenantAberto] = useState(false);
@@ -220,6 +221,36 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
       {/* Right Indicators */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Alternador Rápido de Visão: Painel do Dono vs Frente de Caixa */}
+        {usuarioLogado?.cargo === 'admin_restaurante' && (
+          <div className="hidden md:flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+            <Link
+              to="/painel-dono"
+              className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                location.pathname === '/painel-dono' || location.pathname === '/'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Abrir Painel de Gestão do Dono"
+            >
+              <span>📊</span>
+              <span>Painel do Dono</span>
+            </Link>
+            <Link
+              to="/pdv"
+              className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                location.pathname === '/pdv'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Abrir Frente de Caixa (PDV)"
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Caixa / PDV</span>
+            </Link>
+          </div>
+        )}
+
         {/* Alerta de Transbordo Humano no WhatsApp */}
         {pendentesTransbordo > 0 && (
           <Link

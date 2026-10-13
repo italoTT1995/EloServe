@@ -21,6 +21,7 @@ import {
   BarChart3,
   Megaphone,
   History,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { CargoUsuario } from '../../types';
@@ -35,21 +36,28 @@ interface MenuItemDef {
   cargos: CargoUsuario[];
 }
 
+const menuItemsGestaoDono: MenuItemDef[] = [
+  { path: '/painel-dono', label: 'Painel do Dono', icon: LayoutDashboard, badge: 'Início', highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/elobot', label: 'EloBot (WhatsApp IA)', icon: Bot, highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/relatorios', label: 'Faturamento & DRE', icon: TrendingUp, cargos: ['super_admin', 'admin_restaurante'] },
+];
+
 const menuItemsOperacao: MenuItemDef[] = [
-  { path: '/', label: 'Frente de Caixa (PDV)', icon: Store, badge: 'F1', cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
+  { path: '/pdv', label: 'Frente de Caixa (PDV)', icon: Store, badge: 'F1', cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
   { path: '/mesas', label: 'Mesas & Salão', icon: LayoutGrid, badge: 'F2', cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
   { path: '/delivery', label: 'Delivery & Entregas', icon: Bike, badge: 'F3', cargos: ['super_admin', 'admin_restaurante', 'caixa', 'entregador'] },
   { path: '/kds', label: 'Cozinha (KDS)', icon: ChefHat, badge: 'F4', cargos: ['super_admin', 'admin_restaurante', 'cozinha'] },
-  { path: '/estoque', label: 'Estoque Inteligente', icon: Package, cargos: ['super_admin', 'admin_restaurante'] },
-  { path: '/cardapio', label: 'Cardápio & Itens', icon: BookOpen, cargos: ['super_admin', 'admin_restaurante'] },
-  { path: '/funcionarios', label: 'Funcionários & RH', icon: Users, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/caixa', label: 'Controle de Caixa', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante', 'caixa'] },
-  { path: '/relatorios', label: 'Faturamento & DRE', icon: TrendingUp, cargos: ['super_admin', 'admin_restaurante'] },
-  { path: '/elobot', label: 'EloBot (WhatsApp IA)', icon: Bot, highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
+];
+
+const menuItemsConfiguracoes: MenuItemDef[] = [
+  { path: '/cardapio', label: 'Cardápio & Preços', icon: BookOpen, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/estoque', label: 'Estoque Inteligente', icon: Package, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/funcionarios', label: 'Funcionários & RH', icon: Users, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/minha-assinatura', label: 'Minha Assinatura', icon: CreditCard, cargos: ['super_admin', 'admin_restaurante'] },
 ];
 
 const menuItemsSaaS: MenuItemDef[] = [
-  { path: '/minha-assinatura', label: 'Minha Assinatura', icon: CreditCard, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/saas', label: 'Gestão SaaS Master', icon: Crown, badge: 'SaaS', adminDestaque: true, cargos: ['super_admin'] },
 ];
 
@@ -77,7 +85,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Brand Header */}
       <div className="h-16 px-5 border-b border-slate-800 flex items-center justify-between">
         <Link
-          to={usuarioLogado?.cargo === 'super_admin' ? '/saas' : '/'}
+          to={
+            usuarioLogado?.cargo === 'super_admin'
+              ? '/saas'
+              : usuarioLogado?.cargo === 'admin_restaurante'
+              ? '/painel-dono'
+              : '/pdv'
+          }
           className="flex items-center gap-3 group cursor-pointer"
         >
           <div
@@ -95,10 +109,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </h1>
             <p
               className={`text-[10px] font-semibold tracking-wider uppercase ${
-                usuarioLogado?.cargo === 'super_admin' ? 'text-purple-400' : 'text-emerald-400'
+                usuarioLogado?.cargo === 'super_admin'
+                  ? 'text-purple-400'
+                  : usuarioLogado?.cargo === 'admin_restaurante'
+                  ? 'text-emerald-400'
+                  : 'text-slate-400'
               }`}
             >
-              {usuarioLogado?.cargo === 'super_admin' ? 'Gestão SaaS Master' : 'PDV Inteligente'}
+              {usuarioLogado?.cargo === 'super_admin'
+                ? 'Gestão SaaS Master'
+                : usuarioLogado?.cargo === 'admin_restaurante'
+                ? 'Gestão da Loja'
+                : 'Frente de Loja'}
             </p>
           </div>
         </Link>
@@ -167,97 +189,192 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               });
             })()}
           </div>
+        ) : usuarioLogado?.cargo === 'admin_restaurante' ? (
+          /* SE FOR DONO / GERENTE DA LOJA (NÍVEL 2): MENU ESTRUTURADO EM 3 BLOCOS LIMPOS */
+          <div className="space-y-4">
+            {/* BLOCO 1: GESTÃO DO DONO */}
+            <div>
+              <p className="px-3 text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <span>👔</span>
+                <span>Gestão do Dono</span>
+              </p>
+              <div className="space-y-1">
+                {menuItemsGestaoDono.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => {
+                        if (window.innerWidth < 1024) onClose();
+                      }}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                          isActive
+                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 font-bold'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                        } ${item.highlight && !isActive ? 'border border-emerald-500/30 text-emerald-300 bg-emerald-950/20' : ''}`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <Icon
+                              className={`w-4 h-4 ${
+                                isActive ? 'text-white' : item.highlight ? 'text-emerald-400' : 'text-slate-400'
+                              }`}
+                            />
+                            <span>{item.label}</span>
+                          </div>
+                          {item.badge && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                isActive
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-slate-800 text-slate-400'
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                          {item.highlight && !isActive && (
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* BLOCO 2: OPERAÇÃO DA LOJA */}
+            <div>
+              <p className="px-3 pt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 border-t border-slate-800/80">
+                Operação da Loja
+              </p>
+              <div className="space-y-1">
+                {menuItemsOperacao.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => {
+                        if (window.innerWidth < 1024) onClose();
+                      }}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                          isActive
+                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 font-bold'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                        }`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                            <span>{item.label}</span>
+                          </div>
+                          {item.badge && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                isActive ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* BLOCO 3: CADASTROS & CONFIGURAÇÕES */}
+            <div>
+              <p className="px-3 pt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 border-t border-slate-800/80">
+                Cadastros & Loja
+              </p>
+              <div className="space-y-1">
+                {menuItemsConfiguracoes.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => {
+                        if (window.innerWidth < 1024) onClose();
+                      }}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                          isActive
+                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 font-bold'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                        }`
+                      }
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon className="w-4 h-4 text-slate-400" />
+                        <span>{item.label}</span>
+                      </div>
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         ) : (
-          /* SE FOR FUNCIONÁRIO DO RESTAURANTE (GERENTE, CAIXA, GARÇOM, COZINHA) */
+          /* SE FOR OUTROS CARGOS OPERACIONAIS (CAIXA, GARÇOM, COZINHA) */
           <>
             <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-              Operação do Restaurante
+              Meu Turno de Trabalho
             </p>
 
-            {menuItemsOperacao
-              .filter((item) => temPermissao(item.cargos))
-              .map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => {
-                      if (window.innerWidth < 1024) onClose();
-                    }}
-                    className={({ isActive }) =>
-                      `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
-                        isActive
-                          ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 font-bold'
-                          : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
-                      } ${item.highlight && !isActive ? 'border border-emerald-500/30 text-emerald-300 bg-emerald-950/20' : ''}`
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <div className="flex items-center gap-3">
-                          <Icon
-                            className={`w-4 h-4 ${
-                              isActive ? 'text-white' : item.highlight ? 'text-emerald-400' : 'text-slate-400'
-                            }`}
-                          />
-                          <span>{item.label}</span>
-                        </div>
-                        {item.badge && (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                              isActive
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-slate-800 text-slate-400'
-                            }`}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                        {item.highlight && !isActive && (
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        )}
-                      </>
-                    )}
-                  </NavLink>
-                );
-              })}
-
-            {/* Minha Assinatura para Gerente do Restaurante */}
-            {menuItemsSaaS.some((item) => temPermissao(item.cargos)) && (
-              <div className="pt-3 mt-3 border-t border-slate-800/80">
-                <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Minha Assinatura
-                </p>
-
-                {menuItemsSaaS
-                  .filter((item) => item.path === '/minha-assinatura')
-                  .map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        onClick={() => {
-                          if (window.innerWidth < 1024) onClose();
-                        }}
-                        className={({ isActive }) =>
-                          `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
-                            isActive
-                              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25 font-bold'
-                              : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
-                          }`
-                        }
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className="w-4 h-4 text-purple-400" />
-                          <span>{item.label}</span>
-                        </div>
-                      </NavLink>
-                    );
-                  })}
-              </div>
-            )}
+            <div className="space-y-1">
+              {menuItemsOperacao
+                .filter((item) => temPermissao(item.cargos))
+                .map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => {
+                        if (window.innerWidth < 1024) onClose();
+                      }}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                          isActive
+                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 font-bold'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                        }`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                            <span>{item.label}</span>
+                          </div>
+                          {item.badge && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                isActive ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  );
+                })}
+            </div>
           </>
         )}
       </nav>
