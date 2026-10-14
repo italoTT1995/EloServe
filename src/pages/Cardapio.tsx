@@ -25,12 +25,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Move,
+  Package,
 } from 'lucide-react';
 import { useProductStore } from '../store/useProductStore';
+import { useEstoqueStore } from '../store/useEstoqueStore';
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { AdminAuthModal } from '../components/common/AdminAuthModal';
-import { Produto } from '../types';
+import { Produto, ItemEstoque } from '../types';
 
 // Galeria de fotos gastronômicas prontas em alta resolução
 const FOTOS_SUGERIDAS = [
@@ -70,8 +72,25 @@ export default function Cardapio() {
     removerCategoria,
   } = useProductStore();
 
+  const {
+    itens: itensEstoque,
+    abastecerRapido,
+    ajustarQuantidadeEstoque,
+    sincronizarTodosOsProdutosDoCardapio,
+  } = useEstoqueStore();
+
   const produtos = getProdutosPorTenant(idLoja);
   const categorias = getCategoriasPorTenant(idLoja);
+
+  // Helper para buscar o item de estoque vinculado ao produto
+  function getEstoqueItem(prodId: string, nome: string): ItemEstoque | undefined {
+    return itensEstoque.find(
+      (it) =>
+        it.produtoId === prodId ||
+        it.id === `est-card-${prodId}` ||
+        it.nome.trim().toLowerCase() === nome.trim().toLowerCase()
+    );
+  }
 
   // Estados de Busca e Filtro
   const [busca, setBusca] = useState('');
@@ -98,7 +117,18 @@ export default function Cardapio() {
     fotoUrl: '',
     setorPreparo: 'cozinha' as 'cozinha' | 'bar' | 'nenhum',
     destaque: false,
+    controlaEstoque: true,
+    quantidadeEstoque: '20',
+    estoqueMinimo: '5',
+    unidadeEstoque: 'un' as 'un' | 'kg' | 'g' | 'pct' | 'l' | 'ml' | 'frasco' | 'cx',
   });
+
+  // Modal Rápido de Abastecer / Suprir Estoque
+  const [modalAbastecerAberto, setModalAbastecerAberto] = useState(false);
+  const [produtoAbastecer, setProdutoAbastecer] = useState<Produto | null>(null);
+  const [itemEstoqueAbastecer, setItemEstoqueAbastecer] = useState<ItemEstoque | null>(null);
+  const [qtdAbastecerInput, setQtdAbastecerInput] = useState('10');
+  const [modoAbastecer, setModoAbastecer] = useState<'adicionar' | 'definir'>('adicionar');
 
   // Modal Específico para Alterar Foto
   const [modalFotoAberto, setModalFotoAberto] = useState(false);
@@ -302,12 +332,17 @@ export default function Cardapio() {
       fotoUrl: '',
       setorPreparo: 'cozinha',
       destaque: false,
+      controlaEstoque: true,
+      quantidadeEstoque: '20',
+      estoqueMinimo: '5',
+      unidadeEstoque: 'un',
     });
     setModalProdutoAberto(true);
   }
 
   // Abertura de Edição
   function abrirEditarProduto(prod: Produto) {
+    const itemEst = getEstoqueItem(prod.id, prod.nome);
     setProdutoEditando(prod);
     setFormProduto({
       nome: prod.nome,
@@ -318,9 +353,42 @@ export default function Cardapio() {
       fotoUrl: prod.fotoUrl || '',
       setorPreparo: prod.setorPreparo,
       destaque: !!prod.destaque,
+      controlaEstoque: prod.controlaEstoque !== false,
+      quantidadeEstoque: (itemEst?.quantidadeAtual ?? prod.quantidadeEstoque ?? 20).toString(),
+      estoqueMinimo: (itemEst?.estoqueMinimo ?? prod.estoqueMinimo ?? 5).toString(),
+      unidadeEstoque: (itemEst?.unidadeMedida ?? prod.unidadeEstoque ?? 'un') as any,
     });
     setMenuAbertoId(null);
     setModalProdutoAberto(true);
+  }
+
+  // Abertura do Modal de Abastecer Estoque
+  function abrirModalAbastecer(prod: Produto) {
+    const itemEst = getEstoqueItem(prod.id, prod.nome);
+    setProdutoAbastecer(prod);
+    setItemEstoqueAbastecer(itemEst || null);
+    setQtdAbastecerInput('10');
+    setModoAbastecer('adicionar');
+    setMenuAbertoId(null);
+    setModalAbastecerAberto(true);
+  }
+
+  function confirmarAbastecimento(e: React.FormEvent) {
+    e.preventDefault();
+    if (!produtoAbastecer) return;
+    const valor = parseFloat(qtdAbastecerInput);
+    if (isNaN(valor) || valor < 0) return;
+
+    if (modoAbastecer === 'adicionar') {
+      abastecerRapido(produtoAbastecer.id, valor, 'Abastecimento rápido via Cardápio');
+      exibirToast(`+${valor} un supridas no estoque de "${produtoAbastecer.nome}"!`);
+    } else {
+      ajustarQuantidadeEstoque(produtoAbastecer.id, valor);
+      exibirToast(`Estoque de "${produtoAbastecer.nome}" ajustado para ${valor} un!`);
+    }
+
+    setModalAbastecerAberto(false);
+    setProdutoAbastecer(null);
   }
 
   // Abertura de Modal de Foto Rápida
@@ -374,6 +442,8 @@ export default function Cardapio() {
 
     const precoVendaNum = parseFloat(formProduto.precoVenda);
     const precoCustoNum = parseFloat(formProduto.precoCusto) || 0;
+    const qtdEstoqueNum = parseFloat(formProduto.quantidadeEstoque) || 0;
+    const estMinimoNum = parseFloat(formProduto.estoqueMinimo) || 5;
 
     if (produtoEditando) {
       editarProduto(
@@ -387,10 +457,15 @@ export default function Cardapio() {
           fotoUrl: formProduto.fotoUrl.trim(),
           setorPreparo: formProduto.setorPreparo,
           destaque: formProduto.destaque,
+          controlaEstoque: formProduto.controlaEstoque,
+          quantidadeEstoque: qtdEstoqueNum,
+          estoqueMinimo: estMinimoNum,
+          unidadeEstoque: formProduto.unidadeEstoque,
+          disponivel: qtdEstoqueNum > 0,
         },
         idLoja
       );
-      exibirToast(`Produto "${formProduto.nome}" atualizado!`);
+      exibirToast(`Produto "${formProduto.nome}" atualizado e suprido no estoque!`);
     } else {
       adicionarProduto(
         {
@@ -401,12 +476,16 @@ export default function Cardapio() {
           precoCusto: precoCustoNum,
           fotoUrl: formProduto.fotoUrl.trim(),
           setorPreparo: formProduto.setorPreparo,
-          disponivel: true,
+          disponivel: qtdEstoqueNum > 0,
           destaque: formProduto.destaque,
+          controlaEstoque: formProduto.controlaEstoque,
+          quantidadeEstoque: qtdEstoqueNum,
+          estoqueMinimo: estMinimoNum,
+          unidadeEstoque: formProduto.unidadeEstoque,
         },
         idLoja
       );
-      exibirToast(`Item "${formProduto.nome}" cadastrado com sucesso!`);
+      exibirToast(`Item "${formProduto.nome}" cadastrado e integrado ao estoque!`);
     }
 
     setModalProdutoAberto(false);
@@ -519,6 +598,23 @@ export default function Cardapio() {
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-orange-500" />
             <span>Importar planilha</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sincronizarTodosOsProdutosDoCardapio(produtos);
+              exibirToast('Cardápio sincronizado com o Estoque com sucesso!');
+            }}
+            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+              isWhite
+                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                : 'bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border-emerald-500/30'
+            }`}
+            title="Garantir que todos os pratos e bebidas estão conectados ao Estoque"
+          >
+            <Package className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Sincronizar Estoque</span>
           </button>
 
           <button
@@ -754,6 +850,7 @@ export default function Cardapio() {
                     itensDestaCategoria.map((prod) => {
                       const selecionado = itensSelecionados.includes(prod.id);
                       const isSendoArrastado = produtoArrastandoId === prod.id;
+                      const itemEstoque = getEstoqueItem(prod.id, prod.nome);
 
                       return (
                         <div
@@ -852,8 +949,8 @@ export default function Cardapio() {
                               {prod.descricao || 'Sem descrição cadastrada.'}
                             </p>
 
-                            {/* Linha Inferior: Toggle Switch + Texto de Status (Print: Disponível / Indisponível) */}
-                            <div className="flex items-center gap-2 pt-0.5">
+                            {/* Linha Inferior: Toggle Switch + Texto de Status + Badge Estoque */}
+                            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                               <button
                                 type="button"
                                 onClick={() => alternarDisponibilidade(prod.id, idLoja)}
@@ -886,6 +983,36 @@ export default function Cardapio() {
                               >
                                 {prod.disponivel ? 'Disponível' : 'Indisponível'}
                               </span>
+
+                              {/* Badge de Estoque em Tempo Real Integrado */}
+                              {itemEstoque && (
+                                <button
+                                  type="button"
+                                  onClick={() => abrirModalAbastecer(prod)}
+                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-mono text-[9px] font-bold border transition-all cursor-pointer ${
+                                    itemEstoque.quantidadeAtual <= 0
+                                      ? isWhite
+                                        ? 'bg-rose-100 hover:bg-rose-200 text-rose-800 border-rose-300'
+                                        : 'bg-rose-950/70 hover:bg-rose-900/80 text-rose-300 border-rose-500/40'
+                                      : itemEstoque.quantidadeAtual <= itemEstoque.estoqueMinimo
+                                      ? isWhite
+                                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
+                                        : 'bg-amber-950/70 hover:bg-amber-900/80 text-amber-300 border-amber-500/40'
+                                      : isWhite
+                                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                      : 'bg-[#18181b] hover:bg-slate-800 text-slate-300 border-slate-700/60'
+                                  }`}
+                                  title="Estoque em tempo real. Clique para abastecer rapidamente!"
+                                >
+                                  <Package className="w-2.5 h-2.5 text-orange-500" />
+                                  <span>
+                                    {itemEstoque.quantidadeAtual <= 0
+                                      ? '0 un (Esgotado)'
+                                      : `${itemEstoque.quantidadeAtual} ${itemEstoque.unidadeMedida}`}
+                                  </span>
+                                  <span className="text-[8px] opacity-75 underline ml-0.5">+Suprir</span>
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -905,7 +1032,7 @@ export default function Cardapio() {
                             {/* Dropdown Menu */}
                             {menuAbertoId === prod.id && (
                               <div
-                                className={`absolute right-0 top-7 z-30 w-44 rounded-2xl border shadow-2xl p-1.5 space-y-1 animate-in fade-in zoom-in-95 ${
+                                className={`absolute right-0 top-7 z-30 w-48 rounded-2xl border shadow-2xl p-1.5 space-y-1 animate-in fade-in zoom-in-95 ${
                                   isWhite ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-200'
                                 }`}
                               >
@@ -928,6 +1055,18 @@ export default function Cardapio() {
                                 >
                                   <Pencil className="w-3.5 h-3.5 text-blue-500" />
                                   <span>Editar Detalhes</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    abrirModalAbastecer(prod);
+                                  }}
+                                  className={`w-full px-2.5 py-1.5 text-left rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer ${
+                                    isWhite ? 'hover:bg-slate-100 text-slate-700' : 'hover:bg-slate-800 text-slate-200'
+                                  }`}
+                                >
+                                  <Package className="w-3.5 h-3.5 text-amber-500" />
+                                  <span>Abastecer Estoque</span>
                                 </button>
                                 <button
                                   type="button"
@@ -1352,6 +1491,98 @@ export default function Cardapio() {
                 </label>
               </div>
 
+              {/* SEÇÃO INTEGRADA DE ESTOQUE (Cardápio ↔ Estoque) */}
+              <div className={`p-3.5 rounded-2xl border space-y-2.5 ${
+                isWhite ? 'bg-orange-50/60 border-orange-200' : 'bg-[#18181b] border-orange-500/20'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4 text-orange-500" />
+                    <span className={`font-bold text-xs ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                      Controle de Estoque & Suprimento
+                    </span>
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formProduto.controlaEstoque}
+                      onChange={(e) => setFormProduto({ ...formProduto, controlaEstoque: e.target.checked })}
+                      className="rounded text-orange-500 focus:ring-orange-500 cursor-pointer"
+                    />
+                    <span className={`text-[11px] font-semibold ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
+                      Controlar estoque
+                    </span>
+                  </label>
+                </div>
+
+                {formProduto.controlaEstoque && (
+                  <div className="grid grid-cols-3 gap-2.5 pt-1">
+                    <div>
+                      <label className={`font-bold block mb-1 text-[11px] ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                        Qtd Atual *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        required
+                        value={formProduto.quantidadeEstoque}
+                        onChange={(e) => setFormProduto({ ...formProduto, quantidadeEstoque: e.target.value })}
+                        className={`w-full px-2.5 py-1.5 rounded-xl font-mono text-xs border focus:outline-none focus:border-orange-500 ${
+                          isWhite
+                            ? 'bg-white border-slate-300 text-slate-900'
+                            : 'bg-slate-900 border-slate-700 text-white'
+                        }`}
+                        placeholder="20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`font-bold block mb-1 text-[11px] ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                        Mínimo Alerta
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={formProduto.estoqueMinimo}
+                        onChange={(e) => setFormProduto({ ...formProduto, estoqueMinimo: e.target.value })}
+                        className={`w-full px-2.5 py-1.5 rounded-xl font-mono text-xs border focus:outline-none focus:border-orange-500 ${
+                          isWhite
+                            ? 'bg-white border-slate-300 text-slate-900'
+                            : 'bg-slate-900 border-slate-700 text-white'
+                        }`}
+                        placeholder="5"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`font-bold block mb-1 text-[11px] ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                        Unidade
+                      </label>
+                      <select
+                        value={formProduto.unidadeEstoque}
+                        onChange={(e) => setFormProduto({ ...formProduto, unidadeEstoque: e.target.value as any })}
+                        className={`w-full px-2.5 py-1.5 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                          isWhite
+                            ? 'bg-white border-slate-300 text-slate-900'
+                            : 'bg-slate-900 border-slate-700 text-white'
+                        }`}
+                      >
+                        <option value="un">un (unidades)</option>
+                        <option value="kg">kg (quilos)</option>
+                        <option value="g">g (gramas)</option>
+                        <option value="pct">pct (pacotes)</option>
+                        <option value="l">l (litros)</option>
+                        <option value="ml">ml</option>
+                        <option value="frasco">frasco</option>
+                        <option value="cx">cx (caixa)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Botões */}
               <div className={`flex gap-2 pt-3 border-t ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
                 <button
@@ -1368,6 +1599,195 @@ export default function Cardapio() {
                   className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs shadow-lg shadow-orange-500/20 cursor-pointer active:scale-95"
                 >
                   {produtoEditando ? 'Salvar Alterações' : 'Cadastrar Item'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL RÁPIDO: ABASTECER / SUPRIR ESTOQUE DO PRATO (Cardápio ↔ Estoque)
+         ========================================================================= */}
+      {modalAbastecerAberto && produtoAbastecer && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div
+            className={`border rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 ${
+              isWhite ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-900 border-slate-800 text-white'
+            }`}
+          >
+            <div className={`flex items-center justify-between pb-3 border-b ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center shrink-0">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black">Abastecer / Suprir Estoque</h3>
+                  <p className={`text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Cardápio ↔ Estoque Sincronizado em Tempo Real
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalAbastecerAberto(false);
+                  setProdutoAbastecer(null);
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Info do Prato */}
+            <div className={`p-3.5 rounded-2xl border flex items-center gap-3 ${
+              isWhite ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+            }`}>
+              <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-slate-700">
+                {produtoAbastecer.fotoUrl ? (
+                  <img src={produtoAbastecer.fotoUrl} alt={produtoAbastecer.nome} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-500">
+                    <Package className="w-5 h-5" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-xs truncate">{produtoAbastecer.nome}</h4>
+                <div className="flex items-center gap-2 mt-1 text-[11px]">
+                  <span className={isWhite ? 'text-slate-500' : 'text-slate-400'}>Estoque Atual:</span>
+                  <span className={`font-mono font-black ${
+                    (itemEstoqueAbastecer?.quantidadeAtual || 0) <= 0
+                      ? 'text-rose-500'
+                      : (itemEstoqueAbastecer?.quantidadeAtual || 0) <= (itemEstoqueAbastecer?.estoqueMinimo || 5)
+                      ? 'text-amber-500'
+                      : 'text-emerald-500'
+                  }`}>
+                    {itemEstoqueAbastecer?.quantidadeAtual ?? 0} {itemEstoqueAbastecer?.unidadeMedida || 'un'}
+                  </span>
+                  <span className="text-slate-400 text-[10px]">
+                    (Mín: {itemEstoqueAbastecer?.estoqueMinimo || 5})
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={confirmarAbastecimento} className="space-y-4">
+              {/* Modo: Adicionar ao Estoque vs Definir Quantidade Exata */}
+              <div className={`grid grid-cols-2 gap-2 p-1 rounded-2xl border text-xs font-bold ${
+                isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950/60 border-slate-800'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => setModoAbastecer('adicionar')}
+                  className={`py-2 rounded-xl transition-all cursor-pointer ${
+                    modoAbastecer === 'adicionar'
+                      ? 'bg-orange-500 text-white shadow-sm'
+                      : isWhite
+                      ? 'text-slate-600 hover:text-slate-900'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  + Adicionar Unidades
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoAbastecer('definir')}
+                  className={`py-2 rounded-xl transition-all cursor-pointer ${
+                    modoAbastecer === 'definir'
+                      ? 'bg-orange-500 text-white shadow-sm'
+                      : isWhite
+                      ? 'text-slate-600 hover:text-slate-900'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Ajustar Valor Exato
+                </button>
+              </div>
+
+              {/* Botões de Atalho Rápido (+5, +10, +20, +50) */}
+              {modoAbastecer === 'adicionar' && (
+                <div className="space-y-1.5">
+                  <span className={`text-[11px] font-bold block ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
+                    Atalhos de Reposição Rápida:
+                  </span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[5, 10, 20, 50].map((qtd) => (
+                      <button
+                        key={qtd}
+                        type="button"
+                        onClick={() => setQtdAbastecerInput(qtd.toString())}
+                        className={`py-2 rounded-xl text-xs font-mono font-bold border transition-all cursor-pointer ${
+                          qtdAbastecerInput === qtd.toString()
+                            ? 'bg-orange-500 text-white border-orange-500'
+                            : isWhite
+                            ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-800'
+                            : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+                        }`}
+                      >
+                        +{qtd} un
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Campo de Entrada de Quantidade */}
+              <div>
+                <label className={`font-bold block mb-1 text-xs ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                  {modoAbastecer === 'adicionar'
+                    ? 'Quantidade a abastecer no estoque:'
+                    : 'Novo valor total em estoque:'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    value={qtdAbastecerInput}
+                    onChange={(e) => setQtdAbastecerInput(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 rounded-xl font-mono text-sm border focus:outline-none focus:border-orange-500 font-bold ${
+                      isWhite
+                        ? 'bg-slate-50 border-slate-200 text-slate-900'
+                        : 'bg-slate-950 border-slate-800 text-white'
+                    }`}
+                    placeholder="10"
+                    autoFocus
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    {itemEstoqueAbastecer?.unidadeMedida || 'un'}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-400 mt-1.5">
+                  {modoAbastecer === 'adicionar'
+                    ? `Estoque final estimado: ${(itemEstoqueAbastecer?.quantidadeAtual || 0) + (parseFloat(qtdAbastecerInput) || 0)} ${itemEstoqueAbastecer?.unidadeMedida || 'un'}`
+                    : `O item ficará disponível automaticamente no cardápio se a quantidade for maior que 0.`}
+                </p>
+              </div>
+
+              {/* Botões do Rodapé */}
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalAbastecerAberto(false);
+                    setProdutoAbastecer(null);
+                  }}
+                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs border transition-colors cursor-pointer ${
+                    isWhite ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  }`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Confirmar e Suprir</span>
                 </button>
               </div>
             </form>

@@ -105,7 +105,7 @@ export default function PDV() {
 
     // Baixa automática no estoque para produtos vendidos (Seção 1.5 e 1.9 do documento)
     itens.forEach((it) => {
-      baixarEstoquePorVenda(it.produto.nome, it.quantidade);
+      baixarEstoquePorVenda(it.produto.id || it.produto.nome, it.quantidade);
     });
 
     registrarVendaCaixa(totalLiquido);

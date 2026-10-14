@@ -38,6 +38,10 @@ export interface Produto {
   setorPreparo: 'cozinha' | 'bar' | 'nenhum';
   disponivel: boolean;
   destaque?: boolean;
+  controlaEstoque?: boolean;
+  quantidadeEstoque?: number;
+  estoqueMinimo?: number;
+  unidadeEstoque?: 'un' | 'kg' | 'g' | 'pct' | 'l' | 'ml' | 'frasco' | 'cx';
 }
 
 export interface ItemCarrinho {
@@ -182,6 +186,7 @@ export type StatusDisponibilidade = 'disponivel' | 'esgotando' | 'esgotado';
 
 export interface ItemEstoque {
   id: string;
+  produtoId?: string;
   nome: string;
   categoria: CategoriaEstoque;
   metodoControle: MetodoControleEstoque;
@@ -195,6 +200,7 @@ export interface ItemEstoque {
   precoVenda?: number;            // Para produtos vendidos diretamente (ex: cervejas)
   statusDisponibilidade: StatusDisponibilidade;
   fornecedorHabitual?: string;
+  fotoUrl?: string;
 }
 
 export interface RegistroCompra {
