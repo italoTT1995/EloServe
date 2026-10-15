@@ -1,0 +1,431 @@
+{
+  "tenant-01": {
+    "tenantId": "tenant-01",
+    "nomeLoja": "EloServe SaaS (Visão Global)",
+    "nomeAgente": "EloBot Fogo de Minas",
+    "tomDeVoz": "acolhedor",
+    "chavePix": "financeiro@fogodeminas.com.br",
+    "termosIdentificacao": [
+      "fogo de minas",
+      "churrascaria",
+      "parrilla",
+      "churrasco",
+      "carnes",
+      "picanha",
+      "fogodeminas"
+    ],
+    "produtos": [
+      {
+        "id": "p_fg_1",
+        "nome": "Picanha Angus na Brasa (2 pessoas)",
+        "preco": 128,
+        "categoria": "Cortes Nobres na Brasa",
+        "descricao": "600g de picanha importada maturada com sal de parrilla e chimichurri.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_2",
+        "nome": "Bife Ancho com Chimichurri Uruguaio",
+        "preco": 79,
+        "categoria": "Cortes Nobres na Brasa",
+        "descricao": "400g de corte nobre ancho grelhado na brasa viva ao ponto do cliente.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_9",
+        "nome": "Filé Mignon com Manteiga de Ervas",
+        "preco": 89,
+        "categoria": "Cortes Nobres na Brasa",
+        "descricao": "350g de medalhão grelhado na manteiga clarificada.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_3",
+        "nome": "Costela no Bafo com Mandioca na Manteiga",
+        "preco": 84,
+        "categoria": "Pratos Principais & Porções",
+        "descricao": "Costela bovina desmanchando, marinada 12h na cerveja preta e ervas.",
+        "disponivel": false
+      },
+      {
+        "id": "p_fg_4",
+        "nome": "Linguiça Artesanal de Pernil na Brasa",
+        "preco": 34,
+        "categoria": "Pratos Principais & Porções",
+        "descricao": "Feita na casa com pimenta biquinho, servida com pão de alho crocante.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_10",
+        "nome": "Frango Grelhado na Brasa com Limão",
+        "preco": 42,
+        "categoria": "Pratos Principais & Porções",
+        "descricao": "Sobrecoxa desossada marinada com ervas frescas.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_5",
+        "nome": "Farofa de Ovos com Bacon & Couve Crocante",
+        "preco": 19,
+        "categoria": "Acompanhamentos",
+        "descricao": "Farofa crocante na manteiga de garrafa.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_11",
+        "nome": "Batata Rústica com Alecrim e Alho",
+        "preco": 24,
+        "categoria": "Acompanhamentos",
+        "descricao": "Batatas douradas com casca e molho aioli.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_6",
+        "nome": "Chopp Brahma 500ml",
+        "preco": 15,
+        "categoria": "Bebidas & Vinhos",
+        "descricao": "Chopp claro tirado com colarinho cremoso a -2°C.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_12",
+        "nome": "Cerveja Heineken 600ml Garrafa",
+        "preco": 18,
+        "categoria": "Bebidas & Vinhos",
+        "descricao": "Puro malte estupidamente gelada no balde.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_7",
+        "nome": "Vinho Tinto Malbec Reserva 750ml",
+        "preco": 95,
+        "categoria": "Bebidas & Vinhos",
+        "descricao": "Vinho argentino encorpado de Mendoza, ideal para carnes.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_13",
+        "nome": "Refrigerante Lata 350ml",
+        "preco": 8,
+        "categoria": "Bebidas & Vinhos",
+        "descricao": "Coca-Cola, Guaraná Antarctica ou Zero.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_8",
+        "nome": "Pudim de Leite com Calda de Queijo Canastra",
+        "preco": 16,
+        "categoria": "Sobremesas da Casa",
+        "descricao": "Receita mineira tradicional cremosa sem furinhos.",
+        "disponivel": true
+      },
+      {
+        "id": "p_fg_14",
+        "nome": "Petit Gâteau de Chocolate com Sorvete",
+        "preco": 24,
+        "categoria": "Sobremesas da Casa",
+        "descricao": "Bolo quente com recheio cremoso e sorvete de creme.",
+        "disponivel": false
+      }
+    ]
+  },
+  "tenant-02": {
+    "tenantId": "tenant-02",
+    "nomeLoja": "Pizzaria & Trattoria Bella Napoli",
+    "nomeAgente": "EloBot Bella Napoli",
+    "tomDeVoz": "acolhedor",
+    "chavePix": "contato@bellanapoli.com.br",
+    "termosIdentificacao": [
+      "bella napoli",
+      "pizzaria",
+      "trattoria",
+      "pizza",
+      "calzone",
+      "lasanha",
+      "massa",
+      "bellanapoli",
+      "napoli"
+    ],
+    "produtos": [
+      {
+        "id": "p_bn_1",
+        "nome": "Pizza Margherita Tradizionale",
+        "preco": 58,
+        "categoria": "Pizzas Tradicionais",
+        "descricao": "Molho pelati italiano, mozzarella di bufala e manjericão fresco ao azeite."
+      },
+      {
+        "id": "p_bn_2",
+        "nome": "Pizza Calabresa Curada com Cebola Roxa",
+        "preco": 52,
+        "categoria": "Pizzas Tradicionais",
+        "descricao": "Calabresa artesanal defumada fatiada fina e azeitonas pretas."
+      },
+      {
+        "id": "p_bn_3",
+        "nome": "Pizza Quatro Queijos D.O.C.",
+        "preco": 64,
+        "categoria": "Pizzas Especiais",
+        "descricao": "Gorgonzola doce, parmesão reggiano, catupiry original e mozzarella."
+      },
+      {
+        "id": "p_bn_4",
+        "nome": "Calzone Presunto Di Parma & Catupiry",
+        "preco": 48,
+        "categoria": "Calzones & Massas",
+        "descricao": "Massa dobrada e assada no forno a lenha recheada com queijo derretido."
+      },
+      {
+        "id": "p_bn_5",
+        "nome": "Lasanha Bolonhesa Clássica ao Forno",
+        "preco": 46,
+        "categoria": "Calzones & Massas",
+        "descricao": "Massa fresca artesanal e molho de carne com 6h de cozimento lento."
+      },
+      {
+        "id": "p_bn_6",
+        "nome": "Vinho Chianti Tinto Italiano 750ml",
+        "preco": 89,
+        "categoria": "Vinhos & Bebidas",
+        "descricao": "Vinho clássico toscano com aroma frutado e taninos macios."
+      },
+      {
+        "id": "p_bn_7",
+        "nome": "Refrigerante Lata 350ml",
+        "preco": 8,
+        "categoria": "Vinhos & Bebidas",
+        "descricao": "Coca-Cola, Guaraná Antarctica ou Soda gelada."
+      },
+      {
+        "id": "p_bn_8",
+        "nome": "Tiramisù Clássico Italiano",
+        "preco": 22,
+        "categoria": "Dolci Italianos",
+        "descricao": "Biscoito champanhe embebido em café expresso, queijo mascarpone e cacau."
+      }
+    ]
+  },
+  "tenant-03": {
+    "tenantId": "tenant-03",
+    "nomeLoja": "Smash Burguer Mania",
+    "nomeAgente": "EloBot Smash Burguer",
+    "tomDeVoz": "descontraido",
+    "chavePix": "financeiro@burguermania.com.br",
+    "termosIdentificacao": [
+      "smash burguer mania",
+      "smash burguer",
+      "burguer mania",
+      "burger mania",
+      "smash burger",
+      "smash",
+      "burguer",
+      "hamburguer",
+      "burguermania"
+    ],
+    "produtos": [
+      {
+        "id": "p_sm_1",
+        "nome": "Smash Burger Bacon Especial",
+        "preco": 34.9,
+        "categoria": "Smash Burgers",
+        "descricao": "Dois blends de 90g prensados na chapa, queijo cheddar inglês e bacon crocante."
+      },
+      {
+        "id": "p_sm_2",
+        "nome": "Burger Clássico & Salada Fresca",
+        "preco": 29.9,
+        "categoria": "Burgers Artesanais",
+        "descricao": "Blend 160g, queijo prato derretido, alface americana e picles artesanal."
+      },
+      {
+        "id": "p_sm_3",
+        "nome": "Smash Duplo Cheddar Inglês",
+        "preco": 36,
+        "categoria": "Smash Burgers",
+        "descricao": "Dois blends de 100g smash com camada dupla de cheddar melt cremoso."
+      },
+      {
+        "id": "p_sm_4",
+        "nome": "Batata Rústica com Alecrim e Sal Grosso",
+        "preco": 24.5,
+        "categoria": "Porções & Fritas",
+        "descricao": "Batatas com casca sequinhas com maionese verde da casa."
+      },
+      {
+        "id": "p_sm_5",
+        "nome": "Onion Rings Crocantes com Barbecue",
+        "preco": 22,
+        "categoria": "Porções & Fritas",
+        "descricao": "Anéis de cebola empanados e dourados na hora."
+      },
+      {
+        "id": "p_sm_6",
+        "nome": "Chopp IPA Artesanal 500ml",
+        "preco": 18,
+        "categoria": "Bebidas & Chopp",
+        "descricao": "Chopp artesanal fresco, notas cítricas e amargor balanceado."
+      },
+      {
+        "id": "p_sm_7",
+        "nome": "Milk-shake de Nutella com Ninho 400ml",
+        "preco": 23,
+        "categoria": "Shakes & Sobremesas",
+        "descricao": "Feito com sorvete de baunilha, Nutella pura e finalizado com leite Ninho."
+      }
+    ]
+  },
+  "tenant-04": {
+    "tenantId": "tenant-04",
+    "nomeLoja": "Boteco & Espetos do Silva",
+    "nomeAgente": "EloBot Boteco do Silva",
+    "tomDeVoz": "descontraido",
+    "chavePix": "silva.espetos@gmail.com",
+    "termosIdentificacao": [
+      "boteco & espetos do silva",
+      "boteco do silva",
+      "espetos do silva",
+      "espetos",
+      "espetinho",
+      "boteco",
+      "bar do silva"
+    ],
+    "produtos": [
+      {
+        "id": "p_bs_1",
+        "nome": "Espetinho de Picanha com Farofa & Vinagrete",
+        "preco": 18,
+        "categoria": "Espetinhos na Brasa",
+        "descricao": "Carne macia na brasa com o tempero e farofa caseira do Silva."
+      },
+      {
+        "id": "p_bs_2",
+        "nome": "Espetinho de Queijo Coalho com Melaço de Cana",
+        "preco": 14,
+        "categoria": "Espetinhos na Brasa",
+        "descricao": "Dourado na brasa com crosta crocante e melaço de cana."
+      },
+      {
+        "id": "p_bs_3",
+        "nome": "Espetinho de Coração de Frango Temperado",
+        "preco": 13,
+        "categoria": "Espetinhos na Brasa",
+        "descricao": "Temperado com ervas finas, alho e limão taiti."
+      },
+      {
+        "id": "p_bs_4",
+        "nome": "Torresmo de Rolo Super Crocante",
+        "preco": 38,
+        "categoria": "Petiscos de Boteco",
+        "descricao": "Panceta pururucada e fatiada na hora com gomos de limão, serve 2 pessoas."
+      },
+      {
+        "id": "p_bs_5",
+        "nome": "Frango a Passarinho com Alho Dourado",
+        "preco": 34,
+        "categoria": "Petiscos de Boteco",
+        "descricao": "Pedaços crocantes de frango frito com lâminas de alho douradas."
+      },
+      {
+        "id": "p_bs_6",
+        "nome": "Cerveja Original 600ml Garrafa",
+        "preco": 16,
+        "categoria": "Cervejas Geladas",
+        "descricao": "Estupidamente gelada servida no balde de gelo."
+      },
+      {
+        "id": "p_bs_7",
+        "nome": "Caipirinha Tradicional de Limão 51",
+        "preco": 18,
+        "categoria": "Caipirinhas & Doses",
+        "descricao": "Cachaça mineira de alambique, limão taiti fresco e açúcar."
+      }
+    ]
+  },
+  "tenant-05": {
+    "tenantId": "tenant-05",
+    "nomeLoja": "Sushi Prime Oriental",
+    "nomeAgente": "EloBot Sushi Prime",
+    "tomDeVoz": "acolhedor",
+    "chavePix": "financeiro@sushiprime.com.br",
+    "termosIdentificacao": [
+      "sushi prime oriental",
+      "sushi prime",
+      "prime oriental",
+      "sushi",
+      "temaki",
+      "sashimi",
+      "japones",
+      "oriental",
+      "sushiprime"
+    ],
+    "produtos": [
+      {
+        "id": "p_sp_1",
+        "nome": "Combinado Prime Salmão 20 Peças",
+        "preco": 78,
+        "categoria": "Combinados Prime",
+        "descricao": "6 sashimis, 4 niguiris, 6 uramakis philadelphia e 4 hossomakis de salmão fresco."
+      },
+      {
+        "id": "p_sp_2",
+        "nome": "Temaki Salmão Completo com Cream Cheese & Cebolinha",
+        "preco": 34,
+        "categoria": "Temakis & Rolls",
+        "descricao": "Cone de alga crocante, arroz temperado shari, salmão fresco e cream cheese."
+      },
+      {
+        "id": "p_sp_3",
+        "nome": "Uramaki Philadelphia Salmão (8 un)",
+        "preco": 29.9,
+        "categoria": "Temakis & Rolls",
+        "descricao": "Enrolado invertido com salmão fresco, cream cheese e gergelim torrado."
+      },
+      {
+        "id": "p_sp_4",
+        "nome": "Hot Roll Especial com Molho Tarê (8 un)",
+        "preco": 28,
+        "categoria": "Temakis & Rolls",
+        "descricao": "Empanado na farinha panko, frito na hora com cream cheese e calda tarê."
+      },
+      {
+        "id": "p_sp_5",
+        "nome": "Sashimi de Salmão Fresco (10 fatias)",
+        "preco": 45,
+        "categoria": "Sashimis Frescos",
+        "descricao": "Lâminas nobres de salmão fresco com wasabi e gengibre gari importado."
+      },
+      {
+        "id": "p_sp_6",
+        "nome": "Saquê Dourado Tradicional 150ml",
+        "preco": 22,
+        "categoria": "Bebidas Japonesas",
+        "descricao": "Saquê japonês servido quente ou gelado no copinho ochoko."
+      },
+      {
+        "id": "p_sp_7",
+        "nome": "Cerveja Asahi Super Dry Japonesa 330ml",
+        "preco": 19,
+        "categoria": "Bebidas Japonesas",
+        "descricao": "Cerveja japonesa puro malte leve e refrescante."
+      },
+      {
+        "id": "p_sp_8",
+        "nome": "Petit Gâteau de Chá Verde Matcha com Sorvete",
+        "preco": 26,
+        "categoria": "Sobremesas Orientais",
+        "descricao": "Bolo quente oriental de matcha recheado com sorvete de baunilha."
+      }
+    ]
+  },
+  "tenant-9651": {
+    "tenantId": "tenant-9651",
+    "nomeLoja": "teste teste",
+    "nomeAgente": "EloBot teste",
+    "tomDeVoz": "acolhedor",
+    "chavePix": "000000000000000000000000",
+    "termosIdentificacao": [
+      "teste teste"
+    ],
+    "produtos": []
+  }
+}

@@ -160,7 +160,7 @@ interface SaaSState {
   setAbaAtivaMaster: (aba: AbaMasterSaaS) => void;
   setTenantEmEdicaoId: (id: string | null) => void;
   selecionarTenant: (tenantId: string) => void;
-  adicionarTenant: (novo: Omit<TenantRestaurante, 'id' | 'criadoEm'>) => void;
+  adicionarTenant: (novo: Omit<TenantRestaurante, 'id' | 'criadoEm'>) => TenantRestaurante;
   atualizarDadosTenant: (tenantId: string, dados: Partial<TenantRestaurante>) => void;
   atualizarStatusAssinatura: (tenantId: string, status: StatusAssinatura) => void;
   mudarPlanoTenant: (tenantId: string, planoId: TipoPlanoSaaS) => void;
@@ -393,6 +393,32 @@ export const useSaaSStore = create<SaaSState>()(
         set((state) => ({
           tenants: [tenantCompleto, ...state.tenants],
         }));
+
+        // Sincroniza o novo restaurante com o backend de catálogo do WhatsApp
+        try {
+          const apiUrl =
+            import.meta.env.VITE_API_URL ||
+            (typeof window !== 'undefined' && window.location.port === '5174'
+              ? 'http://localhost:3001'
+              : typeof window !== 'undefined'
+              ? window.location.origin
+              : 'http://localhost:3001');
+
+          fetch(`${apiUrl}/api/whatsapp/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tenantId: id,
+              nomeLoja: novo.nomeFantasia,
+              nomeAgente: `EloBot ${novo.nomeFantasia.split(' ')[0]}`,
+              tomDeVoz: 'acolhedor',
+              chavePix: novo.documento || 'financeiro@eloserve.com.br',
+              produtos: [],
+            }),
+          }).catch(() => {});
+        } catch {}
+
+        return tenantCompleto;
       },
 
       atualizarDadosTenant: (tenantId, dados) => {

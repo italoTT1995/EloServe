@@ -6,9 +6,11 @@ import {
   RegistroCompra,
   FichaTecnica,
   Fornecedor,
-  Produto,
+  MovimentacaoEstoque,
+  VendaRealizada,
+  ItemComandaMesa,
 } from '../types';
-import { useProductStore } from './useProductStore';
+import { converterParaUnidadeEstoque } from '../utils/estoqueUtils';
 
 export const CATEGORIAS_ESTOQUE_NOMES: Record<CategoriaEstoque, string> = {
   alimentos: 'Alimentos & Insumos',
@@ -20,237 +22,104 @@ export const CATEGORIAS_ESTOQUE_NOMES: Record<CategoriaEstoque, string> = {
 };
 
 const ITENS_ESTOQUE_INICIAIS: ItemEstoque[] = [
-  // =========================================================================
-  // 1. Pratos e Bebidas do Cardápio Fogo de Minas (Sincronizados e Vinculados)
-  // =========================================================================
+  // 1. Alimentos e Insumos (Recorrente / Ficha Técnica)
   {
-    id: 'est-card-p_fg_1',
-    produtoId: 'p_fg_1',
-    nome: 'Picanha Angus na Brasa (2 pessoas)',
+    id: 'est-picanha',
+    nome: 'Picanha Bovina Angus Resfriada',
     categoria: 'alimentos',
-    metodoControle: 'individual',
-    quantidadeAtual: 18,
-    unidadeMedida: 'un',
-    estoqueMinimo: 5,
-    estoqueIdeal: 30,
-    precoCusto: 46.0,
-    precoVenda: 128.0,
+    metodoControle: 'recorrente',
+    quantidadeAtual: 15.0,
+    unidadeMedida: 'kg',
+    consumoDiarioPrevisto: 3.0,
+    estoqueMinimo: 4.0,
+    estoqueIdeal: 20.0,
+    precoCusto: 58.0,
     statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300&auto=format&fit=crop&q=80',
     fornecedorHabitual: 'Frigorífico Central',
   },
   {
-    id: 'est-card-p_fg_2',
-    produtoId: 'p_fg_2',
-    nome: 'Bife Ancho com Chimichurri Uruguaio',
+    id: 'est-sal',
+    nome: 'Sal de Parrilla Grosso Especial',
     categoria: 'alimentos',
-    metodoControle: 'individual',
-    quantidadeAtual: 14,
-    unidadeMedida: 'un',
-    estoqueMinimo: 5,
-    estoqueIdeal: 25,
-    precoCusto: 28.0,
-    precoVenda: 79.0,
+    metodoControle: 'recorrente',
+    quantidadeAtual: 8.0,
+    unidadeMedida: 'kg',
+    consumoDiarioPrevisto: 0.2,
+    estoqueMinimo: 2.0,
+    estoqueIdeal: 10.0,
+    precoCusto: 8.5,
     statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1558030006-450675393462?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Frigorífico Central',
+    fornecedorHabitual: 'Atacadão Alimentos',
   },
   {
-    id: 'est-card-p_fg_9',
-    produtoId: 'p_fg_9',
-    nome: 'Filé Mignon com Manteiga de Ervas',
+    id: 'est-farofa',
+    nome: 'Farofa Especial da Casa na Manteiga',
     categoria: 'alimentos',
-    metodoControle: 'individual',
-    quantidadeAtual: 12,
-    unidadeMedida: 'un',
-    estoqueMinimo: 4,
-    estoqueIdeal: 20,
-    precoCusto: 32.0,
-    precoVenda: 89.0,
+    metodoControle: 'recorrente',
+    quantidadeAtual: 12.0,
+    unidadeMedida: 'kg',
+    consumoDiarioPrevisto: 1.5,
+    estoqueMinimo: 3.0,
+    estoqueIdeal: 15.0,
+    precoCusto: 7.2,
     statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Frigorífico Central',
-  },
-  {
-    id: 'est-card-p_fg_3',
-    produtoId: 'p_fg_3',
-    nome: 'Costela no Bafo com Mandioca na Manteiga',
-    categoria: 'alimentos',
-    metodoControle: 'individual',
-    quantidadeAtual: 0, // Zerado no cardápio -> indisponível
-    unidadeMedida: 'un',
-    estoqueMinimo: 5,
-    estoqueIdeal: 20,
-    precoCusto: 30.0,
-    precoVenda: 84.0,
-    statusDisponibilidade: 'esgotado',
-    fotoUrl: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Frigorífico Central',
-  },
-  {
-    id: 'est-card-p_fg_4',
-    produtoId: 'p_fg_4',
-    nome: 'Linguiça Artesanal de Pernil na Brasa',
-    categoria: 'alimentos',
-    metodoControle: 'individual',
-    quantidadeAtual: 22,
-    unidadeMedida: 'un',
-    estoqueMinimo: 6,
-    estoqueIdeal: 35,
-    precoCusto: 10.0,
-    precoVenda: 34.0,
-    statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1597393353415-b3730f3719fe?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Frigorífico Central',
-  },
-  {
-    id: 'est-card-p_fg_10',
-    produtoId: 'p_fg_10',
-    nome: 'Frango Grelhado na Brasa com Limão',
-    categoria: 'alimentos',
-    metodoControle: 'individual',
-    quantidadeAtual: 16,
-    unidadeMedida: 'un',
-    estoqueMinimo: 5,
-    estoqueIdeal: 25,
-    precoCusto: 14.0,
-    precoVenda: 42.0,
-    statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Avícola Santa Rita',
-  },
-  {
-    id: 'est-card-p_fg_5',
-    produtoId: 'p_fg_5',
-    nome: 'Farofa de Ovos com Bacon & Couve Crocante',
-    categoria: 'alimentos',
-    metodoControle: 'individual',
-    quantidadeAtual: 0, // Zerado no cardápio -> indisponível
-    unidadeMedida: 'un',
-    estoqueMinimo: 4,
-    estoqueIdeal: 20,
-    precoCusto: 4.5,
-    precoVenda: 19.0,
-    statusDisponibilidade: 'esgotado',
-    fotoUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&auto=format&fit=crop&q=80',
     fornecedorHabitual: 'Supermercado BH',
   },
   {
-    id: 'est-card-p_fg_11',
-    produtoId: 'p_fg_11',
-    nome: 'Batata Rústica com Alecrim e Alho',
+    id: 'est-bacon',
+    nome: 'Bacon Especial Fatiado',
+    categoria: 'alimentos',
+    metodoControle: 'recorrente',
+    quantidadeAtual: 6.5,
+    unidadeMedida: 'kg',
+    consumoDiarioPrevisto: 1.0,
+    estoqueMinimo: 2.5,
+    estoqueIdeal: 10.0,
+    precoCusto: 28.0,
+    statusDisponibilidade: 'disponivel',
+    fornecedorHabitual: 'Frigorífico Central',
+  },
+  {
+    id: 'est-carne-burger',
+    nome: 'Blend de Carnes para Smash Burger',
+    categoria: 'alimentos',
+    metodoControle: 'recorrente',
+    quantidadeAtual: 18.0,
+    unidadeMedida: 'kg',
+    consumoDiarioPrevisto: 3.5,
+    estoqueMinimo: 5.0,
+    estoqueIdeal: 25.0,
+    precoCusto: 26.5,
+    statusDisponibilidade: 'disponivel',
+    fornecedorHabitual: 'Frigorífico Central',
+  },
+  {
+    id: 'est-pao-burger',
+    nome: 'Pão de Brioche Artesanal para Burger',
     categoria: 'alimentos',
     metodoControle: 'individual',
-    quantidadeAtual: 15,
-    unidadeMedida: 'un',
-    estoqueMinimo: 5,
-    estoqueIdeal: 25,
-    precoCusto: 5.5,
-    precoVenda: 24.0,
-    statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Atacadão Alimentos',
-  },
-  {
-    id: 'est-card-p_fg_6',
-    produtoId: 'p_fg_6',
-    nome: 'Chopp Brahma 500ml',
-    categoria: 'bebidas',
-    metodoControle: 'individual',
-    quantidadeAtual: 58,
+    quantidadeAtual: 50,
     unidadeMedida: 'un',
     estoqueMinimo: 20,
-    estoqueIdeal: 100,
-    precoCusto: 5.5,
-    precoVenda: 15.0,
-    statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1608270546103-976214151a56?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Distribuidora de Bebidas BH',
-  },
-  {
-    id: 'est-card-p_fg_12',
-    produtoId: 'p_fg_12',
-    nome: 'Cerveja Heineken 600ml Garrafa',
-    categoria: 'bebidas',
-    metodoControle: 'individual',
-    quantidadeAtual: 42,
-    unidadeMedida: 'un',
-    estoqueMinimo: 15,
     estoqueIdeal: 80,
-    precoCusto: 8.5,
-    precoVenda: 18.0,
+    precoCusto: 1.8,
     statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1618886614638-80e3c153d31a?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Distribuidora de Bebidas BH',
+    fornecedorHabitual: 'Padaria Modelo',
   },
   {
-    id: 'est-card-p_fg_7',
-    produtoId: 'p_fg_7',
-    nome: 'Vinho Tinto Malbec Reserva 750ml',
-    categoria: 'bebidas',
-    metodoControle: 'individual',
-    quantidadeAtual: 11,
-    unidadeMedida: 'un',
-    estoqueMinimo: 6,
-    estoqueIdeal: 24,
-    precoCusto: 42.0,
-    precoVenda: 95.0,
-    statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Adega & Vinhos Nobres',
-  },
-  {
-    id: 'est-card-p_fg_13',
-    produtoId: 'p_fg_13',
-    nome: 'Refrigerante Lata 350ml',
-    categoria: 'bebidas',
-    metodoControle: 'individual',
-    quantidadeAtual: 68,
-    unidadeMedida: 'un',
-    estoqueMinimo: 20,
-    estoqueIdeal: 100,
-    precoCusto: 3.0,
-    precoVenda: 8.0,
-    statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Atacadão Alimentos',
-  },
-  {
-    id: 'est-card-p_fg_8',
-    produtoId: 'p_fg_8',
-    nome: 'Pudim de Leite com Calda de Queijo Canastra',
+    id: 'est-queijo',
+    nome: 'Queijo Mussarela Peça Especial',
     categoria: 'alimentos',
-    metodoControle: 'individual',
-    quantidadeAtual: 9,
-    unidadeMedida: 'un',
-    estoqueMinimo: 4,
-    estoqueIdeal: 15,
-    precoCusto: 4.0,
-    precoVenda: 16.0,
+    metodoControle: 'recorrente',
+    quantidadeAtual: 14.0,
+    unidadeMedida: 'kg',
+    consumoDiarioPrevisto: 2.0,
+    estoqueMinimo: 4.0,
+    estoqueIdeal: 20.0,
+    precoCusto: 34.0,
     statusDisponibilidade: 'disponivel',
-    fotoUrl: 'https://images.unsplash.com/photo-1587314168485-3236d6710814?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Confeitaria da Vovó',
+    fornecedorHabitual: 'Laticínios da Serra',
   },
-  {
-    id: 'est-card-p_fg_14',
-    produtoId: 'p_fg_14',
-    nome: 'Petit Gâteau de Chocolate com Sorvete',
-    categoria: 'alimentos',
-    metodoControle: 'individual',
-    quantidadeAtual: 0, // Zerado no cardápio -> indisponível
-    unidadeMedida: 'un',
-    estoqueMinimo: 4,
-    estoqueIdeal: 15,
-    precoCusto: 7.0,
-    precoVenda: 24.0,
-    statusDisponibilidade: 'esgotado',
-    fotoUrl: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=300&auto=format&fit=crop&q=80',
-    fornecedorHabitual: 'Confeitaria da Vovó',
-  },
-
-  // =========================================================================
-  // 2. Alimentos e Insumos Gerais (Recorrente / Ficha Técnica)
-  // =========================================================================
   {
     id: 'est-01',
     nome: 'Arroz Tipo 1 (Pacote 5kg)',
@@ -309,9 +178,7 @@ const ITENS_ESTOQUE_INICIAIS: ItemEstoque[] = [
     fornecedorHabitual: 'Frigorífico Central',
   },
 
-  // =========================================================================
-  // 3. Bebidas Adicionais
-  // =========================================================================
+  // 2. Bebidas (Controle Individual por Unidade com Baixa Automática)
   {
     id: 'est-05',
     nome: 'Cerveja Amstel Lager 350ml',
@@ -341,6 +208,20 @@ const ITENS_ESTOQUE_INICIAIS: ItemEstoque[] = [
     fornecedorHabitual: 'Distribuidora de Bebidas BH',
   },
   {
+    id: 'est-07',
+    nome: 'Coca-Cola Lata 350ml',
+    categoria: 'bebidas',
+    metodoControle: 'individual',
+    quantidadeAtual: 68,
+    unidadeMedida: 'un',
+    estoqueMinimo: 20,
+    estoqueIdeal: 100,
+    precoCusto: 3.2,
+    precoVenda: 7.5,
+    statusDisponibilidade: 'disponivel',
+    fornecedorHabitual: 'Atacadão Alimentos',
+  },
+  {
     id: 'est-08',
     nome: 'Água Mineral sem Gás 500ml',
     categoria: 'bebidas',
@@ -355,9 +236,7 @@ const ITENS_ESTOQUE_INICIAIS: ItemEstoque[] = [
     fornecedorHabitual: 'Distribuidora Fonte Pura',
   },
 
-  // =========================================================================
-  // 4. Higiene e Proteção Individual
-  // =========================================================================
+  // 3. Higiene e Proteção Individual
   {
     id: 'est-09',
     nome: 'Toucas Descartáveis Sanfonadas (pct 100un)',
@@ -385,9 +264,7 @@ const ITENS_ESTOQUE_INICIAIS: ItemEstoque[] = [
     fornecedorHabitual: 'Dental & Descartáveis MG',
   },
 
-  // =========================================================================
-  // 5. Utensílios e Equipamentos de Cozinha
-  // =========================================================================
+  // 4. Utensílios e Equipamentos de Cozinha
   {
     id: 'est-11',
     nome: 'Panela de Pressão Industrial 10L',
@@ -415,9 +292,7 @@ const ITENS_ESTOQUE_INICIAIS: ItemEstoque[] = [
     fornecedorHabitual: 'Bazar Gastronômico',
   },
 
-  // =========================================================================
-  // 6. Produtos e Utensílios de Limpeza
-  // =========================================================================
+  // 5. Produtos e Utensílios de Limpeza
   {
     id: 'est-13',
     nome: 'Desinfetante Floral Concentrado (Frasco 2L)',
@@ -445,9 +320,7 @@ const ITENS_ESTOQUE_INICIAIS: ItemEstoque[] = [
     fornecedorHabitual: 'Supermercado BH',
   },
 
-  // =========================================================================
-  // 7. Materiais de Balcão e Atendimento
-  // =========================================================================
+  // 6. Materiais de Balcão e Atendimento
   {
     id: 'est-15',
     nome: 'Bloco de Comandas de Mesa com Carbono (un)',
@@ -526,31 +399,28 @@ const HISTORICO_COMPRAS_INICIAIS: RegistroCompra[] = [
 const FICHAS_TECNICAS_INICIAIS: FichaTecnica[] = [
   {
     id: 'ft-01',
-    produtoId: 'pf-01',
-    nomePrato: 'Prato Feito Tradicional (PF Mineiro)',
+    produtoId: 'p_fg_1',
+    nomePrato: 'Picanha Angus na Brasa (2 pessoas)',
     componentes: [
-      { ingredienteId: 'est-01', ingredienteNome: 'Arroz Branco', pesoGramas: 150, custoPorGrama: 0.0042, custoTotalComponente: 0.63 },
-      { ingredienteId: 'est-02', ingredienteNome: 'Feijão Carioca', pesoGramas: 100, custoPorGrama: 0.0078, custoTotalComponente: 0.78 },
-      { ingredienteId: 'est-mac', ingredienteNome: 'Macarrão Alho e Óleo', pesoGramas: 100, custoPorGrama: 0.0055, custoTotalComponente: 0.55 },
-      { ingredienteId: 'est-far', ingredienteNome: 'Farofa Especial', pesoGramas: 50, custoPorGrama: 0.006, custoTotalComponente: 0.3 },
-      { ingredienteId: 'est-sal', ingredienteNome: 'Salada de Tomate e Alface', pesoGramas: 50, custoPorGrama: 0.008, custoTotalComponente: 0.4 },
-      { ingredienteId: 'est-04', ingredienteNome: 'Bife de Porco Grelhado', pesoGramas: 180, custoPorGrama: 0.0199, custoTotalComponente: 3.58 },
+      { ingredienteId: 'est-picanha', ingredienteNome: 'Picanha Bovina Angus Resfriada', pesoGramas: 600, custoPorGrama: 0.058, custoTotalComponente: 34.8 },
+      { ingredienteId: 'est-sal', ingredienteNome: 'Sal de Parrilla Grosso Especial', pesoGramas: 10, custoPorGrama: 0.0085, custoTotalComponente: 0.09 },
+      { ingredienteId: 'est-farofa', ingredienteNome: 'Farofa Especial da Casa na Manteiga', pesoGramas: 150, custoPorGrama: 0.0072, custoTotalComponente: 1.08 },
     ],
-    custoTotalEstimado: 6.24,
-    precoVenda: 25.0,
-    margemBrutaPercentual: 75.04,
+    custoTotalEstimado: 35.97,
+    precoVenda: 128.0,
+    margemBrutaPercentual: 71.9,
   },
   {
     id: 'ft-02',
-    produtoId: 'p6',
-    nomePrato: 'Batata Rústica com Alecrim (Porção 500g)',
+    produtoId: 'p_fg_11',
+    nomePrato: 'Batata Rústica com Alecrim e Alho',
     componentes: [
-      { ingredienteId: 'est-03', ingredienteNome: 'Batata Pré-Frita Congelada', pesoGramas: 500, custoPorGrama: 0.0085, custoTotalComponente: 4.25 },
-      { ingredienteId: 'est-tem', ingredienteNome: 'Alecrim, Sal Grosso e Alho Confit', pesoGramas: 20, custoPorGrama: 0.0275, custoTotalComponente: 0.55 },
+      { ingredienteId: 'est-03', ingredienteNome: 'Batata Pré-Frita Congelada (1kg)', pesoGramas: 400, custoPorGrama: 0.0085, custoTotalComponente: 3.4 },
+      { ingredienteId: 'est-sal', ingredienteNome: 'Sal de Parrilla Grosso Especial', pesoGramas: 5, custoPorGrama: 0.0085, custoTotalComponente: 0.04 },
     ],
-    custoTotalEstimado: 4.8,
-    precoVenda: 24.5,
-    margemBrutaPercentual: 80.4,
+    custoTotalEstimado: 3.44,
+    precoVenda: 24.0,
+    margemBrutaPercentual: 85.6,
   },
 ];
 
@@ -595,6 +465,44 @@ const FORNECEDORES_INICIAIS: Fornecedor[] = [
     endereco: 'Rua Tupis, 780 - Barro Preto, BH',
     categoriaPrincipal: 'Produtos Químicos e Limpeza',
   },
+  {
+    id: 'forn-05',
+    nomeOuEmpresa: 'Frigorífico Central',
+    pessoaContato: 'Carlos Açougue',
+    telefone: '(31) 99222-1133',
+    email: 'pedidos@frigorificocentral.com.br',
+    cnpj: '11.222.333/0001-88',
+    endereco: 'Ceasa Minas Pavilhão 4 - Contagem',
+    categoriaPrincipal: 'Carnes Bovinas, Suínas e Cortes Nobres',
+  },
+];
+
+const HISTORICO_MOVIMENTACOES_INICIAIS: MovimentacaoEstoque[] = [
+  {
+    id: 'mov-init-01',
+    dataHora: '13/10/2026 19:42',
+    itemId: 'est-05',
+    itemNome: 'Cerveja Amstel Lager 350ml',
+    tipo: 'saida_venda',
+    quantidade: 8,
+    unidadeMedida: 'un',
+    motivo: 'Venda PDV #VD-1082: 8x Cerveja Amstel Lager 350ml',
+    pedidoId: 'VD-1082',
+    responsavel: 'Italo Lemos',
+    saldoApos: 142,
+  },
+  {
+    id: 'mov-init-02',
+    dataHora: '13/10/2026 15:30',
+    itemId: 'est-01',
+    itemNome: 'Arroz Tipo 1 (Pacote 5kg)',
+    tipo: 'entrada_compra',
+    quantidade: 10,
+    unidadeMedida: 'pct',
+    motivo: 'Compra Fornecedor Supermercado Paranaíba NF #8492',
+    responsavel: 'Italo Lemos',
+    saldoApos: 18,
+  },
 ];
 
 interface EstoqueState {
@@ -602,13 +510,22 @@ interface EstoqueState {
   compras: RegistroCompra[];
   fichasTecnicas: FichaTecnica[];
   fornecedores: Fornecedor[];
+  movimentacoes: MovimentacaoEstoque[];
+  pedidosProcessados: string[];
+
+  // Ações de Integração Cardápio / PDV / Vendas / Salão & Mesas
+  processarBaixaVenda: (venda: VendaRealizada) => { sucesso: boolean; movimentacoesGeradas: number };
+  processarBaixaItensMesa: (numeroMesa: number, itensComanda: ItemComandaMesa[], operador: string) => { sucesso: boolean; movimentacoesGeradas: number };
+  estornarBaixaVenda: (venda: VendaRealizada, motivo: string, operador: string) => { sucesso: boolean; itensRestaurados: number };
+  registrarMovimentacao: (mov: Omit<MovimentacaoEstoque, 'id' | 'dataHora'>) => void;
 
   // Ações de Estoque
-  baixarEstoquePorVenda: (produtoNomeOuId: string, quantidade: number) => void;
+  baixarEstoquePorVenda: (produtoNome: string, quantidade: number) => void;
   registrarSaidaManual: (itemId: string, quantidade: number, motivo: string) => void;
   ajustarSobraDiaAnterior: (itemId: string, sobra: number) => void;
   adicionarItemEstoque: (item: Omit<ItemEstoque, 'id'>) => void;
   editarItemEstoque: (id: string, dados: Partial<ItemEstoque>) => void;
+  removerItemEstoque: (id: string) => void;
 
   // Ações de Compras
   adicionarCompra: (compra: Omit<RegistroCompra, 'id'>) => void;
@@ -621,14 +538,6 @@ interface EstoqueState {
 
   // Consumo diário automático na abertura
   processarAberturaDiaConsumoPrevisto: () => void;
-
-  // Ações de Sincronização Bidirecional com o Cardápio
-  sincronizarProdutoDoCardapio: (prod: Produto) => void;
-  removerDoCardapio: (produtoId: string) => void;
-  abastecerRapido: (idOuProdutoId: string, quantidadeAdicional: number, motivo?: string) => void;
-  ajustarQuantidadeEstoque: (idOuProdutoId: string, novaQuantidade: number) => void;
-  obterItemPorProdutoId: (produtoId: string) => ItemEstoque | undefined;
-  sincronizarTodosOsProdutosDoCardapio: (produtos: Produto[]) => void;
 }
 
 export const useEstoqueStore = create<EstoqueState>()(
@@ -638,250 +547,386 @@ export const useEstoqueStore = create<EstoqueState>()(
       compras: HISTORICO_COMPRAS_INICIAIS,
       fichasTecnicas: FICHAS_TECNICAS_INICIAIS,
       fornecedores: FORNECEDORES_INICIAIS,
+      movimentacoes: HISTORICO_MOVIMENTACOES_INICIAIS,
+      pedidosProcessados: ['VD-1082'],
 
-      obterItemPorProdutoId: (produtoId: string) => {
-        return get().itens.find(
-          (it) => it.produtoId === produtoId || it.id === `est-card-${produtoId}`
-        );
-      },
-
-      sincronizarProdutoDoCardapio: (prod: Produto) => {
-        set((state) => {
-          const itemIndex = state.itens.findIndex(
-            (it) =>
-              it.produtoId === prod.id ||
-              it.id === `est-card-${prod.id}` ||
-              it.nome.trim().toLowerCase() === prod.nome.trim().toLowerCase()
-          );
-
-          const qtdAtual =
-            prod.quantidadeEstoque !== undefined
-              ? prod.quantidadeEstoque
-              : itemIndex >= 0
-              ? state.itens[itemIndex].quantidadeAtual
-              : 20;
-
-          const estMinimo =
-            prod.estoqueMinimo !== undefined
-              ? prod.estoqueMinimo
-              : itemIndex >= 0
-              ? state.itens[itemIndex].estoqueMinimo
-              : 5;
-
-          let status: ItemEstoque['statusDisponibilidade'] = 'disponivel';
-          if (qtdAtual <= 0) {
-            status = 'esgotado';
-          } else if (qtdAtual <= estMinimo) {
-            status = 'esgotando';
-          }
-
-          if (itemIndex >= 0) {
-            const itensAtualizados = [...state.itens];
-            itensAtualizados[itemIndex] = {
-              ...itensAtualizados[itemIndex],
-              produtoId: prod.id,
-              nome: prod.nome,
-              precoVenda: prod.precoVenda,
-              precoCusto: prod.precoCusto !== undefined ? prod.precoCusto : itensAtualizados[itemIndex].precoCusto,
-              fotoUrl: prod.fotoUrl || itensAtualizados[itemIndex].fotoUrl,
-              quantidadeAtual: qtdAtual,
-              estoqueMinimo: estMinimo,
-              unidadeMedida: (prod.unidadeEstoque as any) || itensAtualizados[itemIndex].unidadeMedida || 'un',
-              statusDisponibilidade: status,
-            };
-            return { itens: itensAtualizados };
-          } else {
-            const novoItem: ItemEstoque = {
-              id: `est-card-${prod.id}`,
-              produtoId: prod.id,
-              nome: prod.nome,
-              categoria: prod.setorPreparo === 'bar' ? 'bebidas' : 'alimentos',
-              metodoControle: 'individual',
-              quantidadeAtual: qtdAtual,
-              unidadeMedida: (prod.unidadeEstoque as any) || 'un',
-              estoqueMinimo: estMinimo,
-              estoqueIdeal: estMinimo * 4,
-              precoCusto: prod.precoCusto || 0,
-              precoVenda: prod.precoVenda,
-              statusDisponibilidade: status,
-              fotoUrl: prod.fotoUrl,
-            };
-            return { itens: [novoItem, ...state.itens] };
-          }
-        });
-      },
-
-      removerDoCardapio: (produtoId: string) => {
-        set((state) => ({
-          itens: state.itens.filter(
-            (it) => it.produtoId !== produtoId && it.id !== `est-card-${produtoId}`
-          ),
-        }));
-      },
-
-      abastecerRapido: (idOuProdutoId: string, quantidadeAdicional: number, _motivo?: string) => {
-        let produtoIdVinculado: string | undefined;
-        let novaQtdFinal = 0;
-
-        set((state) => {
-          const itensAtualizados = state.itens.map((it) => {
-            if (it.id === idOuProdutoId || it.produtoId === idOuProdutoId) {
-              const novaQtd = Math.max(0, Number((it.quantidadeAtual + quantidadeAdicional).toFixed(2)));
-              novaQtdFinal = novaQtd;
-              produtoIdVinculado = it.produtoId;
-
-              let novoStatus: ItemEstoque['statusDisponibilidade'] = 'disponivel';
-              if (novaQtd <= 0) novoStatus = 'esgotado';
-              else if (novaQtd <= it.estoqueMinimo) novoStatus = 'esgotando';
-
-              return {
-                ...it,
-                quantidadeAtual: novaQtd,
-                statusDisponibilidade: novoStatus,
-              };
-            }
-            return it;
-          });
-
-          return { itens: itensAtualizados };
-        });
-
-        // Sincroniza em tempo real com o Cardápio (useProductStore)
-        if (produtoIdVinculado) {
-          try {
-            const prodStore = useProductStore.getState();
-            prodStore.editarProduto(produtoIdVinculado, {
-              quantidadeEstoque: novaQtdFinal,
-              disponivel: novaQtdFinal > 0,
-            });
-          } catch (e) {
-            console.error('Erro ao refletir abastecimento no Cardapio:', e);
-          }
+      // ==============================================================
+      // BAIXA AUTOMÁTICA EM VENDAS COM FICHA TÉCNICA (SEÇÃO 2 E 4)
+      // ==============================================================
+      processarBaixaVenda: (venda) => {
+        const state = get();
+        // Proteção contra baixas duplicadas para o mesmo pedido (idempotência)
+        if (state.pedidosProcessados.includes(venda.id)) {
+          return { sucesso: false, movimentacoesGeradas: 0 };
         }
-      },
 
-      ajustarQuantidadeEstoque: (idOuProdutoId: string, novaQuantidade: number) => {
-        let produtoIdVinculado: string | undefined;
-        const qtdAjustada = Math.max(0, Number(novaQuantidade.toFixed(2)));
+        const novasMovimentacoes: MovimentacaoEstoque[] = [];
+        const itensAtuais = state.itens.map((item) => ({ ...item }));
+        const agoraTexto =
+          new Date().toLocaleDateString('pt-BR') +
+          ' ' +
+          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        set((state) => {
-          const itensAtualizados = state.itens.map((it) => {
-            if (it.id === idOuProdutoId || it.produtoId === idOuProdutoId) {
-              produtoIdVinculado = it.produtoId;
+        venda.itens.forEach((itemVendido) => {
+          // 1. Caso o item do prato possua Ficha Técnica / Ingredientes vinculados
+          if (itemVendido.fichaTecnica && itemVendido.fichaTecnica.length > 0) {
+            itemVendido.fichaTecnica.forEach((ing) => {
+              const itemIdx = itensAtuais.findIndex((it) => it.id === ing.ingredienteId);
+              if (itemIdx > -1) {
+                const itemEst = itensAtuais[itemIdx];
+                const qtdPorPorcaoNaUnidadeEstoque = converterParaUnidadeEstoque(
+                  ing.quantidade,
+                  ing.unidadeMedida,
+                  itemEst.unidadeMedida
+                );
+                const totalConsumo = Number((qtdPorPorcaoNaUnidadeEstoque * itemVendido.quantidade).toFixed(4));
+                const novoSaldo = Math.max(0, Number((itemEst.quantidadeAtual - totalConsumo).toFixed(4)));
 
-              let novoStatus: ItemEstoque['statusDisponibilidade'] = 'disponivel';
-              if (qtdAjustada <= 0) novoStatus = 'esgotado';
-              else if (qtdAjustada <= it.estoqueMinimo) novoStatus = 'esgotando';
-
-              return {
-                ...it,
-                quantidadeAtual: qtdAjustada,
-                statusDisponibilidade: novoStatus,
-              };
-            }
-            return it;
-          });
-
-          return { itens: itensAtualizados };
-        });
-
-        // Sincroniza em tempo real com o Cardápio
-        if (produtoIdVinculado) {
-          try {
-            const prodStore = useProductStore.getState();
-            prodStore.editarProduto(produtoIdVinculado, {
-              quantidadeEstoque: qtdAjustada,
-              disponivel: qtdAjustada > 0,
-            });
-          } catch (e) {
-            console.error('Erro ao ajustar quantidade no Cardapio:', e);
-          }
-        }
-      },
-
-      sincronizarTodosOsProdutosDoCardapio: (produtos: Produto[]) => {
-        produtos.forEach((p) => {
-          get().sincronizarProdutoDoCardapio(p);
-        });
-      },
-
-      baixarEstoquePorVenda: (produtoNomeOuId, quantidade) => {
-        const produtosZerados: string[] = [];
-
-        set((state) => ({
-          itens: state.itens.map((item) => {
-            const match =
-              item.produtoId === produtoNomeOuId ||
-              item.id === produtoNomeOuId ||
-              item.nome.toLowerCase() === produtoNomeOuId.toLowerCase() ||
-              item.nome.toLowerCase().includes(produtoNomeOuId.toLowerCase()) ||
-              produtoNomeOuId.toLowerCase().includes(item.nome.toLowerCase());
-
-            if (match) {
-              const novaQtd = Math.max(0, Number((item.quantidadeAtual - quantidade).toFixed(2)));
-              let novoStatus: ItemEstoque['statusDisponibilidade'] = 'disponivel';
-
-              // Regra de segurança: 0 ou menos = esgotado
-              if (novaQtd <= 0) {
-                novoStatus = 'esgotado';
-                if (item.produtoId) {
-                  produtosZerados.push(item.produtoId);
+                itemEst.quantidadeAtual = novoSaldo;
+                let novoStatus = itemEst.statusDisponibilidade;
+                if (itemEst.unidadeMedida === 'un' || itemEst.categoria === 'bebidas') {
+                  if (novoSaldo <= 5) novoStatus = 'esgotado';
+                  else if (novoSaldo <= itemEst.estoqueMinimo) novoStatus = 'esgotando';
+                  else novoStatus = 'disponivel';
+                } else {
+                  if (novoSaldo <= 0.05) novoStatus = 'esgotado';
+                  else if (novoSaldo <= itemEst.estoqueMinimo) novoStatus = 'esgotando';
+                  else novoStatus = 'disponivel';
                 }
-              } else if (novaQtd <= item.estoqueMinimo) {
-                novoStatus = 'esgotando';
+                itemEst.statusDisponibilidade = novoStatus;
+
+                novasMovimentacoes.push({
+                  id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                  dataHora: agoraTexto,
+                  itemId: itemEst.id,
+                  itemNome: itemEst.nome,
+                  tipo: 'saida_venda',
+                  quantidade: totalConsumo,
+                  unidadeMedida: itemEst.unidadeMedida,
+                  motivo: `Venda #${venda.id}: ${itemVendido.quantidade}x ${itemVendido.nome}`,
+                  pedidoId: venda.id,
+                  responsavel: venda.operador || 'Operador Caixa',
+                  saldoApos: novoSaldo,
+                });
               }
-
-              return { ...item, quantidadeAtual: novaQtd, statusDisponibilidade: novoStatus };
-            }
-            return item;
-          }),
-        }));
-
-        // Se o produto zerou no estoque, pausa automaticamente a venda no Cardápio!
-        if (produtosZerados.length > 0) {
-          try {
-            const prodStore = useProductStore.getState();
-            produtosZerados.forEach((pId) => {
-              prodStore.editarProduto(pId, { disponivel: false, quantidadeEstoque: 0 });
             });
-          } catch (e) {
-            console.error('Erro ao pausar prato zerado no Cardapio:', e);
+          } else {
+            // 2. Se o prato não possui ficha técnica mas é um produto de controle individual (ex: cerveja/refrigerante)
+            const itemIdx = itensAtuais.findIndex(
+              (it) =>
+                it.metodoControle === 'individual' &&
+                (it.nome.toLowerCase() === itemVendido.nome.toLowerCase() ||
+                  it.nome.toLowerCase().includes(itemVendido.nome.toLowerCase()) ||
+                  itemVendido.nome.toLowerCase().includes(it.nome.toLowerCase()))
+            );
+
+            if (itemIdx > -1) {
+              const itemEst = itensAtuais[itemIdx];
+              const totalConsumo = itemVendido.quantidade;
+              const novoSaldo = Math.max(0, itemEst.quantidadeAtual - totalConsumo);
+              itemEst.quantidadeAtual = novoSaldo;
+              let novoStatus = itemEst.statusDisponibilidade;
+              if (novoSaldo <= 5) novoStatus = 'esgotado';
+              else if (novoSaldo <= itemEst.estoqueMinimo) novoStatus = 'esgotando';
+              else novoStatus = 'disponivel';
+              itemEst.statusDisponibilidade = novoStatus;
+
+              novasMovimentacoes.push({
+                id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                dataHora: agoraTexto,
+                itemId: itemEst.id,
+                itemNome: itemEst.nome,
+                tipo: 'saida_venda',
+                quantidade: totalConsumo,
+                unidadeMedida: itemEst.unidadeMedida,
+                motivo: `Venda #${venda.id}: ${itemVendido.quantidade}x ${itemVendido.nome} (Item Direto)`,
+                pedidoId: venda.id,
+                responsavel: venda.operador || 'Operador Caixa',
+                saldoApos: novoSaldo,
+              });
+            }
           }
-        }
+        });
+
+        set({
+          itens: itensAtuais,
+          movimentacoes: [...novasMovimentacoes, ...state.movimentacoes],
+          pedidosProcessados: [venda.id, ...state.pedidosProcessados],
+        });
+
+        return { sucesso: true, movimentacoesGeradas: novasMovimentacoes.length };
       },
 
-      registrarSaidaManual: (itemId, quantidade, _motivo) => {
-        let produtoIdVinculado: string | undefined;
-        let novaQtdFinal = 0;
+      // ==============================================================
+      // BAIXA AUTOMÁTICA EM ITENS LANÇADOS NA MESA (FICHA TÉCNICA / DIRETO)
+      // ==============================================================
+      processarBaixaItensMesa: (numeroMesa, itensComanda, operador) => {
+        const state = get();
+        const itensAtuais = state.itens.map((it) => ({ ...it }));
+        const novasMovimentacoes: MovimentacaoEstoque[] = [];
+        const agoraTexto =
+          new Date().toLocaleDateString('pt-BR') +
+          ' ' +
+          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+        itensComanda.forEach((itemLancado) => {
+          // 1. Caso o prato possua Ficha Técnica cadastrada
+          const ficha = state.fichasTecnicas.find((f) => f.produtoId === itemLancado.produtoId);
+
+          if (ficha && ficha.componentes && ficha.componentes.length > 0) {
+            ficha.componentes.forEach((comp) => {
+              const itemIdx = itensAtuais.findIndex((it) => it.id === comp.ingredienteId);
+              if (itemIdx > -1) {
+                const itemEst = itensAtuais[itemIdx];
+                const qtdPorPorcaoNaUnidadeEstoque = converterParaUnidadeEstoque(
+                  comp.pesoGramas,
+                  'g',
+                  itemEst.unidadeMedida
+                );
+                const totalConsumo = Number((qtdPorPorcaoNaUnidadeEstoque * itemLancado.quantidade).toFixed(4));
+                const novoSaldo = Math.max(0, Number((itemEst.quantidadeAtual - totalConsumo).toFixed(4)));
+
+                itemEst.quantidadeAtual = novoSaldo;
+                let novoStatus = itemEst.statusDisponibilidade;
+                if (itemEst.unidadeMedida === 'un' || itemEst.categoria === 'bebidas') {
+                  if (novoSaldo <= 5) novoStatus = 'esgotado';
+                  else if (novoSaldo <= itemEst.estoqueMinimo) novoStatus = 'esgotando';
+                  else novoStatus = 'disponivel';
+                } else {
+                  if (novoSaldo <= 0.05) novoStatus = 'esgotado';
+                  else if (novoSaldo <= itemEst.estoqueMinimo) novoStatus = 'esgotando';
+                  else novoStatus = 'disponivel';
+                }
+                itemEst.statusDisponibilidade = novoStatus;
+
+                novasMovimentacoes.unshift({
+                  id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                  dataHora: agoraTexto,
+                  tipo: 'saida_venda',
+                  itemId: itemEst.id,
+                  itemNome: itemEst.nome,
+                  quantidade: totalConsumo,
+                  unidadeMedida: itemEst.unidadeMedida,
+                  motivo: `Mesa #${numeroMesa}: ${itemLancado.quantidade}x ${itemLancado.nome} (Ficha Técnica)`,
+                  pedidoId: `Mesa-${numeroMesa}`,
+                  responsavel: operador || 'Garçom',
+                  saldoApos: novoSaldo,
+                });
+              }
+            });
+          } else {
+            // 2. Se não possui ficha técnica mas é um produto de controle individual (ex: cerveja/refrigerante)
+            const itemIdx = itensAtuais.findIndex(
+              (it) =>
+                it.metodoControle === 'individual' &&
+                (it.nome.toLowerCase() === itemLancado.nome.toLowerCase() ||
+                  it.nome.toLowerCase().includes(itemLancado.nome.toLowerCase()) ||
+                  itemLancado.nome.toLowerCase().includes(it.nome.toLowerCase()))
+            );
+
+            if (itemIdx > -1) {
+              const itemEst = itensAtuais[itemIdx];
+              const totalConsumo = itemLancado.quantidade;
+              const novoSaldo = Math.max(0, itemEst.quantidadeAtual - totalConsumo);
+              itemEst.quantidadeAtual = novoSaldo;
+              let novoStatus = itemEst.statusDisponibilidade;
+              if (novoSaldo <= 5) novoStatus = 'esgotado';
+              else if (novoSaldo <= itemEst.estoqueMinimo) novoStatus = 'esgotando';
+              else novoStatus = 'disponivel';
+              itemEst.statusDisponibilidade = novoStatus;
+
+              novasMovimentacoes.unshift({
+                id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                dataHora: agoraTexto,
+                tipo: 'saida_venda',
+                itemId: itemEst.id,
+                itemNome: itemEst.nome,
+                quantidade: totalConsumo,
+                unidadeMedida: itemEst.unidadeMedida,
+                motivo: `Mesa #${numeroMesa}: ${itemLancado.quantidade}x ${itemLancado.nome} (Item Direto)`,
+                pedidoId: `Mesa-${numeroMesa}`,
+                responsavel: operador || 'Garçom',
+                saldoApos: novoSaldo,
+              });
+            }
+          }
+        });
+
+        set({
+          itens: itensAtuais,
+          movimentacoes: [...novasMovimentacoes, ...state.movimentacoes],
+        });
+
+        return { sucesso: true, movimentacoesGeradas: novasMovimentacoes.length };
+      },
+
+      // ==============================================================
+      // ESTORNO / CANCELAMENTO DE VENDA COM RESTITUIÇÃO AO ESTOQUE
+      // ==============================================================
+      estornarBaixaVenda: (venda, motivo, operador) => {
+        const state = get();
+        const novasMovimentacoes: MovimentacaoEstoque[] = [];
+        const itensAtuais = state.itens.map((item) => ({ ...item }));
+        const agoraTexto =
+          new Date().toLocaleDateString('pt-BR') +
+          ' ' +
+          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        venda.itens.forEach((itemVendido) => {
+          if (itemVendido.fichaTecnica && itemVendido.fichaTecnica.length > 0) {
+            itemVendido.fichaTecnica.forEach((ing) => {
+              const itemIdx = itensAtuais.findIndex((it) => it.id === ing.ingredienteId);
+              if (itemIdx > -1) {
+                const itemEst = itensAtuais[itemIdx];
+                const qtdPorPorcaoNaUnidadeEstoque = converterParaUnidadeEstoque(
+                  ing.quantidade,
+                  ing.unidadeMedida,
+                  itemEst.unidadeMedida
+                );
+                const totalDevolvido = Number((qtdPorPorcaoNaUnidadeEstoque * itemVendido.quantidade).toFixed(4));
+                const novoSaldo = Number((itemEst.quantidadeAtual + totalDevolvido).toFixed(4));
+                itemEst.quantidadeAtual = novoSaldo;
+                let novoStatus = itemEst.statusDisponibilidade;
+                if (novoSaldo > itemEst.estoqueMinimo) novoStatus = 'disponivel';
+                else if (novoSaldo > 0) novoStatus = 'esgotando';
+                itemEst.statusDisponibilidade = novoStatus;
+
+                novasMovimentacoes.push({
+                  id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                  dataHora: agoraTexto,
+                  itemId: itemEst.id,
+                  itemNome: itemEst.nome,
+                  tipo: 'estorno_cancelamento',
+                  quantidade: totalDevolvido,
+                  unidadeMedida: itemEst.unidadeMedida,
+                  motivo: `Estorno Venda #${venda.id}: ${motivo || 'Cancelamento'} (${itemVendido.quantidade}x ${itemVendido.nome})`,
+                  pedidoId: venda.id,
+                  responsavel: operador || 'Operador / Admin',
+                  saldoApos: novoSaldo,
+                });
+              }
+            });
+          } else {
+            const itemIdx = itensAtuais.findIndex(
+              (it) =>
+                it.metodoControle === 'individual' &&
+                (it.nome.toLowerCase() === itemVendido.nome.toLowerCase() ||
+                  it.nome.toLowerCase().includes(itemVendido.nome.toLowerCase()) ||
+                  itemVendido.nome.toLowerCase().includes(it.nome.toLowerCase()))
+            );
+
+            if (itemIdx > -1) {
+              const itemEst = itensAtuais[itemIdx];
+              const totalDevolvido = itemVendido.quantidade;
+              const novoSaldo = itemEst.quantidadeAtual + totalDevolvido;
+              itemEst.quantidadeAtual = novoSaldo;
+              let novoStatus = itemEst.statusDisponibilidade;
+              if (novoSaldo > itemEst.estoqueMinimo) novoStatus = 'disponivel';
+              itemEst.statusDisponibilidade = novoStatus;
+
+              novasMovimentacoes.push({
+                id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                dataHora: agoraTexto,
+                itemId: itemEst.id,
+                itemNome: itemEst.nome,
+                tipo: 'estorno_cancelamento',
+                quantidade: totalDevolvido,
+                unidadeMedida: itemEst.unidadeMedida,
+                motivo: `Estorno Venda #${venda.id}: ${motivo || 'Cancelamento'} (Item Direto)`,
+                pedidoId: venda.id,
+                responsavel: operador || 'Operador / Admin',
+                saldoApos: novoSaldo,
+              });
+            }
+          }
+        });
+
+        set({
+          itens: itensAtuais,
+          movimentacoes: [...novasMovimentacoes, ...state.movimentacoes],
+          pedidosProcessados: state.pedidosProcessados.filter((id) => id !== venda.id),
+        });
+
+        return { sucesso: true, itensRestaurados: novasMovimentacoes.length };
+      },
+
+      registrarMovimentacao: (mov) => {
+        const agoraTexto =
+          new Date().toLocaleDateString('pt-BR') +
+          ' ' +
+          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const novaMov: MovimentacaoEstoque = {
+          ...mov,
+          id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          dataHora: agoraTexto,
+        };
+        set((state) => ({ movimentacoes: [novaMov, ...state.movimentacoes] }));
+      },
+
+      baixarEstoquePorVenda: (produtoNome, quantidade) => {
         set((state) => ({
           itens: state.itens.map((item) => {
-            if (item.id === itemId) {
+            if (
+              item.nome.toLowerCase().includes(produtoNome.toLowerCase()) ||
+              produtoNome.toLowerCase().includes(item.nome.toLowerCase())
+            ) {
               const novaQtd = Math.max(0, Number((item.quantidadeAtual - quantidade).toFixed(2)));
-              novaQtdFinal = novaQtd;
-              produtoIdVinculado = item.produtoId;
-
-              let novoStatus = item.statusDisponibilidade;
-              if (novaQtd <= 0) novoStatus = 'esgotado';
-              else if (novaQtd <= item.estoqueMinimo) novoStatus = 'esgotando';
-
+              let novoStatus: ItemEstoque['statusDisponibilidade'] = 'disponivel';
+              if (item.unidadeMedida === 'un' || item.categoria === 'bebidas') {
+                if (novaQtd <= 5) novoStatus = 'esgotado';
+                else if (novaQtd <= item.estoqueMinimo) novoStatus = 'esgotando';
+              } else {
+                if (novaQtd <= 0) novoStatus = 'esgotado';
+                else if (novaQtd <= item.estoqueMinimo) novoStatus = 'esgotando';
+              }
               return { ...item, quantidadeAtual: novaQtd, statusDisponibilidade: novoStatus };
             }
             return item;
           }),
         }));
+      },
 
-        if (produtoIdVinculado) {
-          try {
-            const prodStore = useProductStore.getState();
-            prodStore.editarProduto(produtoIdVinculado, {
-              quantidadeEstoque: novaQtdFinal,
-              disponivel: novaQtdFinal > 0,
-            });
-          } catch (e) {
-            console.error('Erro ao refletir saída no Cardapio:', e);
+      registrarSaidaManual: (itemId, quantidade, motivo) => {
+        const state = get();
+        const agoraTexto =
+          new Date().toLocaleDateString('pt-BR') +
+          ' ' +
+          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        let itemModificado: ItemEstoque | null = null;
+        const itensAtualizados = state.itens.map((item) => {
+          if (item.id === itemId) {
+            const novaQtd = Math.max(0, item.quantidadeAtual - quantidade);
+            let novoStatus = item.statusDisponibilidade;
+            if (novaQtd <= 5 && (item.unidadeMedida === 'un' || item.categoria === 'bebidas')) novoStatus = 'esgotado';
+            else if (novaQtd <= item.estoqueMinimo) novoStatus = 'esgotando';
+            itemModificado = { ...item, quantidadeAtual: novaQtd, statusDisponibilidade: novoStatus };
+            return itemModificado;
           }
+          return item;
+        });
+
+        const novasMovimentacoes = [...state.movimentacoes];
+        if (itemModificado) {
+          const itemCast = itemModificado as ItemEstoque;
+          novasMovimentacoes.unshift({
+            id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            dataHora: agoraTexto,
+            itemId: itemCast.id,
+            itemNome: itemCast.nome,
+            tipo: 'saida_manual',
+            quantidade,
+            unidadeMedida: itemCast.unidadeMedida,
+            motivo: motivo || 'Uso operacional / descarte interno',
+            responsavel: 'Operador / Cozinha',
+            saldoApos: itemCast.quantidadeAtual,
+          });
         }
+
+        set({
+          itens: itensAtualizados,
+          movimentacoes: novasMovimentacoes,
+        });
       },
 
       ajustarSobraDiaAnterior: (itemId, sobra) => {
@@ -904,93 +949,77 @@ export const useEstoqueStore = create<EstoqueState>()(
       },
 
       editarItemEstoque: (id, dados) => {
-        let produtoIdVinculado: string | undefined;
-        let novaQtdFinal: number | undefined;
-
         set((state) => ({
-          itens: state.itens.map((item) => {
-            if (item.id === id) {
-              const atualizado = { ...item, ...dados };
-              produtoIdVinculado = atualizado.produtoId;
-              novaQtdFinal = atualizado.quantidadeAtual;
-              return atualizado;
-            }
-            return item;
-          }),
+          itens: state.itens.map((item) => (item.id === id ? { ...item, ...dados } : item)),
         }));
+      },
 
-        if (produtoIdVinculado && novaQtdFinal !== undefined) {
-          try {
-            const prodStore = useProductStore.getState();
-            prodStore.editarProduto(produtoIdVinculado, {
-              quantidadeEstoque: novaQtdFinal,
-              disponivel: novaQtdFinal > 0,
-            });
-          } catch (e) {
-            console.error('Erro ao sincronizar edicao com Cardapio:', e);
-          }
-        }
+      removerItemEstoque: (id) => {
+        set((state) => ({
+          itens: state.itens.filter((item) => item.id !== id),
+        }));
       },
 
       adicionarCompra: (compra) => {
         const novoId = `cmp-${Date.now().toString().slice(-4)}`;
         const novoRegistro: RegistroCompra = { ...compra, id: novoId };
-        const produtosReposto: { id: string; qtd: number }[] = [];
+        const agoraTexto =
+          new Date().toLocaleDateString('pt-BR') +
+          ' ' +
+          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         set((state) => {
+          let itemComprado: ItemEstoque | null = null;
           const itensAtualizados = state.itens.map((item) => {
-            if (
-              item.nome.trim().toLowerCase() === compra.produtoNome.trim().toLowerCase() ||
-              item.id === compra.produtoNome
-            ) {
+            if (item.nome.toLowerCase() === compra.produtoNome.toLowerCase()) {
               const qtdAdicionada = compra.quantidade;
-              const novaQtd = Number((item.quantidadeAtual + qtdAdicionada).toFixed(2));
-              let novoStatus: ItemEstoque['statusDisponibilidade'] = 'disponivel';
-              if (novaQtd <= 0) novoStatus = 'esgotado';
-              else if (novaQtd <= item.estoqueMinimo) novoStatus = 'esgotando';
-
-              if (item.produtoId && novaQtd > 0) {
-                produtosReposto.push({ id: item.produtoId, qtd: novaQtd });
-              }
-
-              return {
+              const novaQtd = item.quantidadeAtual + qtdAdicionada;
+              let novoStatus = item.statusDisponibilidade;
+              if (novaQtd > item.estoqueMinimo) novoStatus = 'disponivel';
+              itemComprado = {
                 ...item,
                 quantidadeAtual: novaQtd,
                 precoCusto: compra.precoUnitario,
                 statusDisponibilidade: novoStatus,
               };
+              return itemComprado;
             }
             return item;
           });
 
+          const novasMovimentacoes = [...state.movimentacoes];
+          if (itemComprado) {
+            const itemCast = itemComprado as ItemEstoque;
+            novasMovimentacoes.unshift({
+              id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              dataHora: agoraTexto,
+              itemId: itemCast.id,
+              itemNome: itemCast.nome,
+              tipo: 'entrada_compra',
+              quantidade: compra.quantidade,
+              unidadeMedida: compra.unidadeMedida,
+              motivo: `Compra NF / Fornecedor: ${compra.fornecedorOuLocal}`,
+              responsavel: 'Compras / Almoxarifado',
+              saldoApos: itemCast.quantidadeAtual,
+            });
+          }
+
           return {
             compras: [novoRegistro, ...state.compras],
             itens: itensAtualizados,
+            movimentacoes: novasMovimentacoes,
           };
         });
-
-        // Se uma compra repôs o estoque de um prato vinculado, reativa automaticamente no Cardápio!
-        if (produtosReposto.length > 0) {
-          try {
-            const prodStore = useProductStore.getState();
-            produtosReposto.forEach((p) => {
-              prodStore.editarProduto(p.id, {
-                disponivel: true,
-                quantidadeEstoque: p.qtd,
-              });
-            });
-          } catch (e) {
-            console.error('Erro ao reativar prato abastecido no Cardapio:', e);
-          }
-        }
       },
 
       salvarFichaTecnica: (ficha) => {
         set((state) => {
-          const existe = state.fichasTecnicas.some((f) => f.id === ficha.id);
+          const existe = state.fichasTecnicas.some((f) => f.id === ficha.id || f.produtoId === ficha.produtoId);
           if (existe) {
             return {
-              fichasTecnicas: state.fichasTecnicas.map((f) => (f.id === ficha.id ? ficha : f)),
+              fichasTecnicas: state.fichasTecnicas.map((f) =>
+                f.id === ficha.id || f.produtoId === ficha.produtoId ? ficha : f
+              ),
             };
           }
           return { fichasTecnicas: [...state.fichasTecnicas, ficha] };

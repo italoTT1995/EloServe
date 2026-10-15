@@ -37,7 +37,8 @@ export default function PainelDono() {
   const tenantAtual = getTenantAtivo();
   const currentTenantId = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
   const { usuarioLogado } = useAuthStore();
-  const { caixaAtual, mesas, pedidosKDS } = useAppStore();
+  const { caixaAtual, getMesasPorTenant, pedidosKDS } = useAppStore();
+  const mesas = getMesasPorTenant(currentTenantId);
   const { tema, alternarTema } = useThemeStore();
   const isWhite = tema === 'light';
   const { getProdutosPorTenant, alternarDisponibilidade, atualizarPreco } = useProductStore();

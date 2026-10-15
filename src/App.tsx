@@ -15,6 +15,7 @@ import Estoque from './pages/Estoque';
 import Delivery from './pages/Delivery';
 import Funcionarios from './pages/Funcionarios';
 import PainelDono from './pages/PainelDono';
+import AutoatendimentoMesa from './pages/AutoatendimentoMesa';
 import { useAuthStore } from './store/useAuthStore';
 import { useSaaSStore } from './store/useSaaSStore';
 
@@ -47,6 +48,9 @@ export default function App() {
       <Routes>
         {/* Rota Pública de Login */}
         <Route path="/login" element={<Login />} />
+
+        {/* Rota Pública de Autoatendimento da Mesa via QR Code (Seção 4.12) */}
+        <Route path="/mesa/:numero" element={<AutoatendimentoMesa />} />
 
         {/* Rotas Protegidas dentro do Layout da Aplicação */}
         <Route

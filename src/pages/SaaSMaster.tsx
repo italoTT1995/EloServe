@@ -3317,39 +3317,59 @@ export default function SaaSMaster() {
                   onClick={() => setPlanoIdRegrasEmEdicao(p.id)}
                   className={`p-5 rounded-3xl border text-left transition-all cursor-pointer relative ${
                     isSelected
-                      ? 'bg-gradient-to-b from-purple-950/60 to-slate-900 border-purple-500 shadow-2xl shadow-purple-500/20 ring-2 ring-purple-500/40'
+                      ? isWhite
+                        ? 'bg-purple-50/90 border-purple-600 shadow-xl shadow-purple-500/10 ring-2 ring-purple-600/40'
+                        : 'bg-gradient-to-b from-purple-950/60 to-slate-900 border-purple-500 shadow-2xl shadow-purple-500/20 ring-2 ring-purple-500/40'
+                      : isWhite
+                      ? 'bg-white border-slate-200 hover:border-purple-300 hover:bg-purple-50/30'
                       : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                    <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
+                      isWhite ? (isSelected ? 'text-purple-700' : 'text-slate-500') : (isSelected ? 'text-purple-300' : 'text-slate-400')
+                    }`}>
                       Plano {p.id}
                     </span>
                     {p.destaque && (
-                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold border ${
+                        isWhite ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                      }`}>
                         Mais Vendido
                       </span>
                     )}
                   </div>
 
-                  <h4 className="text-base font-black text-white mt-1">{p.nome}</h4>
+                  <h4 className={`text-base font-black mt-1 ${isWhite ? (isSelected ? 'text-purple-950 font-black' : 'text-slate-900') : 'text-white'}`}>
+                    {p.nome}
+                  </h4>
                   <div className="flex items-baseline gap-1 mt-2">
-                    <span className="text-2xl font-black text-emerald-400 font-mono">
+                    <span className={`text-2xl font-black font-mono ${isWhite ? 'text-emerald-700' : 'text-emerald-400'}`}>
                       R$ {p.precoMensal.toFixed(2)}
                     </span>
-                    <span className="text-xs text-slate-400">/mês</span>
+                    <span className={`text-xs ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>/mês</span>
                   </div>
 
-                  <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400 font-medium">Assinantes Ativos:</span>
-                    <span className="font-bold text-white font-mono bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
+                  <div className={`mt-3 pt-3 border-t flex items-center justify-between text-[11px] ${
+                    isWhite ? 'border-purple-200/80' : 'border-slate-800/80'
+                  }`}>
+                    <span className={isWhite ? 'text-slate-600 font-medium' : 'text-slate-400 font-medium'}>Assinantes Ativos:</span>
+                    <span className={`font-bold font-mono px-2 py-0.5 rounded-md border ${
+                      isWhite
+                        ? isSelected
+                          ? 'bg-white text-purple-950 border-purple-300 font-bold'
+                          : 'bg-slate-100 text-slate-800 border-slate-200'
+                        : 'bg-slate-950 text-white border border-slate-800'
+                    }`}>
                       {totalLojasNestePlano} restaurantes
                     </span>
                   </div>
 
                   {isSelected && (
-                    <div className="mt-3 flex items-center gap-1.5 text-xs text-purple-400 font-bold">
-                      <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
+                    <div className={`mt-3 flex items-center gap-1.5 text-xs font-bold ${
+                      isWhite ? 'text-purple-700' : 'text-purple-400'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full animate-pulse ${isWhite ? 'bg-purple-600' : 'bg-purple-400'}`}></span>
                       <span>Editando Regras Deste Plano</span>
                     </div>
                   )}

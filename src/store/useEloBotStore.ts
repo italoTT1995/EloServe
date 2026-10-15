@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Produto } from '../types';
 import { tocarAlertaTransbordo } from '../utils/audioAlert';
+import { useSaaSStore } from './useSaaSStore';
 
 export interface MensagemWhatsApp {
   id: string;
@@ -19,6 +20,9 @@ export interface MensagemWhatsApp {
     endereco?: string;
     formaPagamento?: string;
     pedidoId?: string;
+    numeroPedido?: number;
+    enviadoParaCozinha?: boolean;
+    chavePix?: string;
   };
 }
 
@@ -30,6 +34,10 @@ export interface PedidoRascunhoWhatsApp {
   endereco?: string;
   formaPagamento?: 'pix' | 'cartao_entrega' | 'dinheiro';
   observacoes?: string;
+  pedidoId?: string;
+  numeroPedido?: number;
+  enviadoParaCozinha?: boolean;
+  chavePix?: string;
 }
 
 export interface ConversaWhatsApp {
@@ -43,6 +51,9 @@ export interface ConversaWhatsApp {
   naoLidas: number;
   mensagens: MensagemWhatsApp[];
   pedidoRascunho?: PedidoRascunhoWhatsApp | null;
+  mesa?: string | null;
+  tenantId?: string | null;
+  nomeLoja?: string | null;
 }
 
 export interface ConfigEloBot {
@@ -65,6 +76,17 @@ export interface ConfigEloBot {
   horarioFuncionamento: string;
   totalMensagensHoje: number;
   tempoRespostaMedioSeg: number;
+  qrCodeDataUrl?: string;
+  isServidorRealAtivo?: boolean;
+
+  // Palavras-chave padrão e gatilhos configuráveis por restaurante
+  palavrasCardapio: string; // Palavras que acionam o cardápio
+  palavrasAtendente: string; // Palavras que acionam transbordo humano
+  palavrasPix: string; // Palavras que disparam a chave PIX
+  mensagemBoasVindas?: string; // Saudação inicial customizada
+  mensagemCardapio?: string; // Mensagem de apresentação do cardápio
+  mensagemTransbordo?: string; // Mensagem ao chamar atendente humano
+  mensagemPix?: string; // Mensagem com dados de pagamento PIX
 }
 
 interface EloBotState {
@@ -74,15 +96,24 @@ interface EloBotState {
 
   // Ações de Configuração
   getConfig: (tenantId: string) => ConfigEloBot;
-  atualizarConfig: (tenantId: string, dados: Partial<ConfigEloBot>) => void;
+  atualizarConfig: (tenantId: string, dados: Partial<ConfigEloBot>, sincronizarServidor?: boolean) => void;
+  sincronizarConfigComServidor: (tenantId: string, produtos?: Produto[], nomeLoja?: string) => Promise<boolean>;
   conectarInstancia: (tenantId: string) => void;
   desconectarInstancia: (tenantId: string) => void;
   gerarNovoQrCode: (tenantId: string) => void;
   concluirLeituraQrCode: (tenantId: string) => void;
 
+  // Ações com o Servidor Baileys Real (WhatsApp Físico)
+  conectarSSE: (tenantId: string) => void;
+  iniciarConexaoBaileysReal: (tenantId: string) => Promise<void>;
+  desconectarBaileysReal: (tenantId: string) => Promise<void>;
+  sincronizarStatusBaileysReal: (tenantId: string) => Promise<void>;
+  enviarMensagemRealWhatsApp: (telefone: string, texto: string) => Promise<boolean>;
+
   // Ações de Conversas
   getConversas: (tenantId: string) => ConversaWhatsApp[];
   selecionarConversa: (id: string | null) => void;
+  atualizarNomeCliente: (tenantId: string, conversaId: string, novoNome: string) => Promise<boolean>;
   getConversaAtiva: (tenantId: string) => ConversaWhatsApp | undefined;
   enviarMensagemCliente: (tenantId: string, conversaId: string, texto: string, produtosLoja: Produto[], nomeLoja?: string) => void;
   enviarMensagemHumana: (tenantId: string, conversaId: string, texto: string) => void;
@@ -93,6 +124,7 @@ interface EloBotState {
   removerConversa: (tenantId: string, conversaId: string) => void;
   marcarComoLida: (tenantId: string, conversaId: string) => void;
   notificarStatusPedidoWhatsApp: (tenantId: string, telefone: string, clienteNome: string, numeroPedido: number, novoStatus: string) => void;
+  marcarPedidoComoEnviado: (tenantId: string, conversaId: string, pedidoId: string, numeroPedido: number) => void;
   dispararCampanhaPromocional: (tenantId: string, clientes: Array<{ nome: string; telefone: string }>, mensagem: string, cupom?: string) => void;
   getTotalTransbordosPendentes: (tenantId: string) => number;
 }
@@ -116,149 +148,25 @@ const CONFIG_PADRAO: ConfigEloBot = {
   horarioFuncionamento: 'Terça a Domingo das 18h00 às 23h30',
   totalMensagensHoje: 47,
   tempoRespostaMedioSeg: 1.2,
+  palavrasCardapio: 'A, a, opcao a, 1, cardapio, menu, pratos, opcoes',
+  palavrasAtendente: 'B, b, opcao b, 2, atendente, humano, suporte, ajuda',
+  palavrasPix: 'C, c, opcao c, 3, pix, chave pix, pagar, pagamento',
+  mensagemBoasVindas: 'Olá {nome}! Seja muito bem-vindo ao {loja}! 😊\n\nComo posso te ajudar hoje? Digite apenas a letra da sua opção:\n👉 A - Ver Cardápio e Preços\n👉 B - Falar com Atendente Humano\n👉 C - Chave PIX do Restaurante\n\n_(Ou se preferir, digite seu pedido diretamente!)_',
+  mensagemCardapio: 'Olá {nome}! 📋 Segue o Cardápio Selecionado do {loja}:\n\n(Para fazer seu pedido, digite o nome do prato ou digite B para falar com um atendente)',
+  mensagemTransbordo: 'Com certeza, {nome}! 👨‍💼 Estou transferindo seu atendimento para nossa equipe do {loja} agora mesmo. Aguarde um instante!',
+  mensagemPix: 'A chave PIX oficial do {loja} é:\n🔑 {chave}\n\nAssim que fizer o pagamento, envie o comprovante por aqui para prepararmos seu pedido!',
 };
 
-const CONVERSAS_INICIAIS_TENANT_01: ConversaWhatsApp[] = [
-  {
-    id: 'conv-01',
-    clienteNome: 'Mariana Costa',
-    clienteTelefone: '(31) 98765-4321',
-    status: 'ia',
-    ultimaMensagem: 'Perfeito! Já confirmamos seu pedido de Picanha na Brasa.',
-    ultimaHora: '19:44',
-    naoLidas: 0,
-    mensagens: [
-      {
-        id: 'm1',
-        remetente: 'cliente',
-        texto: 'Boa noite! Vocês têm opções de carnes nobres para 2 pessoas no cardápio de hoje?',
-        hora: '19:40',
-        statusEnvio: 'lido',
-        tipo: 'texto',
-      },
-      {
-        id: 'm2',
-        remetente: 'bot',
-        texto: 'Olá, Mariana! Seja muito bem-vinda à Churrascaria & Parrilla Fogo de Minas! 🥩🔥 Temos sim! Nossa *Picanha na Brasa Premium (600g)* e a *Costela Bovina no Bafo 12h* acompanham arroz biro-biro, farofa de ovos e vinagrete. Deseja que eu envie o cardápio completo ou anote o seu pedido?',
-        hora: '19:41',
-        statusEnvio: 'lido',
-        tipo: 'texto',
-        cardapioItensDestaque: [
-          { nome: 'Picanha na Brasa Premium (600g)', preco: 89.9, descricao: 'Grelhada na brasa com chimichurri da casa' },
-          { nome: 'Costela Bovina no Bafo 12h (700g)', preco: 79.9, descricao: 'Derretendo com mandioca na manteiga' },
-        ],
-      },
-      {
-        id: 'm3',
-        remetente: 'cliente',
-        texto: 'Quero pedir uma Picanha na Brasa com 2 Chopps para a Rua Paraíba, 420 Savassi. Pode ser no PIX?',
-        hora: '19:43',
-        statusEnvio: 'lido',
-        tipo: 'texto',
-      },
-      {
-        id: 'm4',
-        remetente: 'bot',
-        texto: 'Excelente escolha! 🥩🍺 Anotei seu pedido:\n\n• 1x Picanha na Brasa Premium (R$ 89,90)\n• 2x Chopp Artesanal 500ml (R$ 29,80)\n• Taxa de entrega Savassi: R$ 4,50\n*Total: R$ 124,20*\n\nNossa chave PIX é: *financeiro@eloserve.com.br*. O tempo de entrega estimado é de 35 a 45 minutos. Já enviamos direto para a grelha!',
-        hora: '19:44',
-        statusEnvio: 'lido',
-        tipo: 'pedido',
-        resumoPedido: {
-          itens: [
-            { nome: 'Picanha na Brasa Premium (600g)', quantidade: 1, preco: 89.9 },
-            { nome: 'Chopp Artesanal Pilsen 500ml', quantidade: 2, preco: 14.9 },
-          ],
-          subtotal: 119.7,
-          taxaEntrega: 4.5,
-          total: 124.2,
-          endereco: 'Rua Paraíba, 420 - Savassi',
-          formaPagamento: 'PIX',
-        },
-      },
-    ],
-    pedidoRascunho: {
-      itens: [
-        { nome: 'Picanha na Brasa Premium (600g)', quantidade: 1, preco: 89.9 },
-        { nome: 'Chopp Artesanal Pilsen 500ml', quantidade: 2, preco: 14.9 },
-      ],
-      subtotal: 119.7,
-      taxaEntrega: 4.5,
-      total: 124.2,
-      endereco: 'Rua Paraíba, 420 - Savassi',
-      formaPagamento: 'pix',
-    },
-  },
-  {
-    id: 'conv-02',
-    clienteNome: 'Carlos Eduardo Mendes',
-    clienteTelefone: '(31) 99344-7711',
-    status: 'humano',
-    ultimaMensagem: 'Olá Carlos, aqui é o Rodrigo da gerência! Em que posso te ajudar?',
-    ultimaHora: '20:12',
-    naoLidas: 1,
-    mensagens: [
-      {
-        id: 'm21',
-        remetente: 'cliente',
-        texto: 'Preciso trocar o endereço de entrega do meu pedido que fiz há 5 minutos! Por favor me ajuda.',
-        hora: '20:10',
-        statusEnvio: 'lido',
-        tipo: 'texto',
-      },
-      {
-        id: 'm22',
-        remetente: 'cliente',
-        texto: 'Quero falar com um atendente humano urgente',
-        hora: '20:10',
-        statusEnvio: 'lido',
-        tipo: 'texto',
-      },
-      {
-        id: 'm23',
-        remetente: 'bot',
-        texto: 'Com certeza, Carlos! Estou transferindo seu atendimento para a nossa equipe humana agora mesmo. Um atendente entrará no chat em instantes. 👤🔔',
-        hora: '20:11',
-        statusEnvio: 'lido',
-        tipo: 'aviso',
-      },
-      {
-        id: 'm24',
-        remetente: 'humano',
-        texto: 'Olá Carlos! Aqui é o Rodrigo da gerência. Qual o novo endereço e complemento? Vou avisar o motoboy antes da saída.',
-        hora: '20:12',
-        statusEnvio: 'entregue',
-        tipo: 'texto',
-      },
-    ],
-  },
-  {
-    id: 'conv-03',
-    clienteNome: 'Ana Paula Rezende',
-    clienteTelefone: '(31) 98822-3344',
-    status: 'ia',
-    ultimaMensagem: 'Qual é o horário de almoço de vocês aos domingos?',
-    ultimaHora: '20:18',
-    naoLidas: 0,
-    mensagens: [
-      {
-        id: 'm31',
-        remetente: 'cliente',
-        texto: 'Olá! Vocês abrem para almoço no domingo com música ao vivo?',
-        hora: '20:17',
-        statusEnvio: 'lido',
-        tipo: 'texto',
-      },
-      {
-        id: 'm32',
-        remetente: 'bot',
-        texto: 'Olá, Ana Paula! Sim! Aos domingos abrimos das 11h30 às 17h00 com nosso clássico Rodízio & Parrilla de Cortes Nobres e música ao vivo a partir das 13h. 🎸🥩 Recomendamos fazer reserva de mesa antecipada. Gostaria de reservar para quantas pessoas?',
-        hora: '20:18',
-        statusEnvio: 'lido',
-        tipo: 'texto',
-      },
-    ],
-  },
-];
+const CONVERSAS_INICIAIS_TENANT_01: ConversaWhatsApp[] = [];
+
+let sseConnection: EventSource | null = null;
+const SERVER_URL =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' && window.location.port === '5174'
+    ? 'http://localhost:3001'
+    : typeof window !== 'undefined'
+    ? window.location.origin
+    : 'http://localhost:3001');
 
 export const useEloBotStore = create<EloBotState>()(
   persist(
@@ -269,25 +177,54 @@ export const useEloBotStore = create<EloBotState>()(
           nomeAgente: 'EloBot Fogo de Minas',
           instrucoesCustomizadas: 'Especialista em carnes nobres, ponto da carne (mal passado, ao ponto, bem passado) e chopp artesanal gelado.',
           chavePix: 'financeiro@fogodeminas.com.br',
+          palavrasCardapio: 'cardapio, cardápio, menu, carnes, pratos, opcoes, precos, churrasco, cortes',
+          palavrasAtendente: 'humano, atendente, garcom, garçom, ajuda, suporte, falar com atendente',
+          palavrasPix: 'pix, chave, chave pix, pagar, conta, pagamento',
         },
         'tenant-02': {
           ...CONFIG_PADRAO,
           nomeAgente: 'EloBot Bella Napoli',
-          instrucoesCustomizadas: 'Especialista em pizzas de fermentação lenta artesanal e vinhos italianos.',
+          instrucoesCustomizadas: 'Especialista em pizzas de fermentação lenta artesanal e vinhos italianos. Sugira borda recheada de catupiry.',
           chavePix: 'contato@bellanapoli.com.br',
+          palavrasCardapio: 'cardapio, cardápio, menu, pizzas, sabores, massas, vinhos, precos',
+          palavrasAtendente: 'humano, atendente, ajuda, suporte, falar com atendente',
+          palavrasPix: 'pix, chave, chave pix, pagar, pagamento, conta',
         },
       },
       conversasPorTenant: {
         'tenant-01': CONVERSAS_INICIAIS_TENANT_01,
       },
-      conversaAtivaId: 'conv-01',
+      conversaAtivaId: null,
 
       getConfig: (tenantId: string) => {
         const state = get();
-        return state.configuracoes[tenantId] || { ...CONFIG_PADRAO, nomeAgente: `EloBot Atendente` };
+        if (state.configuracoes[tenantId]) {
+          return state.configuracoes[tenantId];
+        }
+
+        let nomeLoja = 'Restaurante';
+        let chavePix = 'financeiro@eloserve.com.br';
+        try {
+          const tenant = useSaaSStore.getState().tenants.find((t) => t.id === tenantId);
+          if (tenant) {
+            nomeLoja = tenant.nomeFantasia;
+            if (tenant.documento) chavePix = tenant.documento;
+          }
+        } catch {}
+
+        return {
+          ...CONFIG_PADRAO,
+          nomeLoja,
+          nomeAgente: `EloBot ${nomeLoja.split(' ')[0]}`,
+          chavePix,
+          mensagemBoasVindas: `Olá {nome}! Seja muito bem-vindo ao ${nomeLoja}! 😊\n\nComo posso te ajudar hoje? Digite apenas a letra da sua opção:\n👉 A - Ver Cardápio e Preços\n👉 B - Falar com Atendente Humano\n👉 C - Chave PIX do Restaurante\n\n_(Ou se preferir, digite seu pedido diretamente!)_`,
+          mensagemCardapio: `Olá {nome}! 📋 Segue o Cardápio Selecionado do ${nomeLoja}:\n\n(Para fazer seu pedido, digite o nome do prato ou digite B para falar com um atendente)`,
+          mensagemTransbordo: `Com certeza, {nome}! 👨‍💼 Estou transferindo seu atendimento para nossa equipe do ${nomeLoja} agora mesmo. Aguarde um instante!`,
+          mensagemPix: `A chave PIX oficial do ${nomeLoja} é:\n🔑 {chave}\n\nAssim que fizer o pagamento, envie o comprovante por aqui para prepararmos seu pedido!`,
+        };
       },
 
-      atualizarConfig: (tenantId: string, dados: Partial<ConfigEloBot>) => {
+      atualizarConfig: (tenantId: string, dados: Partial<ConfigEloBot>, sincronizarServidor = false) => {
         set((state) => ({
           configuracoes: {
             ...state.configuracoes,
@@ -297,6 +234,65 @@ export const useEloBotStore = create<EloBotState>()(
             },
           },
         }));
+        if (sincronizarServidor) {
+          get().sincronizarConfigComServidor(tenantId).catch(() => {});
+        }
+      },
+
+      sincronizarConfigComServidor: async (tenantId: string, produtos?: Produto[], nomeLoja?: string) => {
+        try {
+          const cfg = get().getConfig(tenantId);
+          const saasStore = (await import('./useSaaSStore')).useSaaSStore.getState();
+          const storeTenant = saasStore.tenants.find((t) => t.id === tenantId);
+          const resolvedNomeLoja = nomeLoja || storeTenant?.nomeFantasia || (tenantId === 'tenant-01' ? 'Churrascaria & Parrilla Fogo de Minas' : 'Restaurante');
+
+          const payload: any = {
+            tenantId,
+            nomeLoja: resolvedNomeLoja,
+            nomeAgente: cfg.nomeAgente,
+            tomDeVoz: cfg.tomDeVoz,
+            modeloIA: cfg.modeloIA,
+            chavePix: cfg.chavePix,
+            taxaEntregaFixa: cfg.taxaEntregaFixa,
+            tempoMedioEntregaMin: cfg.tempoMedioEntregaMin,
+            instrucoesCustomizadas: cfg.instrucoesCustomizadas,
+            palavrasCardapio: cfg.palavrasCardapio,
+            palavrasAtendente: cfg.palavrasAtendente,
+            palavrasPix: cfg.palavrasPix,
+            mensagemBoasVindas: cfg.mensagemBoasVindas,
+            mensagemCardapio: cfg.mensagemCardapio,
+            mensagemTransbordo: cfg.mensagemTransbordo,
+            mensagemPix: cfg.mensagemPix,
+          };
+
+          if (produtos && produtos.length > 0) {
+            let catMap = new Map<string, string>();
+            try {
+              const productStore = (await import('./useProductStore')).useProductStore.getState();
+              const categoriasDaLoja = productStore.getCategoriasPorTenant(tenantId);
+              catMap = new Map(categoriasDaLoja.map((c) => [c.id, c.nome]));
+            } catch (ce) {}
+
+            payload.produtos = produtos.map((p) => ({
+              id: p.id,
+              nome: p.nome,
+              preco: p.precoVenda,
+              categoria: catMap.get(p.categoriaId) || p.categoriaId || 'Pratos Principais',
+              descricao: p.descricao || '',
+              disponivel: p.disponivel !== false,
+            }));
+          }
+
+          const resp = await fetch(`${SERVER_URL}/api/whatsapp/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          return resp.ok;
+        } catch (e) {
+          console.warn('Falha ao sincronizar config com servidor:', e);
+          return false;
+        }
       },
 
       conectarInstancia: (tenantId: string) => {
@@ -330,9 +326,414 @@ export const useEloBotStore = create<EloBotState>()(
         }, 1500);
       },
 
+      // ==============================================================
+      // CONEXÃO COM O SERVIDOR BAILEYS REAL (WHATSAPP FÍSICO DO RESTAURANTE)
+      // ==============================================================
+      conectarSSE: (tenantId: string) => {
+        if (sseConnection && sseConnection.readyState !== EventSource.CLOSED) {
+          return;
+        }
+
+        try {
+          if (sseConnection) {
+            sseConnection.close();
+            sseConnection = null;
+          }
+
+          sseConnection = new EventSource(`${SERVER_URL}/api/whatsapp/eventos`);
+
+          sseConnection.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              const { tipo, dados, connectionState } = data;
+
+              if (connectionState?.qrCodeDataUrl) {
+                get().atualizarConfig(tenantId, {
+                  statusInstancia: 'qrcode',
+                  qrCodeDataUrl: connectionState.qrCodeDataUrl,
+                });
+              }
+
+              if (tipo === 'qrcode_gerado' && dados?.qrCodeDataUrl) {
+                get().atualizarConfig(tenantId, {
+                  statusInstancia: 'qrcode',
+                  qrCodeDataUrl: dados.qrCodeDataUrl,
+                });
+              } else if (tipo === 'conectado') {
+                get().atualizarConfig(tenantId, {
+                  statusInstancia: 'conectado',
+                  telefoneInstancia: dados.telefone || get().getConfig(tenantId).telefoneInstancia,
+                  nomeInstancia: dados.nome || 'WhatsApp Oficial',
+                  qrCodeDataUrl: '',
+                  bateriaPct: 100,
+                });
+              } else if (tipo === 'status_change') {
+                get().atualizarConfig(tenantId, {
+                  statusInstancia: dados.status || 'desconectado',
+                  qrCodeDataUrl: dados.qrCodeDataUrl || '',
+                });
+              } else if (tipo === 'nome_atualizado') {
+                const { clienteTelefone, novoNome, mesa, tenantId: nTenantId, nomeLoja: nNomeLoja } = dados;
+                set((state) => {
+                  const conversas = state.conversasPorTenant[tenantId] || [];
+                  const telLimpo = (clienteTelefone || '').replace(/\D/g, '');
+                  const atualizadas = conversas.map((c) => {
+                    const cTelLimpo = c.clienteTelefone.replace(/\D/g, '');
+                    if (
+                      c.id.includes(clienteTelefone) ||
+                      (telLimpo && cTelLimpo.includes(telLimpo)) ||
+                      (telLimpo && telLimpo.includes(cTelLimpo))
+                    ) {
+                      return {
+                        ...c,
+                        clienteNome: novoNome,
+                        mesa: mesa || c.mesa,
+                        tenantId: nTenantId || c.tenantId,
+                        nomeLoja: nNomeLoja || c.nomeLoja,
+                      };
+                    }
+                    return c;
+                  });
+                  return {
+                    conversasPorTenant: {
+                      ...state.conversasPorTenant,
+                      [tenantId]: atualizadas,
+                    },
+                  };
+                });
+              } else if (tipo === 'nova_mensagem') {
+                // Mensagem recebida de um cliente real ou do bot via WhatsApp
+                const { clienteTelefone, clienteNome, mensagem, pedidoCriado, transbordoHumano, mesa, tenantId: msgTenantId, nomeLoja: msgNomeLoja } = dados;
+
+                // Ignora canais/newsletters do WhatsApp
+                if (clienteTelefone.includes('120363') || clienteTelefone.includes('newsletter')) {
+                  return;
+                }
+
+                if (transbordoHumano) {
+                  try {
+                    tocarAlertaTransbordo();
+                  } catch (e) {}
+                }
+
+                const telLegivel = clienteTelefone.startsWith('55')
+                  ? `(${clienteTelefone.slice(2, 4)}) ${clienteTelefone.slice(4, 9)}-${clienteTelefone.slice(9)}`
+                  : clienteTelefone;
+
+                set((state) => {
+                  const conversas = state.conversasPorTenant[tenantId] || [];
+                  const idx = conversas.findIndex(
+                    (c) =>
+                      c.clienteTelefone.replace(/\D/g, '').includes(clienteTelefone) ||
+                      clienteTelefone.includes(c.clienteTelefone.replace(/\D/g, ''))
+                  );
+
+                  let novaLista: ConversaWhatsApp[];
+
+                  if (idx > -1) {
+                    const convExistente = conversas[idx];
+                    const msgJaExiste = convExistente.mensagens.some((m) => m.id === mensagem.id);
+                    if (msgJaExiste) return state;
+
+                    const nomeAtualEhRuim =
+                      !convExistente.clienteNome ||
+                      convExistente.clienteNome.startsWith('Cliente (') ||
+                      convExistente.clienteNome.toLowerCase().includes('kkk') ||
+                      convExistente.clienteNome.toLowerCase().includes('muito bom');
+
+                    const nomeNovoEhValido =
+                      clienteNome &&
+                      !clienteNome.toLowerCase().includes('kkk') &&
+                      !clienteNome.toLowerCase().includes('muito bom');
+
+                    const clienteNomeFinal = nomeNovoEhValido
+                      ? (nomeAtualEhRuim || !clienteNome.startsWith('Cliente (') ? clienteNome : convExistente.clienteNome)
+                      : convExistente.clienteNome;
+
+                    const atualizada: ConversaWhatsApp = {
+                      ...convExistente,
+                      clienteNome: clienteNomeFinal,
+                      clienteTelefone: telLegivel,
+                      ultimaMensagem: mensagem.texto,
+                      ultimaHora: mensagem.hora,
+                      status: transbordoHumano ? 'humano' : convExistente.status,
+                      mensagens: [...convExistente.mensagens, mensagem],
+                      mesa: mesa || convExistente.mesa || null,
+                      tenantId: msgTenantId || convExistente.tenantId || null,
+                      nomeLoja: msgNomeLoja || convExistente.nomeLoja || null,
+                      pedidoRascunho: mensagem.resumoPedido || convExistente.pedidoRascunho,
+                    };
+                    novaLista = [...conversas];
+                    novaLista[idx] = atualizada;
+                  } else {
+                    const nomeInicial =
+                      clienteNome && !clienteNome.toLowerCase().includes('kkk')
+                        ? clienteNome
+                        : `Cliente (${clienteTelefone.slice(-4)})`;
+
+                    const novaConv: ConversaWhatsApp = {
+                      id: `conv-real-${clienteTelefone}`,
+                      clienteNome: nomeInicial,
+                      clienteTelefone: telLegivel,
+                      status: transbordoHumano ? 'humano' : 'ia',
+                      ultimaMensagem: mensagem.texto,
+                      ultimaHora: mensagem.hora,
+                      naoLidas: 1,
+                      mensagens: [mensagem],
+                      mesa: mesa || null,
+                      tenantId: msgTenantId || null,
+                      nomeLoja: msgNomeLoja || null,
+                      pedidoRascunho: mensagem.resumoPedido || null,
+                    };
+                    novaLista = [novaConv, ...conversas];
+                  }
+
+                  return {
+                    conversasPorTenant: {
+                      ...state.conversasPorTenant,
+                      [tenantId]: novaLista,
+                    },
+                    conversaAtivaId: state.conversaAtivaId || `conv-real-${clienteTelefone}`,
+                  };
+                });
+
+                // Se gerou um pedido real via WhatsApp:
+                if (pedidoCriado && mensagem.resumoPedido) {
+                  const res = mensagem.resumoPedido;
+                  const mesaAlvo = mesa || res.mesa;
+
+                  if (mesaAlvo) {
+                    // Lança na comanda da Mesa no Salão e no KDS da cozinha!
+                    const numMatch = mesaAlvo.match(/\d+/);
+                    const numeroMesa = numMatch ? parseInt(numMatch[0], 10) : 1;
+                    try {
+                      import('./useAppStore').then(({ useAppStore }) => {
+                        const appState = useAppStore.getState();
+                        const mesaExistente = appState.mesas.find((m) => m.numero === numeroMesa);
+                        if (!mesaExistente) {
+                          appState.adicionarMesa({
+                            numero: numeroMesa,
+                            capacidade: 4,
+                            setor: 'Salão',
+                          });
+                        }
+                        const itensComanda = (res.itens || []).map((it: any) => ({
+                          produtoId: `prod-wa-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                          nome: it.nome,
+                          quantidade: it.quantidade,
+                          precoUnitario: it.preco,
+                          subtotal: it.preco * it.quantidade,
+                          observacoes: `Pedido WhatsApp Mesa (${clienteNome || 'Cliente'})`,
+                        }));
+                        appState.lancarItensComandaMesa(numeroMesa, itensComanda, 'EloBot WhatsApp');
+                        appState.atualizarStatusMesa(numeroMesa, 'ocupada');
+                        appState.editarMesa(numeroMesa, { responsavelNome: clienteNome || 'Cliente WhatsApp' });
+                      });
+                    } catch (err) {
+                      console.warn('Erro ao lançar comanda da mesa pelo EloBot:', err);
+                    }
+                  } else {
+                    // Pedido Delivery normal
+                    try {
+                      import('./useDeliveryStore').then(({ useDeliveryStore }) => {
+                        useDeliveryStore.getState().adicionarPedidoDelivery({
+                          clienteNome: clienteNome || `Cliente (${clienteTelefone.slice(-4)})`,
+                          clienteTelefone: telLegivel,
+                          tipo: 'delivery',
+                          endereco: {
+                            rua: res.endereco || 'Endereço informado no WhatsApp',
+                            numero: 'S/N',
+                            bairro: 'Delivery',
+                            cidade: 'Belo Horizonte',
+                          },
+                          status: 'preparando',
+                          formaPagamento: res.formaPagamento === 'PIX' ? 'pix' : 'maquininha_entrega',
+                          pago: res.formaPagamento === 'PIX',
+                          subtotal: res.subtotal,
+                          taxaEntrega: res.taxaEntrega,
+                          total: res.total,
+                          itens: (res.itens || []).map((it: any) => ({
+                            nome: it.nome,
+                            quantidade: it.quantidade,
+                            preco: it.preco,
+                            observacoes: 'Pedido via EloBot WhatsApp',
+                          })),
+                        });
+                      });
+                    } catch (e) {
+                      console.warn('Erro ao criar pedido via Baileys no Delivery:', e);
+                    }
+                  }
+                }
+
+                if (transbordoHumano) {
+                  tocarAlertaTransbordo();
+                }
+              }
+            } catch (err) {
+              console.error('Erro ao processar evento SSE Baileys:', err);
+            }
+          };
+
+          sseConnection.onerror = () => {
+            console.warn('Conexão SSE com Baileys interrompida.');
+          };
+        } catch (e) {
+          console.error('Erro ao conectar EventSource Baileys:', e);
+        }
+      },
+
+      iniciarConexaoBaileysReal: async (tenantId: string) => {
+        try {
+          get().atualizarConfig(tenantId, {
+            statusInstancia: 'conectando',
+            isServidorRealAtivo: true,
+          });
+
+          // 1. Dispara início da sessão no servidor Baileys
+          await fetch(`${SERVER_URL}/api/whatsapp/conectar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+
+          // 2. Conecta SSE para ouvir eventos
+          get().conectarSSE(tenantId);
+        } catch (err) {
+          console.error('Erro ao chamar iniciarConexaoBaileysReal:', err);
+          get().atualizarConfig(tenantId, {
+            statusInstancia: 'desconectado',
+            isServidorRealAtivo: false,
+          });
+        }
+      },
+
+      desconectarBaileysReal: async (tenantId: string) => {
+        try {
+          if (sseConnection) {
+            sseConnection.close();
+            sseConnection = null;
+          }
+          await fetch(`${SERVER_URL}/api/whatsapp/desconectar`, { method: 'POST' });
+        } catch (err) {
+          console.warn('Erro ao desconectar no servidor:', err);
+        }
+        get().atualizarConfig(tenantId, {
+          statusInstancia: 'desconectado',
+          qrCodeDataUrl: '',
+        });
+      },
+
+      sincronizarStatusBaileysReal: async (tenantId: string) => {
+        try {
+          const resp = await fetch(`${SERVER_URL}/api/whatsapp/status`);
+          const data = await resp.json();
+          if (data && data.sucesso) {
+            get().atualizarConfig(tenantId, {
+              statusInstancia: data.status,
+              qrCodeDataUrl: data.qrCodeDataUrl || '',
+              telefoneInstancia: data.telefone || get().getConfig(tenantId).telefoneInstancia,
+              nomeInstancia: data.nome || get().getConfig(tenantId).nomeInstancia,
+              isServidorRealAtivo: true,
+            });
+
+            // Conectar SSE para escutar em tempo real
+            get().conectarSSE(tenantId);
+
+            // Limpa canais/newsletters e conversas mock armazenadas anteriormente
+            set((state) => {
+              const conversasAtuais = state.conversasPorTenant[tenantId] || [];
+              const filtradas = conversasAtuais.filter(
+                (c) =>
+                  !c.id.startsWith('conv-0') &&
+                  !c.id.includes('120363') &&
+                  !c.clienteTelefone.includes('120363') &&
+                  !c.clienteTelefone.includes('newsletter')
+              );
+              return {
+                conversasPorTenant: {
+                  ...state.conversasPorTenant,
+                  [tenantId]: filtradas,
+                },
+                conversaAtivaId: state.conversaAtivaId?.startsWith('conv-0') ? null : state.conversaAtivaId,
+              };
+            });
+
+            // Sincronizar conversas existentes do servidor
+            try {
+              const cResp = await fetch(`${SERVER_URL}/api/whatsapp/conversas`);
+              const cData = await cResp.json();
+              if (cData && cData.sucesso && Array.isArray(cData.conversas) && cData.conversas.length > 0) {
+                set((state) => {
+                  const conversasAtuais = state.conversasPorTenant[tenantId] || [];
+                  // Remove conversas corrompidas antigas (ex: "Kkk Muito Bom" ou LIDs antigos substituídos pelo número real)
+                  const filtradas = conversasAtuais.filter(
+                    (c) =>
+                      !c.clienteNome.toLowerCase().includes('kkk') &&
+                      !c.clienteNome.toLowerCase().includes('muito bom') &&
+                      !c.id.includes('54735549776053')
+                  );
+                  const novas = [...filtradas];
+                  for (const c of cData.conversas) {
+                    if (c.id.includes('120363') || c.clienteTelefone.includes('120363') || c.clienteTelefone.includes('newsletter')) continue;
+                    const cNumLimpo = c.clienteTelefone.replace(/\D/g, '');
+                    const idx = novas.findIndex(
+                      (n) => n.id === c.id || (cNumLimpo && n.clienteTelefone.replace(/\D/g, '') === cNumLimpo)
+                    );
+                    if (idx > -1) {
+                      novas[idx] = c;
+                    } else {
+                      novas.unshift(c);
+                    }
+                  }
+                  const primeiroReal = novas.find((c) => c.id.startsWith('conv-real-'));
+                  return {
+                    conversasPorTenant: {
+                      ...state.conversasPorTenant,
+                      [tenantId]: novas,
+                    },
+                    conversaAtivaId:
+                      state.conversaAtivaId && !state.conversaAtivaId.startsWith('conv-0') && !state.conversaAtivaId.includes('54735549776053')
+                        ? state.conversaAtivaId
+                        : (primeiroReal ? primeiroReal.id : state.conversaAtivaId),
+                  };
+                });
+              }
+            } catch (ce) {}
+          }
+        } catch (e) {
+          // Servidor local não está rodando no momento
+          get().atualizarConfig(tenantId, { isServidorRealAtivo: false });
+        }
+      },
+
+      enviarMensagemRealWhatsApp: async (telefone: string, texto: string) => {
+        try {
+          const resp = await fetch(`${SERVER_URL}/api/whatsapp/enviar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telefone, texto }),
+          });
+          const data = await resp.json();
+          return !!data.sucesso;
+        } catch (e) {
+          console.error('Erro ao enviar mensagem real:', e);
+          return false;
+        }
+      },
+
       getConversas: (tenantId: string) => {
         const state = get();
-        return state.conversasPorTenant[tenantId] || [];
+        const lista = state.conversasPorTenant[tenantId] || [];
+        return lista.filter(
+          (c) =>
+            !c.id.startsWith('conv-0') &&
+            !c.id.includes('120363') &&
+            !c.clienteTelefone.includes('120363') &&
+            !c.clienteTelefone.includes('newsletter') &&
+            !c.clienteNome.includes('Cliente (9480)') &&
+            !c.clienteNome.includes('Cliente (3540)') &&
+            !c.clienteNome.includes('Cliente (6536)')
+        );
       },
 
       selecionarConversa: (id: string | null) => {
@@ -348,6 +749,40 @@ export const useEloBotStore = create<EloBotState>()(
             }
             return { conversasPorTenant: novasPorTenant };
           });
+        }
+      },
+
+      atualizarNomeCliente: async (tenantId: string, conversaId: string, novoNome: string) => {
+        const nomeLimpo = novoNome.trim();
+        if (!nomeLimpo) return false;
+
+        // Atualização otimista imediata no frontend
+        set((state) => {
+          const conversas = state.conversasPorTenant[tenantId] || [];
+          const atualizadas = conversas.map((c) =>
+            c.id === conversaId ? { ...c, clienteNome: nomeLimpo } : c
+          );
+          return {
+            conversasPorTenant: {
+              ...state.conversasPorTenant,
+              [tenantId]: atualizadas,
+            },
+          };
+        });
+
+        // Sincroniza com o servidor Baileys se for conversa real
+        try {
+          const conversa = (get().conversasPorTenant[tenantId] || []).find((c) => c.id === conversaId);
+          const tel = conversa?.clienteTelefone || conversaId.replace('conv-real-', '');
+          await fetch(`${SERVER_URL}/api/whatsapp/renomear`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telefone: tel, novoNome: nomeLimpo }),
+          });
+          return true;
+        } catch (e) {
+          console.warn('Erro ao atualizar nome no servidor Baileys:', e);
+          return true;
         }
       },
 
@@ -387,6 +822,13 @@ export const useEloBotStore = create<EloBotState>()(
             },
           };
         });
+
+        // Se houver conexão Baileys ativa, despacha mensagem real para o WhatsApp do cliente
+        const state = get();
+        const conversa = (state.conversasPorTenant[tenantId] || []).find((c) => c.id === conversaId);
+        if (conversa && conversa.clienteTelefone) {
+          get().enviarMensagemRealWhatsApp(conversa.clienteTelefone, texto.trim());
+        }
       },
 
       alternarModoAtendimento: (tenantId: string, conversaId: string, novoModo: 'ia' | 'humano' | 'finalizado') => {
@@ -561,6 +1003,61 @@ export const useEloBotStore = create<EloBotState>()(
         });
       },
 
+      marcarPedidoComoEnviado: (tenantId: string, conversaId: string, pedidoId: string, numeroPedido: number) => {
+        const horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const config = get().getConfig(tenantId);
+        const msgConfirmacao: MensagemWhatsApp = {
+          id: `msg-conf-${Date.now().toString().slice(-4)}`,
+          remetente: 'bot',
+          texto: `🎉 *Pedido #${numeroPedido} confirmado e enviado para a Cozinha (KDS)!* 🍳🔥\n\nNossa equipe já recebeu a comanda e iniciou a preparação.\nTempo estimado de entrega: *${config.tempoMedioEntregaMin} minutos*.\nAssim que o motoboy sair para a entrega, você receberá o aviso em tempo real por aqui! 🛵💨`,
+          hora: horaAtual,
+          statusEnvio: 'entregue',
+          tipo: 'aviso',
+        };
+
+        set((state) => {
+          const lista = state.conversasPorTenant[tenantId] || [];
+          return {
+            conversasPorTenant: {
+              ...state.conversasPorTenant,
+              [tenantId]: lista.map((c) => {
+                if (c.id !== conversaId) return c;
+                const rascunhoAtualizado: PedidoRascunhoWhatsApp | null = c.pedidoRascunho
+                  ? {
+                      ...c.pedidoRascunho,
+                      enviadoParaCozinha: true,
+                      pedidoId,
+                      numeroPedido,
+                    }
+                  : null;
+
+                const msgsAtualizadas = c.mensagens.map((m) =>
+                  m.resumoPedido
+                    ? {
+                        ...m,
+                        resumoPedido: {
+                          ...m.resumoPedido,
+                          enviadoParaCozinha: true,
+                          pedidoId,
+                          numeroPedido,
+                        },
+                      }
+                    : m
+                );
+
+                return {
+                  ...c,
+                  pedidoRascunho: rascunhoAtualizado,
+                  ultimaMensagem: msgConfirmacao.texto,
+                  ultimaHora: horaAtual,
+                  mensagens: [...msgsAtualizadas, msgConfirmacao],
+                };
+              }),
+            },
+          };
+        });
+      },
+
       enviarMensagemCliente: (tenantId: string, conversaId: string, texto: string, produtosLoja: Produto[], nomeLoja = 'Restaurante') => {
         if (!texto.trim()) return;
         const horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -623,8 +1120,42 @@ export const useEloBotStore = create<EloBotState>()(
           let novoRascunho: PedidoRascunhoWhatsApp | null = conversaAtual?.pedidoRascunho || null;
           let transbordo = false;
 
-          // 1. Detectar solicitação de atendente humano
+          // Detecção de Mesa no simulador
+          const matchMesa = texto.match(/\bmesa\s*#?\s*(\d{1,3})\b/i);
+          const mesaDetectada = matchMesa
+            ? `Mesa ${matchMesa[1].padStart(2, '0')}`
+            : (lower.includes('balcao') || lower.includes('balcão') ? 'Balcão' : conversaAtual?.mesa || null);
+
+          if (mesaDetectada && conversaAtual && conversaAtual.mesa !== mesaDetectada) {
+            set((state) => {
+              const list = state.conversasPorTenant[tenantId] || [];
+              return {
+                conversasPorTenant: {
+                  ...state.conversasPorTenant,
+                  [tenantId]: list.map((c) => c.id === conversaId ? { ...c, mesa: mesaDetectada, nomeLoja } : c),
+                },
+              };
+            });
+          }
+
+          // 1. Detectar chamada de garçom ou atendente
           if (
+            lower.includes('garcom') ||
+            lower.includes('garçom') ||
+            lower.includes('chamar garcom') ||
+            lower.includes('chamar garçom') ||
+            (mesaDetectada && lower.trim() === 'b')
+          ) {
+            respostaBot = `🔔 *GARÇOM ACIONADO PARA A ${mesaDetectada || 'SUA MESA'}!* 🙋‍♂️\n\nOlá, *${conversaAtual?.clienteNome || 'Cliente'}*! Já notificamos nossa equipe do *${nomeLoja}*.\nUm garçom está a caminho para te atender presencialmente!`;
+            tipoResposta = 'aviso';
+            transbordo = true;
+            try {
+              tocarAlertaTransbordo();
+            } catch (e) {
+              console.warn(e);
+            }
+          }
+          else if (
             lower.includes('atendente') ||
             lower.includes('humano') ||
             lower.includes('pessoa') ||
@@ -634,7 +1165,7 @@ export const useEloBotStore = create<EloBotState>()(
             lower.includes('reclamação') ||
             lower.includes('reclamaçao')
           ) {
-            respostaBot = `Com certeza, ${conversaAtual?.clienteNome || 'amigo(a)'}! Estou transferindo o seu atendimento agora mesmo para a nossa equipe humana da loja. 👤🔔 Por favor, aguarde só um instante que um atendente irá te responder por aqui!`;
+            respostaBot = `Com certeza, ${conversaAtual?.clienteNome || 'amigo(a)'}! Estou transferindo o seu atendimento agora mesmo para a nossa equipe humana do *${nomeLoja}*. 👤🔔 Por favor, aguarde só um instante que um atendente irá te responder por aqui!`;
             tipoResposta = 'aviso';
             transbordo = true;
             try {
@@ -643,8 +1174,9 @@ export const useEloBotStore = create<EloBotState>()(
               console.warn(e);
             }
           }
-          // 2. Consulta de Cardápio / Preço / Opções
+          // 2. Consulta de Cardápio / Mesa QR Code / Opções
           else if (
+            (mesaDetectada && (lower.includes('ver o cardapio') || lower.includes('fazer meu pedido') || lower.includes('estou na') || lower.includes('to na') || lower.startsWith('ola') || lower.startsWith('oi'))) ||
             lower.includes('cardapio') ||
             lower.includes('cardápio') ||
             lower.includes('menu') ||
@@ -654,18 +1186,27 @@ export const useEloBotStore = create<EloBotState>()(
             lower.includes('quais pratos') ||
             lower.includes('recomenda')
           ) {
-            const itensDisponiveis = produtosLoja.filter((p) => p.disponivel).slice(0, 4);
-            itensDestaque = itensDisponiveis.map((p) => ({
+            const itensDisponiveis = produtosLoja.filter((p) => p.disponivel);
+            itensDestaque = itensDisponiveis.slice(0, 5).map((p) => ({
               nome: p.nome,
               preco: p.precoVenda,
               descricao: p.descricao,
             }));
 
-            const listaTexto = itensDisponiveis
-              .map((p) => `• *${p.nome}* — R$ ${p.precoVenda.toFixed(2).replace('.', ',')}`)
-              .join('\n');
+            if (mesaDetectada) {
+              const listaTexto = itensDisponiveis
+                .map((p) => `• *${p.nome}* — R$ ${p.precoVenda.toFixed(2).replace('.', ',')}${p.descricao ? `\n   _${p.descricao}_` : ''}`)
+                .join('\n');
 
-            respostaBot = `Aqui estão alguns dos nossos pratos mais pedidos hoje no *${nomeLoja}*:\n\n${listaTexto}\n\nVocê pode pedir qualquer um desses itens diretamente por aqui! Deseja que eu monte o seu pedido agora? 🍽️`;
+              respostaBot = `🍽️ *ATENDIMENTO NA ${mesaDetectada.toUpperCase()} — ${nomeLoja.toUpperCase()}* 🍽️\nOlá, *${conversaAtual?.clienteNome || 'você'}*! Que alegria ter você conosco aqui na *${mesaDetectada}*! ✨\n\n📋 *CARDÁPIO OFICIAL DA LOJA:*\n\n${listaTexto}\n\n🛎️ *Consumo Presencial na ${mesaDetectada}:*\n✅ *Taxa de Entrega:* R$ 0,00 (Grátis na Mesa)\n⚡ *Preparo:* Enviado diretamente para a Cozinha e Bar!\n\n👉 *Para pedir:* Basta digitar o prato ou bebida desejada (ex: "1x ${itensDisponiveis[0]?.nome || 'prato'}")\n🙋‍♂️ *Chamar Garçom:* Digite *Garçom* ou *B* para atendimento presencial na mesa.`;
+            } else {
+              const listaTexto = itensDisponiveis
+                .slice(0, 6)
+                .map((p) => `• *${p.nome}* — R$ ${p.precoVenda.toFixed(2).replace('.', ',')}`)
+                .join('\n');
+
+              respostaBot = `Aqui estão nossos pratos e bebidas no *${nomeLoja}*:\n\n${listaTexto}\n\n🛵 Taxa de entrega fixa: R$ ${(config.taxaEntregaFixa || 5).toFixed(2)}\n\nVocê pode pedir qualquer um desses itens diretamente por aqui! O que gostaria de pedir hoje? 🍽️`;
+            }
             tipoResposta = 'cardapio';
           }
           // 3. Intenção de Pedido de item específico
@@ -691,28 +1232,78 @@ export const useEloBotStore = create<EloBotState>()(
               }));
 
               const subtotal = itensSelecionados.reduce((acc, it) => acc + it.preco * it.quantidade, 0);
-              const taxa = config.taxaEntregaFixa || 5.0;
-              const total = subtotal + taxa;
 
-              novoRascunho = {
-                itens: itensSelecionados,
-                subtotal,
-                taxaEntrega: taxa,
-                total,
-              };
+              if (mesaDetectada) {
+                const numeroPedido = Math.floor(100 + Math.random() * 900);
+                novoRascunho = {
+                  itens: itensSelecionados,
+                  subtotal,
+                  taxaEntrega: 0,
+                  total: subtotal,
+                  enviadoParaCozinha: true,
+                  numeroPedido,
+                  pedidoId: `CMD-${mesaDetectada.replace(/\s+/g, '')}-${numeroPedido}`,
+                };
+                resumoPedidoGerado = novoRascunho;
 
-              const listaResumo = itensSelecionados
-                .map((it) => `• 1x ${it.nome} (R$ ${it.preco.toFixed(2).replace('.', ',')})`)
-                .join('\n');
+                const listaResumo = itensSelecionados
+                  .map((it) => `• 1x ${it.nome} - R$ ${it.preco.toFixed(2).replace('.', ',')}`)
+                  .join('\n');
 
-              respostaBot = `Perfeito! Entendi seu pedido:\n\n${listaResumo}\n• Taxa de entrega estimada: R$ ${taxa.toFixed(2).replace('.', ',')}\n*Valor Total: R$ ${total.toFixed(2).replace('.', ',')}*\n\nPor favor, me informe o seu *endereço completo com bairro* e a *forma de pagamento* (PIX ou Cartão na entrega) para finalizarmos! 🛵`;
-              tipoResposta = 'pedido';
-              resumoPedidoGerado = {
-                itens: itensSelecionados,
-                subtotal,
-                taxaEntrega: taxa,
-                total,
-              };
+                respostaBot = `🍽️ *PEDIDO REGISTRADO PARA A ${mesaDetectada}!* 👨‍🍳\n*Restaurante:* ${nomeLoja}\n\nItens Solicitados:\n${listaResumo}\n\n💰 *Total da Mesa: R$ ${subtotal.toFixed(2).replace('.', ',')}*\n🛎️ *Local:* ${mesaDetectada} (Consumo Presencial • Taxa de Entrega: R$ 0,00)\n\n👨‍🍳 A comanda já foi enviada para a Cozinha e Bar (KDS)!\nEm instantes seus itens serão servidos quentinhos na mesa.`;
+                tipoResposta = 'pedido';
+
+                // Registra na comanda da Mesa no useAppStore
+                const numMatch = mesaDetectada.match(/\d+/);
+                const numeroMesa = numMatch ? parseInt(numMatch[0], 10) : 1;
+                try {
+                  import('./useAppStore').then(({ useAppStore }) => {
+                    const appState = useAppStore.getState();
+                    const mesaExistente = appState.mesas.find((m) => m.numero === numeroMesa);
+                    if (!mesaExistente) {
+                      appState.adicionarMesa({
+                        numero: numeroMesa,
+                        capacidade: 4,
+                        setor: 'Salão',
+                      });
+                    }
+                    const itensCmd = itensSelecionados.map((it) => ({
+                      produtoId: `prod-sim-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                      nome: it.nome,
+                      quantidade: it.quantidade,
+                      precoUnitario: it.preco,
+                      subtotal: it.preco * it.quantidade,
+                      observacoes: `Pedido WhatsApp Mesa (${conversaAtual?.clienteNome || 'Cliente'})`,
+                    }));
+                    appState.lancarItensComandaMesa(numeroMesa, itensCmd, 'EloBot WhatsApp');
+                    appState.atualizarStatusMesa(numeroMesa, 'ocupada');
+                    appState.editarMesa(numeroMesa, { responsavelNome: conversaAtual?.clienteNome || 'Cliente WhatsApp' });
+                  });
+                } catch (e) {}
+              } else {
+                const taxa = config.taxaEntregaFixa || 5.0;
+                const total = subtotal + taxa;
+
+                novoRascunho = {
+                  itens: itensSelecionados,
+                  subtotal,
+                  taxaEntrega: taxa,
+                  total,
+                };
+
+                const listaResumo = itensSelecionados
+                  .map((it) => `• 1x ${it.nome} (R$ ${it.preco.toFixed(2).replace('.', ',')})`)
+                  .join('\n');
+
+                respostaBot = `Perfeito! Entendi seu pedido:\n\n${listaResumo}\n• Taxa de entrega estimada: R$ ${taxa.toFixed(2).replace('.', ',')}\n*Valor Total: R$ ${total.toFixed(2).replace('.', ',')}*\n\nPor favor, me informe o seu *endereço completo com bairro* e a *forma de pagamento* (PIX ou Cartão na entrega) para finalizarmos! 🛵`;
+                tipoResposta = 'pedido';
+                resumoPedidoGerado = {
+                  itens: itensSelecionados,
+                  subtotal,
+                  taxaEntrega: taxa,
+                  total,
+                };
+              }
             } else {
               respostaBot = `Excelente! Vi que você quer fazer um pedido no *${nomeLoja}*. Qual item você deseja? Se quiser, posso listar as opções do cardápio com preços para você escolher! 📋`;
             }
@@ -732,10 +1323,11 @@ export const useEloBotStore = create<EloBotState>()(
               const forma = lower.includes('pix') ? 'pix' : lower.includes('dinheiro') ? 'dinheiro' : 'cartao_entrega';
               novoRascunho.endereco = texto.trim();
               novoRascunho.formaPagamento = forma;
+              novoRascunho.chavePix = config.chavePix;
 
               const chavePixAviso = forma === 'pix' ? `\n\nNossa chave PIX oficial é: *${config.chavePix}*` : '';
 
-              respostaBot = `Sensacional, ${conversaAtual?.clienteNome}! Pedido 100% confirmado e já enviado para a nossa cozinha! 🍳🔥\n\nTempo estimado de entrega: *${config.tempoMedioEntregaMin} minutos*.${chavePixAviso}\n\nAssim que o motoboy sair com a sua entrega, eu te envio uma notificação por aqui com o aviso em tempo real!`;
+              respostaBot = `Sensacional, ${conversaAtual?.clienteNome || 'amigo(a)'}! Pedido 100% confirmado e já enviado para a nossa cozinha! 🍳🔥\n\nTempo estimado de entrega: *${config.tempoMedioEntregaMin} minutos*.${chavePixAviso}\n\nAssim que o motoboy sair com a sua entrega, eu te envio uma notificação por aqui com o aviso em tempo real!`;
               tipoResposta = 'pedido';
               resumoPedidoGerado = {
                 itens: novoRascunho.itens,
@@ -744,7 +1336,39 @@ export const useEloBotStore = create<EloBotState>()(
                 total: novoRascunho.total,
                 endereco: novoRascunho.endereco,
                 formaPagamento: forma.toUpperCase(),
+                chavePix: config.chavePix,
+                enviadoParaCozinha: false,
               };
+
+              // Se autoCriarPedido estiver ativo, cria no Delivery e envia para KDS
+              if (config.autoCriarPedido) {
+                try {
+                  import('./useDeliveryStore').then(({ useDeliveryStore }) => {
+                    const novoPed = useDeliveryStore.getState().adicionarPedidoDelivery({
+                      clienteNome: conversaAtual?.clienteNome || 'Cliente WhatsApp',
+                      clienteTelefone: conversaAtual?.clienteTelefone || '',
+                      tipo: 'delivery',
+                      endereco: {
+                        rua: novoRascunho?.endereco || texto.trim(),
+                        numero: 'S/N',
+                        bairro: 'Centro',
+                        cidade: 'Belo Horizonte',
+                        obs: `Pedido feito via WhatsApp EloBot (${forma.toUpperCase()})`,
+                      },
+                      itens: novoRascunho?.itens || [],
+                      subtotal: novoRascunho?.subtotal || 0,
+                      taxaEntrega: novoRascunho?.taxaEntrega || 0,
+                      total: novoRascunho?.total || 0,
+                      formaPagamento: forma as any,
+                      status: 'preparando',
+                      pago: forma === 'pix',
+                    });
+                    get().marcarPedidoComoEnviado(tenantId, conversaId, novoPed.id, novoPed.numero);
+                  });
+                } catch (e) {
+                  console.warn('Erro ao criar pedido automático:', e);
+                }
+              }
             } else {
               respostaBot = `Anotado! Qual prato ou bebida você gostaria de incluir para entregarmos nesse endereço? Posso te sugerir nosso cardápio se desejar! 😋`;
             }

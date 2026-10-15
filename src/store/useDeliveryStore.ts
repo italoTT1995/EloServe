@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { PedidoDelivery, ClienteDelivery, FaixaTaxaEntrega, StatusDelivery } from '../types';
 import { useEloBotStore } from './useEloBotStore';
+import { useAppStore } from './useAppStore';
+import { useEstoqueStore } from './useEstoqueStore';
 
 const FAIXAS_TAXA_PADRAO: FaixaTaxaEntrega[] = [
   { ateKm: 1.5, taxa: 3.0 },
@@ -137,7 +139,7 @@ interface DeliveryState {
   enderecoOrigem: string;
   
   // Ações
-  adicionarPedidoDelivery: (pedido: Omit<PedidoDelivery, 'id' | 'numero' | 'horario'>) => void;
+  adicionarPedidoDelivery: (pedido: Omit<PedidoDelivery, 'id' | 'numero' | 'horario'>) => PedidoDelivery;
   avancarStatusDelivery: (pedidoId: string) => void;
   marcarComoPago: (pedidoId: string) => void;
   atribuirEntregador: (pedidoId: string, entregador: string) => void;
@@ -176,6 +178,49 @@ export const useDeliveryStore = create<DeliveryState>()(
         set((state) => ({
           pedidos: [novo, ...state.pedidos],
         }));
+
+        // 1. Integrar com KDS da Cozinha
+        try {
+          const { adicionarPedidoKDS } = useAppStore.getState();
+          adicionarPedidoKDS({
+            id: `kds-${novo.id}`,
+            numero: novo.numero,
+            tipo: 'delivery',
+            nomeCliente: `${novo.clienteNome} (WhatsApp)`,
+            status: 'novo',
+            itens: novo.itens.map((it) => ({
+              nome: it.nome,
+              quantidade: it.quantidade,
+              observacoes: novo.endereco?.obs || `Entrega WhatsApp (${novo.formaPagamento})`,
+            })),
+            minutosEspera: 0,
+            criadoEm: novo.horario,
+          });
+        } catch (err) {
+          console.warn('Erro ao integrar com KDS:', err);
+        }
+
+        // 2. Dar baixa no Estoque e Insumos
+        try {
+          const { baixarEstoquePorVenda } = useEstoqueStore.getState();
+          novo.itens.forEach((it) => {
+            baixarEstoquePorVenda(it.nome, it.quantidade);
+          });
+        } catch (err) {
+          console.warn('Erro ao processar baixa no estoque:', err);
+        }
+
+        // 3. Registrar entrada financeira no Caixa se pago (ex: PIX)
+        if (novo.pago) {
+          try {
+            const { registrarVendaCaixa } = useAppStore.getState();
+            registrarVendaCaixa(novo.total);
+          } catch (err) {
+            console.warn('Erro ao registrar no caixa:', err);
+          }
+        }
+
+        return novo;
       },
 
       avancarStatusDelivery: (pedidoId) => {

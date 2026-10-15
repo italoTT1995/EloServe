@@ -26,6 +26,14 @@ export interface Categoria {
   cor?: string;
 }
 
+export interface IngredientePrato {
+  ingredienteId: string;
+  ingredienteNome: string;
+  quantidade: number;
+  unidadeMedida: string;
+  custoUnitarioEstimado?: number;
+}
+
 export interface Produto {
   id: string;
   categoriaId: string;
@@ -38,10 +46,7 @@ export interface Produto {
   setorPreparo: 'cozinha' | 'bar' | 'nenhum';
   disponivel: boolean;
   destaque?: boolean;
-  controlaEstoque?: boolean;
-  quantidadeEstoque?: number;
-  estoqueMinimo?: number;
-  unidadeEstoque?: 'un' | 'kg' | 'g' | 'pct' | 'l' | 'ml' | 'frasco' | 'cx';
+  fichaTecnica?: IngredientePrato[];
 }
 
 export interface ItemCarrinho {
@@ -54,8 +59,22 @@ export interface ItemCarrinho {
 
 export type StatusMesa = 'livre' | 'ocupada' | 'aguardando_pagamento' | 'chamar_garcom';
 
+export interface ItemComandaMesa {
+  id: string;
+  produtoId: string;
+  nome: string;
+  quantidade: number;
+  precoUnitario: number;
+  subtotal: number;
+  observacoes?: string;
+  horario: string;
+  garcomNome?: string;
+  statusKDS?: StatusProducaoKDS;
+}
+
 export interface Mesa {
   id: string;
+  tenantId?: string;
   numero: number;
   capacidade: number;
   setor: string;
@@ -71,6 +90,7 @@ export interface Mesa {
   alertaCritico?: boolean;
   solicitacaoTransferida?: boolean;
   mesasUnidas?: number[];
+  comandaItens?: ItemComandaMesa[];
 }
 
 export type StatusProducaoKDS = 'novo' | 'em_preparo' | 'pronto';
@@ -186,7 +206,6 @@ export type StatusDisponibilidade = 'disponivel' | 'esgotando' | 'esgotado';
 
 export interface ItemEstoque {
   id: string;
-  produtoId?: string;
   nome: string;
   categoria: CategoriaEstoque;
   metodoControle: MetodoControleEstoque;
@@ -200,7 +219,6 @@ export interface ItemEstoque {
   precoVenda?: number;            // Para produtos vendidos diretamente (ex: cervejas)
   statusDisponibilidade: StatusDisponibilidade;
   fornecedorHabitual?: string;
-  fotoUrl?: string;
 }
 
 export interface RegistroCompra {
@@ -231,6 +249,49 @@ export interface FichaTecnica {
   custoTotalEstimado: number;
   precoVenda: number;
   margemBrutaPercentual: number;
+}
+
+export type TipoMovimentacaoEstoque =
+  | 'saida_venda'
+  | 'estorno_cancelamento'
+  | 'entrada_compra'
+  | 'saida_manual'
+  | 'ajuste_sobra';
+
+export interface MovimentacaoEstoque {
+  id: string;
+  dataHora: string;
+  itemId: string;
+  itemNome: string;
+  tipo: TipoMovimentacaoEstoque;
+  quantidade: number;
+  unidadeMedida: string;
+  motivo: string;
+  pedidoId?: string;
+  responsavel: string;
+  saldoApos?: number;
+}
+
+export interface ItemVendaRealizada {
+  produtoId: string;
+  nome: string;
+  quantidade: number;
+  precoUnitario: number;
+  subtotal: number;
+  fichaTecnica?: IngredientePrato[];
+}
+
+export interface VendaRealizada {
+  id: string;
+  dataHora: string;
+  total: number;
+  formaPagamento: FormaPagamento;
+  itens: ItemVendaRealizada[];
+  operador: string;
+  status: 'concluida' | 'cancelada';
+  motivoCancelamento?: string;
+  canceladoEm?: string;
+  canceladoPor?: string;
 }
 
 // -------------------------------------------------------------

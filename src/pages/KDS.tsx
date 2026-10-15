@@ -7,17 +7,68 @@ import {
   Check,
   Flame,
   Volume2,
+  Lock,
+  Crown,
+  ArrowUpRight,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { useSaaSStore, PLANOS_DISPONIVEIS } from '../store/useSaaSStore';
 import { audio } from '../lib/audio';
 import { PedidoKDS } from '../types';
 
 export default function KDS() {
   const { pedidosKDS, avancarStatusKDS } = useAppStore();
+  const { getTenantAtivo, mudarPlanoTenant } = useSaaSStore();
+  const tenantAtual = getTenantAtivo();
+  const planoAtual = PLANOS_DISPONIVEIS.find((p) => p.id === tenantAtual?.planoId) || PLANOS_DISPONIVEIS[0];
+  const kdsDisponivel = planoAtual.limites.kdsIncluso !== false;
 
   const novos = pedidosKDS.filter((p) => p.status === 'novo');
   const emPreparo = pedidosKDS.filter((p) => p.status === 'em_preparo');
   const prontos = pedidosKDS.filter((p) => p.status === 'pronto');
+
+  if (!kdsDisponivel) {
+    return (
+      <div className="h-full flex items-center justify-center p-6">
+        <div className="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-8 h-8" />
+          </div>
+          <span className="text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 inline-block mb-3">
+            Plano Starter Detectado
+          </span>
+          <h2 className="text-xl font-black text-white mb-2">Painel KDS da Cozinha</h2>
+          <p className="text-xs text-slate-400 leading-relaxed mb-6">
+            O restaurante <strong className="text-slate-200">{tenantAtual?.nomeFantasia}</strong> está no plano <strong className="text-amber-400">Starter</strong> (ideal para operação essencial com cardápio QR Code e PDV). O Painel de Cozinha KDS sem papel em tempo real está disponível a partir do <strong className="text-emerald-400">Plano Pro</strong>.
+          </p>
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-left mb-6 space-y-2.5">
+            <div className="text-xs text-slate-300 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Ordem de preparo automática sem comandas de papel</span>
+            </div>
+            <div className="text-xs text-slate-300 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Alertas sonoros para novos pedidos do salão e delivery</span>
+            </div>
+            <div className="text-xs text-slate-300 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Mesas ilimitadas e múltiplos setores de preparo</span>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              if (tenantAtual) mudarPlanoTenant(tenantAtual.id, 'pro');
+            }}
+            className="w-full py-3.5 px-6 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-500/25 transition-all active:scale-95"
+          >
+            <Crown className="w-4 h-4 text-amber-300" />
+            <span>Fazer Upgrade para o Plano Pro (R$ 199/mês)</span>
+            <ArrowUpRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col space-y-4 select-none">

@@ -16,51 +16,75 @@ import {
   X,
   Save,
   ArrowRight,
-  RefreshCw,
-  UtensilsCrossed,
+  History,
+  RotateCcw,
+  Utensils,
 } from 'lucide-react';
 import { useEstoqueStore, CATEGORIAS_ESTOQUE_NOMES } from '../store/useEstoqueStore';
-import { useThemeStore } from '../store/useThemeStore';
 import { useProductStore } from '../store/useProductStore';
 import { useSaaSStore } from '../store/useSaaSStore';
-import { CategoriaEstoque, ItemEstoque, RegistroCompra, FichaTecnica, Fornecedor } from '../types';
+import {
+  CategoriaEstoque,
+  ItemEstoque,
+  RegistroCompra,
+  FichaTecnica,
+  Fornecedor,
+  Produto,
+  IngredientePrato,
+  MovimentacaoEstoque,
+  TipoMovimentacaoEstoque,
+} from '../types';
+import { calcularCustoIngrediente } from '../utils/estoqueUtils';
 
 export default function Estoque() {
-  const { tema } = useThemeStore();
-  const isWhite = tema === 'light';
   const { tenantAtivoId } = useSaaSStore();
   const idLoja = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
   const { getProdutosPorTenant } = useProductStore();
-  const produtosCardapio = getProdutosPorTenant(idLoja);
+  const produtos = getProdutosPorTenant(idLoja);
 
   const {
     itens,
     compras,
     fichasTecnicas,
     fornecedores,
+    movimentacoes,
     registrarSaidaManual,
     adicionarCompra,
     adicionarItemEstoque,
     adicionarFornecedor,
-    abastecerRapido,
-    ajustarQuantidadeEstoque,
-    sincronizarTodosOsProdutosDoCardapio,
   } = useEstoqueStore();
 
-  const [abaAtiva, setAbaAtiva] = useState<'estoque' | 'compras' | 'fichas' | 'fornecedores'>('estoque');
+  const [abaAtiva, setAbaAtiva] = useState<'estoque' | 'compras' | 'fichas' | 'fornecedores' | 'movimentacoes'>('estoque');
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>('todas');
+  const [filtroTipoMov, setFiltroTipoMov] = useState<string>('todos');
   const [busca, setBusca] = useState('');
+
+  // Modal para consultar quais pratos utilizam o ingrediente (Requisito 5)
+  const [modalPratosVinculados, setModalPratosVinculados] = useState<{
+    item: ItemEstoque;
+    pratos: { produto: Produto; ingrediente: IngredientePrato }[];
+  } | null>(null);
+
+  function getPratosVinculadosAoItem(itemId: string) {
+    const vinculados: { produto: Produto; ingrediente: IngredientePrato }[] = [];
+    produtos.forEach((prod) => {
+      if (prod.fichaTecnica) {
+        const ing = prod.fichaTecnica.find((i) => i.ingredienteId === itemId);
+        if (ing) {
+          vinculados.push({ produto: prod, ingrediente: ing });
+        }
+      }
+    });
+    return vinculados;
+  }
 
   // Modais
   const [modalNovoItem, setModalNovoItem] = useState(false);
   const [modalNovaCompra, setModalNovaCompra] = useState(false);
   const [modalSaidaManual, setModalSaidaManual] = useState<ItemEstoque | null>(null);
   const [modalNovoFornecedor, setModalNovoFornecedor] = useState(false);
-  const [modalAbastecerItem, setModalAbastecerItem] = useState<ItemEstoque | null>(null);
-  const [qtdAbastecerInput, setQtdAbastecerInput] = useState('10');
-  const [modoAbastecer, setModoAbastecer] = useState<'adicionar' | 'definir'>('adicionar');
   const [qtdSaidaManual, setQtdSaidaManual] = useState(1);
-  const [motivoSaidaManual, setMotivoSaidaManual] = useState('Uso operacional');
+  const [motivoSaidaManual, setMotivoSaidaManual] = useState('Uso operacional na limpeza');
 
   // Formulário Nova Compra
   const [formCompra, setFormCompra] = useState({
@@ -167,83 +191,40 @@ export default function Estoque() {
     dispararToast(`Fornecedor "${formForn.nomeOuEmpresa}" cadastrado com sucesso!`);
   }
 
-  function handleConfirmarAbastecimento(e: React.FormEvent) {
-    e.preventDefault();
-    if (!modalAbastecerItem) return;
-    const valor = parseFloat(qtdAbastecerInput);
-    if (isNaN(valor) || valor < 0) return;
-
-    if (modoAbastecer === 'adicionar') {
-      abastecerRapido(modalAbastecerItem.id, valor, 'Abastecimento via tela de Estoque');
-      dispararToast(`+${valor} ${modalAbastecerItem.unidadeMedida} supridas no estoque de "${modalAbastecerItem.nome}"!`);
-    } else {
-      ajustarQuantidadeEstoque(modalAbastecerItem.id, valor);
-      dispararToast(`Estoque de "${modalAbastecerItem.nome}" ajustado para ${valor} ${modalAbastecerItem.unidadeMedida}!`);
-    }
-
-    setModalAbastecerItem(null);
-  }
-
   return (
     <div className="space-y-6 select-none max-w-7xl mx-auto pb-10">
-      {/* Top Banner com Suporte ao Tema */}
-      <div className={`flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 rounded-3xl shadow-xl border ${
-        isWhite
-          ? 'bg-gradient-to-r from-emerald-50 via-slate-50 to-orange-50/50 border-slate-200'
-          : 'bg-gradient-to-r from-slate-900 via-slate-900 to-purple-950/40 border-slate-800'
-      }`}>
+      {/* Top Banner */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-900 to-purple-950/40 border border-slate-800 p-5 rounded-3xl shadow-xl">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
             <Package className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className={`text-lg font-black ${isWhite ? 'text-slate-900' : 'text-white'}`}>Estoque Inteligente & Compras</h2>
-              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${
-                isWhite ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-              }`}>
-                Conectado ao Cardápio
+              <h2 className="text-lg font-black text-white">Estoque Inteligente & Compras</h2>
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                Gestão Interna
               </span>
             </div>
-            <p className={`text-xs mt-0.5 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
-              Controle automatizado e integrado: alterações no cardápio suprem o estoque e vendas no PDV dão baixa em tempo real.
+            <p className="text-xs text-slate-400 mt-0.5">
+              Controle automatizado de insumos recorrentes, bebidas por unidade e materiais operacionais sem burocracia.
             </p>
           </div>
         </div>
 
-        {/* Métricas rápidas e Ações */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className={`px-3.5 py-2 rounded-2xl border text-right ${
-            isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-950 border-slate-800'
-          }`}>
-            <span className={`text-[10px] font-medium block ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>Total de Itens</span>
-            <span className={`text-sm font-black font-mono ${isWhite ? 'text-slate-900' : 'text-white'}`}>{itens.length}</span>
+        {/* Métricas rápidas */}
+        <div className="flex items-center gap-3">
+          <div className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-right">
+            <span className="text-[10px] text-slate-400 font-medium block">Total de Itens</span>
+            <span className="text-sm font-black text-white font-mono">{itens.length}</span>
           </div>
 
-          <div className={`px-3.5 py-2 rounded-2xl border text-right ${
-            isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-950 border-slate-800'
-          }`}>
-            <span className={`text-[10px] font-medium block ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>Alertas de Reposição</span>
-            <span className={`text-sm font-black font-mono ${totalEmAlerta > 0 ? (isWhite ? 'text-amber-600' : 'text-amber-400') : (isWhite ? 'text-emerald-700' : 'text-emerald-400')}`}>
+          <div className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-right">
+            <span className="text-[10px] text-slate-400 font-medium block">Alertas de Reposição</span>
+            <span className={`text-sm font-black font-mono ${totalEmAlerta > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
               {totalEmAlerta} itens
             </span>
           </div>
-
-          <button
-            onClick={() => {
-              sincronizarTodosOsProdutosDoCardapio(produtosCardapio);
-              dispararToast('Estoque sincronizado com todos os pratos e bebidas do Cardápio!');
-            }}
-            className={`px-3.5 py-2.5 rounded-2xl border font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
-              isWhite
-                ? 'bg-orange-50 hover:bg-orange-100 text-orange-900 border-orange-200 shadow-sm'
-                : 'bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 border-orange-500/30'
-            }`}
-            title="Garantir conexão e disponibilidade sincronizada com o Cardápio"
-          >
-            <RefreshCw className="w-4 h-4 text-orange-500" />
-            <span>Sincronizar com Cardápio</span>
-          </button>
 
           <button
             onClick={() => setModalNovaCompra(true)}
@@ -312,6 +293,18 @@ export default function Estoque() {
           <Building2 className="w-4 h-4" />
           <span>Fornecedores Cadastrados ({fornecedores.length})</span>
         </button>
+
+        <button
+          onClick={() => setAbaAtiva('movimentacoes')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            abaAtiva === 'movimentacoes'
+              ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>Auditoria & Movimentações ({movimentacoes.length})</span>
+        </button>
       </div>
 
       {/* ============================================================== */}
@@ -356,15 +349,11 @@ export default function Estoque() {
             </button>
           </div>
 
-          {/* Tabela de Itens de Estoque com Suporte a Tema */}
-          <div className={`border rounded-3xl overflow-hidden shadow-xl ${
-            isWhite ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
-          }`}>
+          {/* Tabela de Itens de Estoque */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[750px]">
-                <thead className={`border-b text-[10px] font-bold uppercase tracking-wider ${
-                  isWhite ? 'bg-slate-100/80 border-slate-200 text-slate-600' : 'bg-slate-950/80 border-slate-800 text-slate-400'
-                }`}>
+                <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                   <tr>
                     <th className="py-3 px-4">Item / Produto</th>
                     <th className="py-3 px-4">Seção</th>
@@ -372,87 +361,72 @@ export default function Estoque() {
                     <th className="py-3 px-4">Qtd Atual</th>
                     <th className="py-3 px-4">Mínimo / Ideal</th>
                     <th className="py-3 px-4">Disponibilidade</th>
-                    <th className="py-3 px-4 text-right">Ações & Suprimento</th>
+                    <th className="py-3 px-4 text-right">Ação Rápida</th>
                   </tr>
                 </thead>
-                <tbody className={`divide-y font-medium ${isWhite ? 'divide-slate-100' : 'divide-slate-800/60'}`}>
+                <tbody className="divide-y divide-slate-800/60 font-medium">
                   {itensFiltrados.map((item) => {
                     const isCritico = item.statusDisponibilidade === 'esgotado';
                     const isAtencao = item.statusDisponibilidade === 'esgotando';
-                    const isDoCardapio = !!item.produtoId || produtosCardapio.some((p) => p.nome.trim().toLowerCase() === item.nome.trim().toLowerCase());
 
                     return (
-                      <tr key={item.id} className={`transition-colors ${isWhite ? 'hover:bg-slate-50' : 'hover:bg-slate-800/40'}`}>
+                      <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
                         <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            {item.fotoUrl ? (
-                              <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-slate-700/60 shadow-sm">
-                                <img src={item.fotoUrl} alt={item.nome} className="w-full h-full object-cover" />
-                              </div>
-                            ) : (
-                              <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center border ${
-                                isWhite ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-slate-800 border-slate-700 text-slate-500'
-                              }`}>
-                                <Package className="w-4 h-4" />
-                              </div>
-                            )}
-                            <div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className={`font-bold block text-sm ${isWhite ? 'text-slate-900' : 'text-white'}`}>{item.nome}</span>
-                                {isDoCardapio && (
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 border ${
-                                    isWhite
-                                      ? 'bg-orange-100 text-orange-900 border-orange-200'
-                                      : 'bg-orange-500/15 text-orange-400 border-orange-500/30'
-                                  }`}>
-                                    <span>🍽️ Vinculado ao Cardápio</span>
-                                  </span>
-                                )}
-                              </div>
-                              <span className={`text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-                                Custo: R$ {item.precoCusto.toFixed(2)} / {item.unidadeMedida}
-                                {item.precoVenda ? ` • Venda PDV: R$ ${item.precoVenda.toFixed(2)}` : ''}
-                                {item.fornecedorHabitual && ` • ${item.fornecedorHabitual}`}
-                              </span>
-                            </div>
-                          </div>
+                          <span className="font-bold text-white block text-sm">{item.nome}</span>
+                          <span className="text-[11px] text-slate-400 block">
+                            Custo: R$ {item.precoCusto.toFixed(2)} / {item.unidadeMedida}
+                            {item.fornecedorHabitual && ` • ${item.fornecedorHabitual}`}
+                          </span>
+                          {(() => {
+                            const vinculados = getPratosVinculadosAoItem(item.id);
+                            if (vinculados.length === 0) return null;
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setModalPratosVinculados({ item, pratos: vinculados })}
+                                className="mt-1.5 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 text-[10px] font-bold cursor-pointer transition-all"
+                                title="Consultar pratos do cardápio que utilizam este insumo"
+                              >
+                                <Utensils className="w-3 h-3" />
+                                <span>
+                                  {vinculados.length} prato{vinculados.length > 1 ? 's' : ''} vinculado{vinculados.length > 1 ? 's' : ''}
+                                </span>
+                              </button>
+                            );
+                          })()}
                         </td>
 
-                        <td className={`py-3.5 px-4 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
-                          <span className={`px-2 py-0.5 rounded-lg border text-[10px] font-semibold ${
-                            isWhite ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-slate-950 border-slate-800 text-slate-300'
-                          }`}>
+                        <td className="py-3.5 px-4 text-slate-300">
+                          <span className="px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-800 text-[10px] font-semibold">
                             {CATEGORIAS_ESTOQUE_NOMES[item.categoria]}
                           </span>
                         </td>
 
                         <td className="py-3.5 px-4">
                           {item.metodoControle === 'recorrente' && (
-                            <span className="text-[10px] text-purple-400 bg-purple-950/60 border border-purple-500/30 px-2 py-0.5 rounded-md font-bold block w-fit">
+                            <span className="text-[10px] text-purple-300 bg-purple-950/60 border border-purple-500/30 px-2 py-0.5 rounded-md font-bold block w-fit">
                               Consumo Previsto: {item.consumoDiarioPrevisto} {item.unidadeMedida}/dia
                             </span>
                           )}
                           {item.metodoControle === 'individual' && (
-                            <span className="text-[10px] text-blue-400 bg-blue-950/60 border border-blue-500/30 px-2 py-0.5 rounded-md font-bold block w-fit">
+                            <span className="text-[10px] text-blue-300 bg-blue-950/60 border border-blue-500/30 px-2 py-0.5 rounded-md font-bold block w-fit">
                               Baixa Automática na Venda
                             </span>
                           )}
                           {item.metodoControle === 'manual' && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold block w-fit border ${
-                              isWhite ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-slate-950 border-slate-800 text-slate-400'
-                            }`}>
+                            <span className="text-[10px] text-slate-400 bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-md font-bold block w-fit">
                               Consumo Interno (Manual)
                             </span>
                           )}
                         </td>
 
                         <td className="py-3.5 px-4 font-mono font-bold text-sm">
-                          <span className={isCritico ? 'text-rose-500' : isAtencao ? 'text-amber-500' : 'text-emerald-500'}>
+                          <span className={isCritico ? 'text-rose-400' : isAtencao ? 'text-amber-400' : 'text-emerald-400'}>
                             {item.quantidadeAtual} {item.unidadeMedida}
                           </span>
                         </td>
 
-                        <td className={`py-3.5 px-4 font-mono text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                        <td className="py-3.5 px-4 text-slate-400 font-mono text-[11px]">
                           Min: {item.estoqueMinimo} • Ideal: {item.estoqueIdeal}
                         </td>
 
@@ -460,61 +434,34 @@ export default function Estoque() {
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                               isCritico
-                                ? isWhite
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                  : 'bg-rose-950 text-rose-300 border border-rose-500/40'
+                                ? 'bg-rose-950 text-rose-300 border border-rose-500/40'
                                 : isAtencao
-                                ? isWhite
-                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                  : 'bg-amber-950 text-amber-300 border border-amber-500/40'
-                                : isWhite
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                ? 'bg-amber-950 text-amber-300 border border-amber-500/40'
                                 : 'bg-emerald-950 text-emerald-300 border border-emerald-500/30'
                             }`}
                           >
                             {item.statusDisponibilidade}
                           </span>
                           {item.metodoControle === 'individual' && item.quantidadeAtual <= 5 && (
-                            <span className={`text-[9px] block mt-0.5 ${isWhite ? 'text-slate-500' : 'text-slate-500'}`}>Margem de segurança retida</span>
+                            <span className="text-[9px] text-slate-500 block mt-0.5">Margem de segurança retida</span>
                           )}
                         </td>
 
                         <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                          {item.metodoControle === 'manual' ? (
                             <button
                               onClick={() => {
-                                setModalAbastecerItem(item);
-                                setQtdAbastecerInput('10');
-                                setModoAbastecer('adicionar');
+                                setModalSaidaManual(item);
+                                setQtdSaidaManual(1);
                               }}
-                              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                                isWhite
-                                  ? 'bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-200 shadow-sm'
-                                  : 'bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                              }`}
-                              title="Suprir ou ajustar quantidade e refletir no Cardápio"
+                              className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-rose-600/30 hover:text-rose-300 text-slate-300 text-xs font-bold transition-all flex items-center gap-1 ml-auto cursor-pointer"
                             >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Suprir</span>
+                              <MinusCircle className="w-3.5 h-3.5 text-rose-400" />
+                              <span>Baixa de Uso</span>
                             </button>
-
-                            {item.metodoControle === 'manual' && (
-                              <button
-                                onClick={() => {
-                                  setModalSaidaManual(item);
-                                  setQtdSaidaManual(1);
-                                }}
-                                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                                  isWhite
-                                    ? 'bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200'
-                                    : 'bg-slate-800 hover:bg-rose-600/30 hover:text-rose-300 text-slate-300'
-                                }`}
-                              >
-                                <MinusCircle className="w-3.5 h-3.5 text-rose-400" />
-                                <span>Baixa</span>
-                              </button>
-                            )}
-                          </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-500">Automático</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -648,54 +595,86 @@ export default function Estoque() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {fichasTecnicas.map((ft) => (
-              <div key={ft.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-3">
-                <div className="flex items-start justify-between pb-2 border-b border-slate-800">
-                  <div>
-                    <h4 className="text-base font-black text-white">{ft.nomePrato}</h4>
-                    <span className="text-[11px] text-slate-400">Ficha Técnica ID: {ft.id}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Preço Venda</span>
-                    <span className="text-base font-black text-emerald-400 font-mono">
-                      R$ {ft.precoVenda.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
+            {(() => {
+              const fichasConsolidadas: FichaTecnica[] = [
+                ...fichasTecnicas,
+                ...produtos
+                  .filter((p) => p.fichaTecnica && p.fichaTecnica.length > 0 && !fichasTecnicas.some((f) => f.produtoId === p.id))
+                  .map((p) => {
+                    const componentes = (p.fichaTecnica || []).map((ing) => {
+                      const itemEst = itens.find((i) => i.id === ing.ingredienteId);
+                      const custoPorGrama = itemEst ? itemEst.precoCusto / (itemEst.unidadeMedida === 'kg' ? 1000 : 1) : 0;
+                      return {
+                        ingredienteId: ing.ingredienteId,
+                        ingredienteNome: ing.ingredienteNome,
+                        pesoGramas: ing.quantidade,
+                        custoPorGrama,
+                        custoTotalComponente: ing.custoUnitarioEstimado || 0,
+                      };
+                    });
+                    const custoTotal = componentes.reduce((acc, c) => acc + c.custoTotalComponente, 0);
+                    return {
+                      id: `ft-${p.id}`,
+                      produtoId: p.id,
+                      nomePrato: p.nome,
+                      componentes,
+                      custoTotalEstimado: custoTotal,
+                      precoVenda: p.precoVenda,
+                      margemBrutaPercentual:
+                        p.precoVenda > 0 ? Number((((p.precoVenda - custoTotal) / p.precoVenda) * 100).toFixed(1)) : 0,
+                    };
+                  }),
+              ];
 
-                {/* Tabela de Componentes */}
-                <div className="space-y-1.5 text-xs">
-                  <p className="text-[10px] font-bold uppercase text-slate-400">Componentes & Pesagem:</p>
-                  <div className="bg-slate-950/80 rounded-2xl p-3 border border-slate-800/80 space-y-1.5">
-                    {ft.componentes.map((comp, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-slate-300 text-[11px]">
-                        <span className="font-medium">{comp.ingredienteNome}</span>
-                        <div className="flex items-center gap-3 font-mono">
-                          <span className="text-slate-400">{comp.pesoGramas}g</span>
-                          <span className="text-emerald-400">R$ {comp.custoTotalComponente.toFixed(2)}</span>
+              return fichasConsolidadas.map((ft) => (
+                <div key={ft.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-3">
+                  <div className="flex items-start justify-between pb-2 border-b border-slate-800">
+                    <div>
+                      <h4 className="text-base font-black text-white">{ft.nomePrato}</h4>
+                      <span className="text-[11px] text-slate-400">Ficha Técnica ID: {ft.id}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Preço Venda</span>
+                      <span className="text-base font-black text-emerald-400 font-mono">
+                        R$ {ft.precoVenda.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Tabela de Componentes */}
+                  <div className="space-y-1.5 text-xs">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Componentes & Pesagem:</p>
+                    <div className="bg-slate-950/80 rounded-2xl p-3 border border-slate-800/80 space-y-1.5">
+                      {ft.componentes.map((comp, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-slate-300 text-[11px]">
+                          <span className="font-medium">{comp.ingredienteNome}</span>
+                          <div className="flex items-center gap-3 font-mono">
+                            <span className="text-slate-400">{comp.pesoGramas}g</span>
+                            <span className="text-emerald-400">R$ {comp.custoTotalComponente.toFixed(2)}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Resumo de Lucro Bruto e Margem */}
-                <div className="p-3 bg-purple-950/20 border border-purple-500/20 rounded-2xl flex items-center justify-between text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">Custo Estimado Insumos:</span>
-                    <span className="font-mono font-bold text-white text-sm">
-                      R$ {ft.custoTotalEstimado.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-purple-300 block font-bold">Margem Bruta Estimada:</span>
-                    <span className="font-mono font-black text-emerald-400 text-sm">
-                      {ft.margemBrutaPercentual.toFixed(1)}% (R$ {(ft.precoVenda - ft.custoTotalEstimado).toFixed(2)})
-                    </span>
+                  {/* Resumo de Lucro Bruto e Margem */}
+                  <div className="p-3 bg-purple-950/20 border border-purple-500/20 rounded-2xl flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Custo Estimado Insumos:</span>
+                      <span className="font-mono font-bold text-white text-sm">
+                        R$ {ft.custoTotalEstimado.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-purple-300 block font-bold">Margem Bruta Estimada:</span>
+                      <span className="font-mono font-black text-emerald-400 text-sm">
+                        {ft.margemBrutaPercentual.toFixed(1)}% (R$ {(ft.precoVenda - ft.custoTotalEstimado).toFixed(2)})
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ));
+            })()}
           </div>
         </div>
       )}
@@ -737,6 +716,123 @@ export default function Estoque() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* ABA 5: AUDITORIA & MOVIMENTAÇÕES DE ESTOQUE (REQUISITO 4)      */}
+      {/* ============================================================== */}
+      {abaAtiva === 'movimentacoes' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+            <History className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 text-xs text-slate-300">
+              <h4 className="font-extrabold text-white">Registro de Auditoria & Movimentações de Estoque</h4>
+              <p>
+                Histórico transacional completo de todas as baixas de vendas com ficha técnica, estornos/cancelamentos com restituição ao estoque, entradas de compras e saídas manuais.
+              </p>
+            </div>
+          </div>
+
+          {/* Filtros de Tipo */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {[
+              { id: 'todos', label: `Todas (${movimentacoes.length})` },
+              { id: 'saida_venda', label: 'Saídas por Venda PDV' },
+              { id: 'estorno_cancelamento', label: 'Estornos / Devoluções' },
+              { id: 'entrada_compra', label: 'Entradas de Compras' },
+              { id: 'saida_manual', label: 'Baixas Manuais' },
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFiltroTipoMov(f.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  filtroTipoMov === f.id
+                    ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20'
+                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tabela de Movimentações */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[780px]">
+                <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="py-3 px-4">Data / Horário</th>
+                    <th className="py-3 px-4">Tipo</th>
+                    <th className="py-3 px-4">Insumo Movimentado</th>
+                    <th className="py-3 px-4">Quantidade</th>
+                    <th className="py-3 px-4">Motivo / Venda Relacionada</th>
+                    <th className="py-3 px-4">Responsável</th>
+                    <th className="py-3 px-4 text-right">Saldo Restante</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-medium">
+                  {movimentacoes
+                    .filter((m) => filtroTipoMov === 'todos' || m.tipo === filtroTipoMov)
+                    .map((m) => {
+                      const isEntrada = m.tipo === 'entrada_compra' || m.tipo === 'estorno_cancelamento';
+                      return (
+                        <tr key={m.id} className="hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3.5 px-4 text-slate-400 font-mono text-[11px] whitespace-nowrap">
+                            {m.dataHora}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {m.tipo === 'saida_venda' && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-950/70 border border-rose-500/30 text-rose-300">
+                                Saída Venda PDV
+                              </span>
+                            )}
+                            {m.tipo === 'estorno_cancelamento' && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/70 border border-emerald-500/30 text-emerald-300 flex items-center gap-1 w-fit">
+                                <RotateCcw className="w-3 h-3" /> Estorno / Restituição
+                              </span>
+                            )}
+                            {m.tipo === 'entrada_compra' && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-950/70 border border-blue-500/30 text-blue-300">
+                                Entrada Compra NF
+                              </span>
+                            )}
+                            {m.tipo === 'saida_manual' && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-950/70 border border-amber-500/30 text-amber-300">
+                                Baixa Manual
+                              </span>
+                            )}
+                            {m.tipo === 'ajuste_sobra' && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-950/70 border border-purple-500/30 text-purple-300">
+                                Ajuste Sobra
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-white">
+                            {m.itemNome}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono font-bold">
+                            <span className={isEntrada ? 'text-emerald-400' : 'text-rose-400'}>
+                              {isEntrada ? '+' : '-'}{m.quantidade} {m.unidadeMedida}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-300 text-xs">
+                            {m.motivo}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-400 text-xs font-mono">
+                            {m.responsavel}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-200">
+                            {m.saldoApos !== undefined ? `${m.saldoApos} ${m.unidadeMedida}` : '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -1158,178 +1254,88 @@ export default function Estoque() {
           </div>
         </div>
       )}
-
       {/* ============================================================== */}
-      {/* MODAL: ABASTECER / SUPRIR ESTOQUE (Conectado ao Cardápio)      */}
+      {/* MODAL: PRATOS VINCULADOS AO INGREDIENTE (REQUISITO 5)           */}
       {/* ============================================================== */}
-      {modalAbastecerItem && (
+      {modalPratosVinculados && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className={`border rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 ${
-            isWhite ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-900 border-slate-800 text-white'
-          }`}>
-            <div className={`flex justify-between items-center pb-3 border-b ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center shrink-0">
-                  <Package className="w-5 h-5" />
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center">
+                  <Utensils className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black">Suprir / Abastecer Item</h3>
-                  <p className={`text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {modalAbastecerItem.produtoId ? '🍽️ Sincronizado automaticamente com o Cardápio' : 'Gestão de Estoque Interno'}
+                  <h3 className="text-base font-extrabold text-white">
+                    Pratos Vinculados a este Insumo
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Insumo: <strong className="text-white">{modalPratosVinculados.item.nome}</strong> • Estoque:{' '}
+                    <span className="text-emerald-400 font-mono font-bold">
+                      {modalPratosVinculados.item.quantidadeAtual} {modalPratosVinculados.item.unidadeMedida}
+                    </span>
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setModalAbastecerItem(null)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                onClick={() => setModalPratosVinculados(null)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Info do Item */}
-            <div className={`p-3.5 rounded-2xl border flex items-center gap-3 ${
-              isWhite ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
-            }`}>
-              {modalAbastecerItem.fotoUrl ? (
-                <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-slate-700">
-                  <img src={modalAbastecerItem.fotoUrl} alt={modalAbastecerItem.nome} className="w-full h-full object-cover" />
-                </div>
-              ) : (
-                <div className="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center shrink-0">
-                  <Package className="w-6 h-6" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-xs truncate">{modalAbastecerItem.nome}</h4>
-                <div className="flex items-center gap-2 mt-1 text-[11px]">
-                  <span className={isWhite ? 'text-slate-500' : 'text-slate-400'}>Estoque Atual:</span>
-                  <span className={`font-mono font-black ${
-                    modalAbastecerItem.quantidadeAtual <= 0
-                      ? 'text-rose-500'
-                      : modalAbastecerItem.quantidadeAtual <= modalAbastecerItem.estoqueMinimo
-                      ? 'text-amber-500'
-                      : 'text-emerald-500'
-                  }`}>
-                    {modalAbastecerItem.quantidadeAtual} {modalAbastecerItem.unidadeMedida}
-                  </span>
-                  <span className="text-slate-400 text-[10px]">
-                    (Mín: {modalAbastecerItem.estoqueMinimo})
-                  </span>
-                </div>
-              </div>
+            <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+              {modalPratosVinculados.pratos.map(({ produto, ingrediente }) => {
+                const custoCalculado = calcularCustoIngrediente(
+                  ingrediente.quantidade,
+                  ingrediente.unidadeMedida,
+                  modalPratosVinculados.item.unidadeMedida,
+                  modalPratosVinculados.item.precoCusto
+                );
+                return (
+                  <div
+                    key={produto.id}
+                    className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center">
+                        {produto.fotoUrl ? (
+                          <img src={produto.fotoUrl} alt={produto.nome} className="w-full h-full object-cover" />
+                        ) : (
+                          <ChefHat className="w-5 h-5 text-orange-500" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-white text-sm truncate">{produto.nome}</h4>
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          Preço Venda: R$ {produto.precoVenda.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0 font-mono">
+                      <span className="text-[11px] text-orange-400 font-bold block">
+                        Consome: {ingrediente.quantidade} {ingrediente.unidadeMedida}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block">
+                        Custo insumo: R$ {custoCalculado.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <form onSubmit={handleConfirmarAbastecimento} className="space-y-4">
-              {/* Modo: Adicionar vs Definir Exato */}
-              <div className={`grid grid-cols-2 gap-2 p-1 rounded-2xl border text-xs font-bold ${
-                isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950/60 border-slate-800'
-              }`}>
-                <button
-                  type="button"
-                  onClick={() => setModoAbastecer('adicionar')}
-                  className={`py-2 rounded-xl transition-all cursor-pointer ${
-                    modoAbastecer === 'adicionar'
-                      ? 'bg-orange-500 text-white shadow-sm'
-                      : isWhite
-                      ? 'text-slate-600 hover:text-slate-900'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  + Adicionar Qtd
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModoAbastecer('definir')}
-                  className={`py-2 rounded-xl transition-all cursor-pointer ${
-                    modoAbastecer === 'definir'
-                      ? 'bg-orange-500 text-white shadow-sm'
-                      : isWhite
-                      ? 'text-slate-600 hover:text-slate-900'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Ajustar Valor Exato
-                </button>
-              </div>
-
-              {/* Atalhos Rápidos */}
-              {modoAbastecer === 'adicionar' && (
-                <div className="space-y-1.5">
-                  <span className={`text-[11px] font-bold block ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
-                    Atalhos Rápidos:
-                  </span>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[5, 10, 20, 50].map((qtd) => (
-                      <button
-                        key={qtd}
-                        type="button"
-                        onClick={() => setQtdAbastecerInput(qtd.toString())}
-                        className={`py-2 rounded-xl text-xs font-mono font-bold border transition-all cursor-pointer ${
-                          qtdAbastecerInput === qtd.toString()
-                            ? 'bg-orange-500 text-white border-orange-500'
-                            : isWhite
-                            ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-800'
-                            : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
-                        }`}
-                      >
-                        +{qtd}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className={`font-bold block mb-1 text-xs ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
-                  {modoAbastecer === 'adicionar'
-                    ? `Quantidade a suprir (${modalAbastecerItem.unidadeMedida}):`
-                    : `Novo total em estoque (${modalAbastecerItem.unidadeMedida}):`}
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    value={qtdAbastecerInput}
-                    onChange={(e) => setQtdAbastecerInput(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 rounded-xl font-mono text-sm border focus:outline-none focus:border-orange-500 font-bold ${
-                      isWhite
-                        ? 'bg-slate-50 border-slate-200 text-slate-900'
-                        : 'bg-slate-950 border-slate-800 text-white'
-                    }`}
-                    placeholder="10"
-                    autoFocus
-                  />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                    {modalAbastecerItem.unidadeMedida}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  {modalAbastecerItem.produtoId && 'O prato correspondente no Cardápio será atualizado em tempo real.'}
-                </p>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalAbastecerItem(null)}
-                  className={`flex-1 py-2.5 rounded-xl border text-xs font-bold cursor-pointer ${
-                    isWhite ? 'border-slate-200 text-slate-600 hover:text-slate-900' : 'border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-lg shadow-orange-500/20 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Confirmar Suprimento</span>
-                </button>
-              </div>
-            </form>
+            <div className="pt-2 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setModalPratosVinculados(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Fechar Consulta
+              </button>
+            </div>
           </div>
         </div>
       )}

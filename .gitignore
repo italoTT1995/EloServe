@@ -30,3 +30,8 @@ lerna-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# WhatsApp Baileys Auth & Credentials
+server/auth_info_baileys/
+server/conversas_memoria.json
+server/contatos_cache.json

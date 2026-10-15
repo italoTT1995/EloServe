@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Users,
   Clock,
@@ -23,17 +23,42 @@ import {
   Crown,
   AlertTriangle,
   ArrowUpRight,
+  Search,
+  ChefHat,
+  Minus,
+  Send,
+  Printer,
+  Download,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useFuncionarioStore } from '../store/useFuncionarioStore';
 import { useSaaSStore, PLANOS_DISPONIVEIS } from '../store/useSaaSStore';
-import { Mesa } from '../types';
+import { useProductStore } from '../store/useProductStore';
+import { useEstoqueStore } from '../store/useEstoqueStore';
+import { Mesa, Produto } from '../types';
+import { MesaQRCodeThumbnail } from '../components/mesas/MesaQRCodeThumbnail';
+import {
+  gerarQrCodeMesaDataUrl,
+  getUrlMesaCliente,
+  baixarQrCodeMesaPng,
+  imprimirDisplayMesaIndividual,
+  imprimirTodosDisplaysMesas,
+} from '../utils/qrCodeHelper';
 
 export default function Mesas() {
-  const { mesas, atualizarStatusMesa, adicionarMesa, removerMesa } = useAppStore();
+  const { getMesasPorTenant, atualizarStatusMesa, adicionarMesa, removerMesa, lancarItensComandaMesa } = useAppStore();
   const { funcionarios } = useFuncionarioStore();
+  const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
+  const { fichasTecnicas } = useEstoqueStore();
   const { getTenantAtivo, mudarPlanoTenant } = useSaaSStore();
   const tenantAtual = getTenantAtivo();
+  const idLoja = (!tenantAtual || tenantAtual.id === 'global') ? 'tenant-01' : tenantAtual.id;
+  const mesas = getMesasPorTenant(idLoja);
+  const produtos = getProdutosPorTenant(idLoja);
+  const categorias = getCategoriasPorTenant(idLoja);
+
   const planoAtual = PLANOS_DISPONIVEIS.find((p) => p.id === tenantAtual?.planoId) || PLANOS_DISPONIVEIS[0];
   const maxMesasPermitidas = planoAtual.limites.maxMesas || 10;
   const isPlanoIlimitado = maxMesasPermitidas >= 999;
@@ -65,8 +90,113 @@ export default function Mesas() {
   const [mesaParaFechar, setMesaParaFechar] = useState<Mesa | null>(null);
   const [pessoasDivisao, setPessoasDivisao] = useState(2);
   const [mesaModalQR, setMesaModalQR] = useState<Mesa | null>(null);
+  const [modalQrDataUrl, setModalQrDataUrl] = useState<string>('');
+  const [copiadoLink, setCopiadoLink] = useState(false);
+
+  useEffect(() => {
+    if (mesaModalQR) {
+      let ativo = true;
+      gerarQrCodeMesaDataUrl(mesaModalQR.numero, mesaModalQR.setor, 500, idLoja)
+        .then((url) => {
+          if (ativo) setModalQrDataUrl(url);
+        })
+        .catch((err) => console.error('Erro gerando QR:', err));
+      return () => {
+        ativo = false;
+      };
+    } else {
+      setModalQrDataUrl('');
+      setCopiadoLink(false);
+    }
+  }, [mesaModalQR, idLoja]);
+
+  const handleCopiarLink = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiadoLink(true);
+    dispararToast('Link copiado para a área de transferência!');
+    setTimeout(() => setCopiadoLink(false), 2500);
+  };
+
   const [mesaParaUnir, setMesaParaUnir] = useState<Mesa | null>(null);
   const [mesaDestinoUniao, setMesaDestinoUniao] = useState<number>(2);
+
+  // Estados de Lançamento de Pedidos e Comanda da Mesa
+  const [mesaParaLancar, setMesaParaLancar] = useState<Mesa | null>(null);
+  const [abaModalComanda, setAbaModalComanda] = useState<'cardapio' | 'itens_consumidos'>('cardapio');
+  const [categoriaCardapioMesa, setCategoriaCardapioMesa] = useState<string>('todas');
+  const [buscaPratoMesa, setBuscaPratoMesa] = useState<string>('');
+  const [carrinhoMesa, setCarrinhoMesa] = useState<{
+    produto: Produto;
+    quantidade: number;
+    observacoes: string;
+  }[]>([]);
+
+  function handleAdicionarItemCarrinhoMesa(produto: Produto) {
+    setCarrinhoMesa((prev) => {
+      const existente = prev.find((it) => it.produto.id === produto.id);
+      if (existente) {
+        return prev.map((it) =>
+          it.produto.id === produto.id ? { ...it, quantidade: it.quantidade + 1 } : it
+        );
+      }
+      return [...prev, { produto, quantidade: 1, observacoes: '' }];
+    });
+  }
+
+  function handleAlterarQtdItemCarrinhoMesa(produtoId: string, delta: number) {
+    setCarrinhoMesa((prev) =>
+      prev
+        .map((it) => {
+          if (it.produto.id === produtoId) {
+            const novaQtd = it.quantidade + delta;
+            return novaQtd > 0 ? { ...it, quantidade: novaQtd } : null;
+          }
+          return it;
+        })
+        .filter(Boolean) as { produto: Produto; quantidade: number; observacoes: string }[]
+    );
+  }
+
+  function handleAlterarObsItemCarrinhoMesa(produtoId: string, observacoes: string) {
+    setCarrinhoMesa((prev) =>
+      prev.map((it) => (it.produto.id === produtoId ? { ...it, observacoes } : it))
+    );
+  }
+
+  function handleEnviarPedidoKDS(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!mesaParaLancar || carrinhoMesa.length === 0) return;
+
+    const novosItens = carrinhoMesa.map((it) => ({
+      produtoId: it.produto.id,
+      nome: it.produto.nome,
+      quantidade: it.quantidade,
+      precoUnitario: it.produto.precoVenda,
+      subtotal: Number((it.produto.precoVenda * it.quantidade).toFixed(2)),
+      observacoes: it.observacoes.trim() || undefined,
+      garcomNome: mesaParaLancar.garcomResponsavel || 'Lucas Oliveira',
+    }));
+
+    const res = lancarItensComandaMesa(
+      mesaParaLancar.numero,
+      novosItens,
+      mesaParaLancar.garcomResponsavel || 'Lucas Oliveira',
+      idLoja
+    );
+
+    if (res.sucesso) {
+      dispararToast(
+        `Pedido #${res.pedidoKDSId.replace('kds_', '')} da Mesa #${mesaParaLancar.numero} enviado com sucesso ao KDS da Cozinha! R$ ${res.totalAdicionado.toFixed(2)} lançado e estoque atualizado.`
+      );
+      setCarrinhoMesa([]);
+      // Atualiza a mesa no modal para refletir os novos itens
+      const mesaAtualizada = useAppStore.getState().getMesasPorTenant(idLoja).find((m) => m.numero === mesaParaLancar.numero);
+      if (mesaAtualizada) {
+        setMesaParaLancar({ ...mesaAtualizada });
+      }
+      setAbaModalComanda('itens_consumidos');
+    }
+  }
 
   // Toast
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -83,16 +213,31 @@ export default function Mesas() {
     (m) => setorSelecionado === 'todos' || m.setor === setorSelecionado
   );
 
+  const produtosFiltradosMesa = produtos.filter((p) => {
+    if (!p.disponivel) return false;
+    const matchCat = categoriaCardapioMesa === 'todas' || p.categoriaId === categoriaCardapioMesa;
+    const matchBusca =
+      !buscaPratoMesa ||
+      p.nome.toLowerCase().includes(buscaPratoMesa.toLowerCase()) ||
+      (p.descricao && p.descricao.toLowerCase().includes(buscaPratoMesa.toLowerCase()));
+    return matchCat && matchBusca;
+  });
+
+  const totalLoteCarrinho = carrinhoMesa.reduce(
+    (acc, it) => acc + it.produto.precoVenda * it.quantidade,
+    0
+  );
+
   const totalOcupadas = mesas.filter((m) => m.status === 'ocupada').length;
   const totalLivres = mesas.filter((m) => m.status === 'livre').length;
   const totalChamados = mesas.filter((m) => m.status === 'chamar_garcom').length;
-  const taxaOcupacao = Math.round((totalOcupadas / mesas.length) * 100);
+  const taxaOcupacao = mesas.length > 0 ? Math.round((totalOcupadas / mesas.length) * 100) : 0;
 
   function handleConfirmarAberturaMesa(e: React.FormEvent) {
     e.preventDefault();
     if (!mesaParaAbrir) return;
 
-    atualizarStatusMesa(mesaParaAbrir.numero, 'ocupada');
+    atualizarStatusMesa(mesaParaAbrir.numero, 'ocupada', idLoja);
     mesaParaAbrir.quantidadePessoas = Number(formAbertura.quantidadePessoas);
     mesaParaAbrir.responsavelNome = formAbertura.responsavelNome || 'Cliente Salão';
     mesaParaAbrir.garcomResponsavel = formAbertura.garcomResponsavel;
@@ -108,7 +253,7 @@ export default function Mesas() {
     mesa.tempoChamadaGarcomMin = 0;
     mesa.alertaCritico = false;
     mesa.solicitacaoTransferida = false;
-    atualizarStatusMesa(mesa.numero, 'ocupada');
+    atualizarStatusMesa(mesa.numero, 'ocupada', idLoja);
     dispararToast(`Chamado da Mesa #${mesa.numero} atendido com sucesso pelo garçom!`);
   }
 
@@ -125,7 +270,7 @@ export default function Mesas() {
     } else {
       dispararToast(`Mesa #${mesa.numero} chamou o garçom! Notificação enviada.`);
     }
-    atualizarStatusMesa(mesa.numero, 'chamar_garcom');
+    atualizarStatusMesa(mesa.numero, 'chamar_garcom', idLoja);
   }
 
   function handleConfirmarUniaoMesas() {
@@ -165,7 +310,7 @@ export default function Mesas() {
       numero: num,
       capacidade: Number(formNovaMesa.capacidade) || 4,
       setor: formNovaMesa.setor || 'Salão',
-    });
+    }, idLoja);
     if (res.sucesso) {
       dispararToast(`✅ Mesa #${num} criada com sucesso no ${formNovaMesa.setor}!`);
       setModalCriarMesaAberto(false);
@@ -180,7 +325,7 @@ export default function Mesas() {
       return;
     }
     if (window.confirm(`Tem certeza que deseja excluir permanentemente a Mesa #${mesa.numero} (${mesa.setor})?`)) {
-      const res = removerMesa(mesa.numero);
+      const res = removerMesa(mesa.numero, idLoja);
       if (res.sucesso) {
         dispararToast(`🗑️ Mesa #${mesa.numero} excluída com sucesso!`);
       } else {
@@ -264,6 +409,29 @@ export default function Mesas() {
             </div>
           </div>
 
+          {/* Botão Imprimir Todos os QRs */}
+          <button
+            onClick={() =>
+              imprimirTodosDisplaysMesas(
+                mesas.map((m) => ({
+                  numero: m.numero,
+                  setor: m.setor,
+                  capacidade: m.capacidade,
+                  tenantId: idLoja,
+                })),
+                tenantAtual?.nomeFantasia || 'Restaurante EloServe',
+                'Cliente_Wifi',
+                'eloserve2026',
+                idLoja
+              )
+            }
+            title="Imprimir displays e totens com QR Code de todas as mesas cadastradas"
+            className="px-3.5 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
+          >
+            <Printer className="w-4 h-4 text-orange-400" />
+            <span className="hidden sm:inline">Imprimir Todos os QRs</span>
+          </button>
+
           {/* Botão + Nova Mesa */}
           <button
             onClick={abrirModalCriarMesa}
@@ -334,23 +502,32 @@ export default function Mesas() {
             >
               <div>
                 {/* Header do Card */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                      {mesa.setor} {mesa.mesasUnidas ? `(Unida com #${mesa.mesasUnidas.join(', ')})` : ''}
-                    </span>
-                    <h3 className="text-xl font-black text-white mt-0.5">
-                      Mesa #{mesa.numero}
-                    </h3>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <MesaQRCodeThumbnail
+                      numero={mesa.numero}
+                      setor={mesa.setor}
+                      size={44}
+                      tenantId={idLoja}
+                      onClick={() => setMesaModalQR(mesa)}
+                    />
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block">
+                        {mesa.setor} {mesa.mesasUnidas ? `(Unida com #${mesa.mesasUnidas.join(', ')})` : ''}
+                      </span>
+                      <h3 className="text-xl font-black text-white mt-0.5">
+                        Mesa #{mesa.numero}
+                      </h3>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-1.5 relative">
                     <button
                       onClick={() => setMesaModalQR(mesa)}
-                      title="Abrir QR Code da Mesa"
+                      title="Ampliar QR Code Real da Mesa"
                       className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
                     >
-                      <QrCode className="w-4 h-4" />
+                      <QrCode className="w-4 h-4 text-orange-400" />
                     </button>
 
                     <span
@@ -408,56 +585,48 @@ export default function Mesas() {
                                   garcomResponsavel: garconsDisponiveis[0]?.nome || 'Lucas Oliveira',
                                 });
                               } else {
-                                dispararToast(`Novo pedido para Mesa #${mesa.numero}!`);
+                                setMesaParaLancar(mesa);
+                                setAbaModalComanda('cardapio');
+                                setCarrinhoMesa([]);
                               }
                             }}
                             className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5 text-slate-600" />
-                            <span>Novo Pedido</span>
+                            <span>Novo Pedido / Cardápio</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => {
                               setMenuAcoesMesaId(null);
-                              dispararToast(`Editando pedido da Mesa #${mesa.numero}...`);
-                            }}
-                            className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
-                          >
-                            <Pencil className="w-3.5 h-3.5 text-slate-600" />
-                            <span>Editar Pedido</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMenuAcoesMesaId(null);
-                              dispararToast(`Itens consumidos na Mesa #${mesa.numero}: R$ ${(mesa.totalConsumo || 0).toFixed(2)}`);
+                              setMesaParaLancar(mesa);
+                              setAbaModalComanda('itens_consumidos');
                             }}
                             className="w-full px-3 py-1.5 text-left bg-slate-100 hover:bg-slate-200 flex items-center gap-2.5 text-slate-900 font-bold cursor-pointer"
                           >
                             <UtensilsCrossed className="w-3.5 h-3.5 text-slate-700" />
-                            <span>Ver Pedidos</span>
+                            <span>Ver Comanda & Pedidos</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => {
                               setMenuAcoesMesaId(null);
-                              window.print();
+                              setMesaParaLancar(mesa);
+                              setAbaModalComanda('itens_consumidos');
                             }}
                             className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
                           >
                             <FileText className="w-3.5 h-3.5 text-slate-600" />
-                            <span>Visualizar Comanda</span>
+                            <span>Visualizar Comanda Completa</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => {
                               setMenuAcoesMesaId(null);
-                              atualizarStatusMesa(mesa.numero, 'chamar_garcom');
+                              atualizarStatusMesa(mesa.numero, 'chamar_garcom', idLoja);
                               dispararToast(`Atenção marcada para Mesa #${mesa.numero}!`);
                             }}
                             className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
@@ -483,7 +652,7 @@ export default function Mesas() {
                             type="button"
                             onClick={() => {
                               setMenuAcoesMesaId(null);
-                              atualizarStatusMesa(mesa.numero, 'livre');
+                              atualizarStatusMesa(mesa.numero, 'livre', idLoja);
                               dispararToast(`Mesa #${mesa.numero} liberada com sucesso!`);
                             }}
                             className="w-full px-3 py-1.5 text-left hover:bg-emerald-50 flex items-center gap-2.5 text-emerald-600 font-bold cursor-pointer"
@@ -586,7 +755,46 @@ export default function Mesas() {
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800">
+                      {/* Prévia dos itens da comanda */}
+                      {mesa.comandaItens && mesa.comandaItens.length > 0 && (
+                        <div className="pt-1.5 space-y-1">
+                          <div className="flex items-center justify-between text-[11px] text-slate-400">
+                            <span className="font-semibold flex items-center gap-1 text-slate-300">
+                              <UtensilsCrossed className="w-3 h-3 text-orange-400" />
+                              Comanda ({mesa.comandaItens.length} {mesa.comandaItens.length === 1 ? 'item' : 'itens'}):
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMesaParaLancar(mesa);
+                                setAbaModalComanda('itens_consumidos');
+                              }}
+                              className="text-emerald-400 hover:underline cursor-pointer font-bold text-[10px]"
+                            >
+                              Ver comanda
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-1 max-h-12 overflow-hidden">
+                            {mesa.comandaItens.slice(-3).map((it, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 flex items-center gap-1"
+                              >
+                                <span className="font-bold text-orange-400">{it.quantidade}x</span>
+                                <span className="truncate max-w-[110px]">{it.nome}</span>
+                              </span>
+                            ))}
+                            {mesa.comandaItens.length > 3 && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-lg bg-slate-800 text-slate-400 font-bold">
+                                +{mesa.comandaItens.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-800">
                         <span className="text-slate-400 flex items-center gap-1">
                           <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
                           Consumo Acumulado:
@@ -618,26 +826,51 @@ export default function Mesas() {
                     <span>Abrir Mesa no Salão</span>
                   </button>
                 ) : (
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="space-y-1.5">
+                    {/* Botão Principal de Lançamento de Pedidos */}
                     <button
+                      type="button"
                       onClick={() => {
-                        setMesaParaFechar(mesa);
-                        setPessoasDivisao(mesa.quantidadePessoas || 2);
+                        setMesaParaLancar(mesa);
+                        setAbaModalComanda('cardapio');
+                        setCarrinhoMesa([]);
                       }}
-                      className="py-2 px-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      className="w-full py-2.5 px-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/20 cursor-pointer active:scale-95"
                     >
-                      <Split className="w-3.5 h-3.5" />
-                      <span>Dividir Conta</span>
+                      <Plus className="w-4 h-4" />
+                      <span>Lançar Pedidos na Mesa</span>
+                      {mesa.comandaItens && mesa.comandaItens.length > 0 && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950/40 text-white font-mono font-bold">
+                          {mesa.comandaItens.length}
+                        </span>
+                      )}
                     </button>
 
-                    <button
-                      onClick={() => handleSimularChamarGarcom(mesa, 9)}
-                      title="Simular cliente chamando garçom"
-                      className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <Bell className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Chamado</span>
-                    </button>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMesaParaLancar(mesa);
+                          setAbaModalComanda('itens_consumidos');
+                        }}
+                        className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Ver Comanda</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMesaParaFechar(mesa);
+                          setPessoasDivisao(mesa.quantidadePessoas || 2);
+                        }}
+                        className="py-2 px-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Split className="w-3.5 h-3.5" />
+                        <span>Fechar Conta</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -794,7 +1027,7 @@ export default function Mesas() {
                 <button
                   type="button"
                   onClick={() => {
-                    atualizarStatusMesa(mesaParaFechar.numero, 'livre');
+                    atualizarStatusMesa(mesaParaFechar.numero, 'livre', idLoja);
                     mesaParaFechar.totalConsumo = 0;
                     dispararToast(`Conta da Mesa #${mesaParaFechar.numero} quitada e mesa liberada!`);
                     setMesaParaFechar(null);
@@ -813,48 +1046,124 @@ export default function Mesas() {
       {/* MODAL: QR CODE DA MESA COM SIMULADOR DO CLIENTE (SEÇÃO 4.12)  */}
       {/* ============================================================== */}
       {mesaModalQR && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 text-center space-y-4">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto">
             <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-              <h4 className="text-sm font-bold text-white">QR Code — Mesa #{mesaModalQR.numero}</h4>
-              <button onClick={() => setMesaModalQR(null)} className="text-slate-400 hover:text-white cursor-pointer">
-                <X className="w-4 h-4" />
+              <div className="flex items-center gap-2 text-left">
+                <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                  <QrCode className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-white">
+                    QR Code Real — Mesa #{mesaModalQR.numero}
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Setor: {mesaModalQR.setor} • {mesaModalQR.capacidade} lugares
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMesaModalQR(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-4 bg-white rounded-2xl inline-block shadow-lg">
-              <div className="w-44 h-44 border-4 border-slate-900 grid grid-cols-5 grid-rows-5 gap-1 p-1">
-                <div className="bg-slate-950"></div>
-                <div className="bg-slate-950"></div>
-                <div></div>
-                <div className="bg-slate-950"></div>
-                <div className="bg-slate-950"></div>
-                <div className="bg-slate-950"></div>
-                <div></div>
-                <div className="bg-slate-950"></div>
-                <div></div>
-                <div className="bg-slate-950"></div>
-                <div></div>
-                <div className="bg-slate-950"></div>
-                <div></div>
-                <div className="bg-slate-950"></div>
-                <div></div>
-                <div className="bg-slate-950"></div>
-                <div></div>
-                <div className="bg-slate-950"></div>
-                <div></div>
-                <div className="bg-slate-950"></div>
-                <div className="bg-slate-950"></div>
-                <div className="bg-slate-950"></div>
-                <div></div>
-                <div className="bg-slate-950"></div>
-                <div className="bg-slate-950"></div>
+            {/* Imagem do QR Code Real Gerado */}
+            <div className="p-4 bg-white rounded-3xl inline-block shadow-2xl border-4 border-slate-800 mx-auto">
+              {modalQrDataUrl ? (
+                <img
+                  src={modalQrDataUrl}
+                  alt={`QR Code Real Mesa #${mesaModalQR.numero}`}
+                  className="w-56 h-56 block rounded-xl"
+                />
+              ) : (
+                <div className="w-56 h-56 flex items-center justify-center text-slate-400 text-xs">
+                  Gerando QR Code...
+                </div>
+              )}
+            </div>
+
+            {/* URL e Copiar Link */}
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between gap-2 text-left">
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] text-slate-500 font-bold uppercase block">
+                  Link de Acesso do Cliente:
+                </span>
+                <span className="text-xs text-orange-400 font-mono font-medium truncate block">
+                  {getUrlMesaCliente(mesaModalQR.numero, mesaModalQR.setor, idLoja)}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleCopiarLink(getUrlMesaCliente(mesaModalQR.numero, mesaModalQR.setor, idLoja))
+                  }
+                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Copiar link da mesa"
+                >
+                  {copiadoLink ? (
+                    <Check className="w-4 h-4 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                </button>
+                <a
+                  href={getUrlMesaCliente(mesaModalQR.numero, mesaModalQR.setor, idLoja)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md shadow-orange-500/20"
+                  title="Abrir autoatendimento do cliente em nova aba"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
               </div>
             </div>
 
+            {/* Ações de Impressão e Download */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (modalQrDataUrl) {
+                    baixarQrCodeMesaPng(modalQrDataUrl, mesaModalQR.numero);
+                    dispararToast(`QR Code da Mesa #${mesaModalQR.numero} baixado em PNG de alta definição!`);
+                  }
+                }}
+                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-2 border border-slate-700 transition-colors"
+              >
+                <Download className="w-4 h-4 text-orange-400" />
+                <span>Baixar PNG</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (modalQrDataUrl) {
+                    imprimirDisplayMesaIndividual({
+                      numero: mesaModalQR.numero,
+                      setor: mesaModalQR.setor,
+                      capacidade: mesaModalQR.capacidade,
+                      nomeRestaurante: tenantAtual?.nomeFantasia || 'Restaurante EloServe',
+                      qrDataUrl: modalQrDataUrl,
+                      tenantId: idLoja,
+                    });
+                  }
+                }}
+                className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-colors"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Imprimir Display</span>
+              </button>
+            </div>
+
+            {/* Painel Experiência do Consumidor (Seção 4.12) */}
             <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-left text-xs space-y-1.5">
-              <span className="text-[10px] text-purple-300 font-bold uppercase block">
-                Experiência do Consumidor (Seção 4.12):
+              <span className="text-[10px] text-purple-300 font-bold uppercase block flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-purple-400" />
+                <span>Experiência do Consumidor (Seção 4.12):</span>
               </span>
               <p className="text-slate-300 text-[11px]">
                 1. Cliente escaneia na mesa sem digitar número.
@@ -867,25 +1176,17 @@ export default function Mesas() {
               </p>
             </div>
 
-            <div className="flex gap-2">
+            {/* Simulação rápida */}
+            <div className="pt-1">
               <button
                 onClick={() => {
                   handleSimularChamarGarcom(mesaModalQR, 3);
                   setMesaModalQR(null);
                 }}
-                className="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer flex items-center justify-center gap-1"
+                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-colors"
               >
-                <Bell className="w-3.5 h-3.5" />
-                <span>Simular Chamado</span>
-              </button>
-              <button
-                onClick={() => {
-                  dispararToast(`Display QR Code da Mesa #${mesaModalQR.numero} enviado para impressão térmica!`);
-                  setMesaModalQR(null);
-                }}
-                className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs cursor-pointer"
-              >
-                Imprimir Display
+                <Bell className="w-4 h-4" />
+                <span>Simular Chamado do Garçom nesta Mesa</span>
               </button>
             </div>
           </div>
@@ -1097,6 +1398,480 @@ export default function Mesas() {
                 <Sparkles className="w-4 h-4 text-slate-950" />
                 <span>Fazer Upgrade para o Pro</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: COMANDA & LANÇAMENTO DE PEDIDOS NA MESA (KDS & ESTOQUE) */}
+      {/* ============================================================== */}
+      {mesaParaLancar && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 select-none">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            {/* Header da Comanda */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+                  <UtensilsCrossed className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-white">
+                      Mesa #{mesaParaLancar.numero}
+                    </h3>
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                      {mesaParaLancar.setor}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      Ocupada
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                    <span>
+                      Cliente: <strong className="text-white">{mesaParaLancar.responsavelNome || 'Cliente Salão'}</strong>
+                    </span>
+                    <span>
+                      Garçom: <strong className="text-purple-300">{mesaParaLancar.garcomResponsavel || 'Lucas Oliveira'}</strong>
+                    </span>
+                    <span>
+                      Pessoas: <strong className="text-slate-200">{mesaParaLancar.quantidadePessoas || 2}</strong>
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 self-end sm:self-auto">
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Total Consumido:</span>
+                  <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
+                    R$ {(mesaParaLancar.totalConsumo || 0).toFixed(2)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMesaParaLancar(null);
+                    setCarrinhoMesa([]);
+                  }}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Navegação de Abas do Modal */}
+            <div className="flex border-b border-slate-800 bg-slate-900/80 px-4 sm:px-5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setAbaModalComanda('cardapio')}
+                className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 cursor-pointer transition-all ${
+                  abaModalComanda === 'cardapio'
+                    ? 'border-orange-500 text-orange-400'
+                    : 'border-transparent text-slate-400 hover:text-white'
+                }`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Lançar Pedidos do Cardápio</span>
+                {carrinhoMesa.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-orange-500 text-white font-mono font-bold">
+                    {carrinhoMesa.reduce((acc, it) => acc + it.quantidade, 0)}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAbaModalComanda('itens_consumidos')}
+                className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 cursor-pointer transition-all ${
+                  abaModalComanda === 'itens_consumidos'
+                    ? 'border-emerald-500 text-emerald-400'
+                    : 'border-transparent text-slate-400 hover:text-white'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>Comanda da Mesa & KDS</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+                  {mesaParaLancar.comandaItens?.length || 0}
+                </span>
+              </button>
+            </div>
+
+            {/* Conteúdo da Aba */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+              {abaModalComanda === 'cardapio' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-full">
+                  {/* Coluna Esquerda: Catálogo do Cardápio (7 cols) */}
+                  <div className="lg:col-span-7 space-y-3.5">
+                    {/* Barra de Busca e Filtros de Categoria */}
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={buscaPratoMesa}
+                          onChange={(e) => setBuscaPratoMesa(e.target.value)}
+                          placeholder="Buscar pratos, cortes, porções, bebidas..."
+                          className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+
+                      {/* Chips de Categorias */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                        <button
+                          type="button"
+                          onClick={() => setCategoriaCardapioMesa('todas')}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
+                            categoriaCardapioMesa === 'todas'
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Todas
+                        </button>
+                        {categorias.map((cat) => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setCategoriaCardapioMesa(cat.id)}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
+                              categoriaCardapioMesa === cat.id
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {cat.nome}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Lista / Grid de Pratos do Cardápio */}
+                    <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+                      {produtosFiltradosMesa.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500 text-xs rounded-2xl bg-slate-950 border border-dashed border-slate-800">
+                          Nenhum prato encontrado com o filtro aplicado.
+                        </div>
+                      ) : (
+                        produtosFiltradosMesa.map((prod) => {
+                          const temFicha = fichasTecnicas.some(
+                            (f) => f.produtoId === prod.id && f.componentes && f.componentes.length > 0
+                          );
+                          const noCarrinho = carrinhoMesa.find((it) => it.produto.id === prod.id);
+
+                          return (
+                            <div
+                              key={prod.id}
+                              className="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-all flex items-center justify-between gap-3"
+                            >
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-white text-xs sm:text-sm truncate">
+                                    {prod.nome}
+                                  </span>
+                                  {temFicha ? (
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold shrink-0">
+                                      🥗 Ficha Técnica (Baixa Estoque)
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-semibold shrink-0">
+                                      Item Direto
+                                    </span>
+                                  )}
+                                </div>
+                                {prod.descricao && (
+                                  <p className="text-[11px] text-slate-400 line-clamp-1">
+                                    {prod.descricao}
+                                  </p>
+                                )}
+                                <span className="text-xs font-black font-mono text-emerald-400 block">
+                                  R$ {prod.precoVenda.toFixed(2)}
+                                </span>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleAdicionarItemCarrinhoMesa(prod)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                                  noCarrinho
+                                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
+                                    : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-orange-500/50'
+                                }`}
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>{noCarrinho ? `${noCarrinho.quantidade}x` : 'Adicionar'}</span>
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Coluna Direita: Lote a Enviar para a Cozinha / KDS (5 cols) */}
+                  <div className="lg:col-span-5 bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                        <h4 className="text-xs font-extrabold uppercase text-orange-400 tracking-wider flex items-center gap-1.5">
+                          <ChefHat className="w-4 h-4" />
+                          <span>Lote a Enviar à Cozinha</span>
+                        </h4>
+                        <span className="text-xs font-bold text-slate-400 font-mono">
+                          {carrinhoMesa.reduce((acc, it) => acc + it.quantidade, 0)} itens
+                        </span>
+                      </div>
+
+                      {carrinhoMesa.length === 0 ? (
+                        <div className="py-12 px-4 text-center text-slate-500 text-xs rounded-xl border border-dashed border-slate-800/80 space-y-2">
+                          <UtensilsCrossed className="w-7 h-7 mx-auto text-slate-600 opacity-60" />
+                          <p className="font-semibold text-slate-400">Nenhum prato adicionado ao lote.</p>
+                          <p className="text-[11px] text-slate-500">
+                            Selecione os itens do cardápio ao lado para montar o pedido desta mesa.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
+                          {carrinhoMesa.map((it) => (
+                            <div
+                              key={it.produto.id}
+                              className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-white truncate">
+                                  {it.produto.nome}
+                                </span>
+                                <span className="text-xs font-mono font-bold text-emerald-400 shrink-0">
+                                  R$ {(it.produto.precoVenda * it.quantidade).toFixed(2)}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAlterarQtdItemCarrinhoMesa(it.produto.id, -1)}
+                                    className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  <span className="px-2 font-mono font-bold text-white text-xs">
+                                    {it.quantidade}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAlterarQtdItemCarrinhoMesa(it.produto.id, 1)}
+                                    className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
+
+                                <input
+                                  type="text"
+                                  value={it.observacoes}
+                                  onChange={(e) =>
+                                    handleAlterarObsItemCarrinhoMesa(it.produto.id, e.target.value)
+                                  }
+                                  placeholder="Obs: sem cebola, ponto..."
+                                  className="flex-1 px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleAlterarQtdItemCarrinhoMesa(it.produto.id, -it.quantidade)}
+                                  className="p-1.5 text-slate-500 hover:text-rose-400 cursor-pointer"
+                                  title="Remover item"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Resumo do Lote e Envio */}
+                    <div className="pt-3 border-t border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400 font-semibold">Subtotal deste Lote:</span>
+                        <span className="text-lg font-black font-mono text-emerald-400">
+                          R$ {totalLoteCarrinho.toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>
+                          Ao confirmar, os ingredientes serão <strong>baixados do estoque automaticamente</strong> e o pedido entrará em tempo real na tela do <strong>KDS da Cozinha</strong>.
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleEnviarPedidoKDS()}
+                        disabled={carrinhoMesa.length === 0}
+                        className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                      >
+                        <Send className="w-4 h-4" />
+                        <span>Enviar Pedido para a Cozinha (KDS)</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Aba 2: Comanda Completa da Mesa & KDS */
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                    <div>
+                      <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-emerald-400" />
+                        <span>Histórico de Consumo da Mesa #{mesaParaLancar.numero}</span>
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Todos os pedidos lançados até o momento para este atendimento.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAbaModalComanda('cardapio')}
+                        className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md shadow-orange-500/20"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Lançar Mais Pedidos</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Imprimir Conferência</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {!mesaParaLancar.comandaItens || mesaParaLancar.comandaItens.length === 0 ? (
+                    <div className="p-12 text-center text-slate-500 text-xs rounded-2xl bg-slate-950 border border-dashed border-slate-800 space-y-2">
+                      <UtensilsCrossed className="w-8 h-8 mx-auto text-slate-600" />
+                      <p className="font-semibold text-slate-400">Nenhum pedido lançado nesta comanda até o momento.</p>
+                      <button
+                        type="button"
+                        onClick={() => setAbaModalComanda('cardapio')}
+                        className="mt-2 px-4 py-2 rounded-xl bg-orange-500 text-white font-bold text-xs cursor-pointer inline-flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Abrir Cardápio e Lançar Itens</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] font-semibold">
+                              <th className="py-2.5 px-3">Horário</th>
+                              <th className="py-2.5 px-3">Item / Prato</th>
+                              <th className="py-2.5 px-3">Qtd</th>
+                              <th className="py-2.5 px-3">Unitário</th>
+                              <th className="py-2.5 px-3">Subtotal</th>
+                              <th className="py-2.5 px-3">KDS Cozinha</th>
+                              <th className="py-2.5 px-3 text-right">Lançado Por</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/60">
+                            {mesaParaLancar.comandaItens.map((item, idx) => (
+                              <tr key={item.id || idx} className="hover:bg-slate-950/60 transition-colors">
+                                <td className="py-2.5 px-3 font-mono text-slate-400">{item.horario}</td>
+                                <td className="py-2.5 px-3">
+                                  <span className="font-bold text-white block">{item.nome}</span>
+                                  {item.observacoes && (
+                                    <span className="text-[11px] text-amber-300 italic block mt-0.5">
+                                      "{item.observacoes}"
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 font-mono font-bold text-orange-400">
+                                  {item.quantidade}x
+                                </td>
+                                <td className="py-2.5 px-3 font-mono text-slate-300">
+                                  R$ {item.precoUnitario.toFixed(2)}
+                                </td>
+                                <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
+                                  R$ {item.subtotal.toFixed(2)}
+                                </td>
+                                <td className="py-2.5 px-3">
+                                  <span
+                                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-block ${
+                                      item.statusKDS === 'pronto'
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        : item.statusKDS === 'em_preparo'
+                                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                                        : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                    }`}
+                                  >
+                                    {item.statusKDS === 'pronto'
+                                      ? 'Pronto / Servido'
+                                      : item.statusKDS === 'em_preparo'
+                                      ? 'Em Preparo'
+                                      : 'Fila da Cozinha'}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 text-right text-slate-400 text-[11px]">
+                                  {item.garcomNome || 'Lucas Oliveira'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Totais e Fechamento */}
+                      <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-end sm:items-center justify-between gap-4">
+                        <div className="space-y-1 text-xs text-slate-400">
+                          <p>
+                            Total de pratos/bebidas servidos:{' '}
+                            <strong className="text-white">
+                              {mesaParaLancar.comandaItens.reduce((acc, it) => acc + it.quantidade, 0)} unidades
+                            </strong>
+                          </p>
+                          <p>
+                            10% Serviço Sugerido (opcional):{' '}
+                            <strong className="text-slate-300">
+                              R$ {((mesaParaLancar.totalConsumo || 0) * 0.1).toFixed(2)}
+                            </strong>
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <span className="text-[10px] text-slate-400 block font-semibold">Total a Pagar:</span>
+                            <span className="text-2xl font-black font-mono text-emerald-400">
+                              R$ {(mesaParaLancar.totalConsumo || 0).toFixed(2)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const mesaAlvo = mesaParaLancar;
+                              setMesaParaLancar(null);
+                              setMesaParaFechar(mesaAlvo);
+                              setPessoasDivisao(mesaAlvo.quantidadePessoas || 2);
+                            }}
+                            className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Split className="w-4 h-4" />
+                            <span>Fechar Conta / Checkout</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

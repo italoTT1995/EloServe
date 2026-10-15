@@ -17,8 +17,12 @@ import {
   ScanBarcode,
   EyeOff,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Bell,
   MessageSquare,
+  RotateCcw,
+  History,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
@@ -29,6 +33,7 @@ import { useSaaSStore } from '../store/useSaaSStore';
 import { useEloBotStore } from '../store/useEloBotStore';
 import { useWindowFocus } from '../hooks/useWindowFocus';
 import { audio } from '../lib/audio';
+import { VendaRealizada } from '../types';
 
 export default function PDV() {
   const [categoriaAtiva, setCategoriaAtiva] = useState('todas');
@@ -58,15 +63,57 @@ export default function PDV() {
     getTotalLiquido,
   } = useCartStore();
 
-  const { registrarVendaCaixa } = useAppStore();
+  const { registrarVenda, vendas, cancelarVenda, operadorAtivo } = useAppStore();
   const { tenantAtivoId } = useSaaSStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
   const idLoja = tenantAtivoId === 'global' ? 'tenant-03' : tenantAtivoId;
   const produtos = getProdutosPorTenant(idLoja);
   const categorias = getCategoriasPorTenant(idLoja);
-  const { baixarEstoquePorVenda } = useEstoqueStore();
+  const { processarBaixaVenda } = useEstoqueStore();
   const { getTotalTransbordosPendentes } = useEloBotStore();
   const pendentesTransbordo = getTotalTransbordosPendentes(idLoja);
+
+  // Estados de Histórico / Estorno de Vendas no PDV
+  const [modalEstornoAberto, setModalEstornoAberto] = useState(false);
+  const [vendaParaEstorno, setVendaParaEstorno] = useState<VendaRealizada | null>(null);
+  const [motivoEstorno, setMotivoEstorno] = useState('Desistência do cliente');
+
+  // Navegação horizontal / Arrastar Categorias com o mouse (Drag-to-Scroll)
+  const categoriasBarRef = useRef<HTMLDivElement | null>(null);
+  const [isMouseDownCat, setIsMouseDownCat] = useState(false);
+  const [startXCat, setStartXCat] = useState(0);
+  const [scrollLeftCat, setScrollLeftCat] = useState(0);
+  const [arrastouCat, setArrastouCat] = useState(false);
+
+  function handleMouseDownCategorias(e: React.MouseEvent) {
+    if (e.button !== 0 || !categoriasBarRef.current) return;
+    setIsMouseDownCat(true);
+    setArrastouCat(false);
+    setStartXCat(e.pageX - categoriasBarRef.current.offsetLeft);
+    setScrollLeftCat(categoriasBarRef.current.scrollLeft);
+  }
+
+  function handleMouseMoveCategorias(e: React.MouseEvent) {
+    if (!isMouseDownCat || !categoriasBarRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - categoriasBarRef.current.offsetLeft;
+    const walk = (x - startXCat) * 1.5;
+    if (Math.abs(walk) > 4) {
+      setArrastouCat(true);
+    }
+    categoriasBarRef.current.scrollLeft = scrollLeftCat - walk;
+  }
+
+  function handleMouseUpCategorias() {
+    setIsMouseDownCat(false);
+    setTimeout(() => setArrastouCat(false), 60);
+  }
+
+  function rolarCategorias(direcao: 'esq' | 'dir') {
+    if (!categoriasBarRef.current) return;
+    const offset = direcao === 'esq' ? -220 : 220;
+    categoriasBarRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+  }
 
   // Filtragem rápida
   const produtosFiltrados = useMemo(() => {
@@ -103,12 +150,30 @@ export default function PDV() {
   function finalizarVenda() {
     if (itens.length === 0) return;
 
-    // Baixa automática no estoque para produtos vendidos (Seção 1.5 e 1.9 do documento)
-    itens.forEach((it) => {
-      baixarEstoquePorVenda(it.produto.id || it.produto.nome, it.quantidade);
-    });
+    const vendaId = `VD-${Date.now().toString().slice(-6)}`;
+    const novaVenda: VendaRealizada = {
+      id: vendaId,
+      dataHora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      total: totalLiquido,
+      formaPagamento: formaSelecionada,
+      itens: itens.map((it) => ({
+        produtoId: it.produto.id,
+        nome: it.produto.nome,
+        quantidade: it.quantidade,
+        precoUnitario: it.produto.precoVenda,
+        subtotal: it.subtotal,
+        fichaTecnica: it.produto.fichaTecnica,
+      })),
+      operador: operadorAtivo || 'Operador Caixa',
+      status: 'concluida',
+    };
 
-    registrarVendaCaixa(totalLiquido);
+    // Baixa automática no estoque calculada pelas fichas técnicas dos pratos vendidos
+    processarBaixaVenda(novaVenda);
+
+    // Registra a venda no fluxo do caixa
+    registrarVenda(novaVenda);
+
     audio.tocarSucessoVenda();
     setVendaSucesso(true);
     setTimeout(() => {
@@ -118,6 +183,17 @@ export default function PDV() {
       limparCarrinho();
       setValorRecebido('');
     }, 1500);
+  }
+
+  function handleConfirmarEstorno() {
+    if (!vendaParaEstorno) return;
+    const res = cancelarVenda(vendaParaEstorno.id, motivoEstorno, operadorAtivo);
+    if (res.sucesso) {
+      exibirToast(`Venda #${vendaParaEstorno.id} cancelada e insumos devolvidos ao estoque!`);
+      setVendaParaEstorno(null);
+    } else {
+      exibirToast(res.mensagem || 'Erro ao estornar venda.');
+    }
   }
 
   // Atalhos de teclado & Suporte automático a leitor de código de barras
@@ -394,54 +470,106 @@ export default function PDV() {
 
         {/* Barra Superior: Busca & Filtro de Categorias */}
         <div className="space-y-3 mb-4">
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              placeholder="Buscar item pelo nome ou código de barras... (Atalho: '/')"
-              className="w-full pl-11 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
-            />
-            {busca ? (
-              <button
-                onClick={() => setBusca('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            ) : (
-              <ScanBarcode className="w-4 h-4 text-slate-600 absolute right-3.5 top-1/2 -translate-y-1/2 hidden sm:block" />
-            )}
+          <div className="flex items-center gap-2.5">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Buscar item pelo nome ou código de barras... (Atalho: '/')"
+                className="w-full pl-11 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+              />
+              {busca ? (
+                <button
+                  onClick={() => setBusca('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              ) : (
+                <ScanBarcode className="w-4 h-4 text-slate-600 absolute right-3.5 top-1/2 -translate-y-1/2 hidden sm:block" />
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setModalEstornoAberto(true)}
+              className="px-3.5 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm shrink-0"
+              title="Consultar vendas recentes e realizar estorno de estoque"
+            >
+              <RotateCcw className="w-4 h-4 text-orange-400" />
+              <span className="hidden sm:inline">Vendas & Estorno ({vendas.length})</span>
+            </button>
           </div>
 
-          {/* Categorias em pílulas deslizáveis */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {/* Categorias em pílulas deslizáveis com suporte a arrastar com o mouse e setas */}
+          <div className="relative flex items-center gap-1.5">
+            {/* Botão Rolar Esquerda */}
             <button
-              onClick={() => setCategoriaAtiva('todas')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
-                categoriaAtiva === 'todas'
-                  ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
-                  : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              type="button"
+              onClick={() => rolarCategorias('esq')}
+              className="p-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer shrink-0 shadow-sm active:scale-95"
+              title="Rolar categorias para a esquerda (ou arraste com o mouse)"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {/* Container Deslizável / Arrastável */}
+            <div
+              ref={categoriasBarRef}
+              onMouseDown={handleMouseDownCategorias}
+              onMouseMove={handleMouseMoveCategorias}
+              onMouseUp={handleMouseUpCategorias}
+              onMouseLeave={handleMouseUpCategorias}
+              className={`flex-1 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none select-none transition-colors ${
+                isMouseDownCat ? 'cursor-grabbing' : 'cursor-grab'
               }`}
             >
-              Todos os Itens
-            </button>
-            {categorias.map((cat) => (
               <button
-                key={cat.id}
-                onClick={() => setCategoriaAtiva(cat.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
-                  categoriaAtiva === cat.id
+                type="button"
+                onClick={() => {
+                  if (arrastouCat) return;
+                  setCategoriaAtiva('todas');
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
+                  categoriaAtiva === 'todas'
                     ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
                     : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                 }`}
               >
-                {cat.nome}
+                Todos os Itens
               </button>
-            ))}
+              {categorias.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    if (arrastouCat) return;
+                    setCategoriaAtiva(cat.id);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
+                    categoriaAtiva === cat.id
+                      ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                      : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  {cat.nome}
+                </button>
+              ))}
+            </div>
+
+            {/* Botão Rolar Direita */}
+            <button
+              type="button"
+              onClick={() => rolarCategorias('dir')}
+              className="p-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer shrink-0 shadow-sm active:scale-95"
+              title="Rolar categorias para a direita (ou arraste com o mouse)"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -726,6 +854,179 @@ export default function PDV() {
                   </button>
                 </div>
               </>
+            )}
+          </div>
+        </div>
+      )}
+      {/* ============================================================== */}
+      {/* MODAL: VENDAS DO TURNO & ESTORNO DE ESTOQUE (REQUISITO 2 E 4)   */}
+      {/* ============================================================== */}
+      {modalEstornoAberto && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">
+                    Vendas do Turno & Estorno de Estoque
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Estorne pedidos para devolver automaticamente os insumos da ficha técnica ao estoque.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setModalEstornoAberto(false);
+                  setVendaParaEstorno(null);
+                }}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Sub-tela: Confirmação do Estorno */}
+            {vendaParaEstorno ? (
+              <div className="space-y-4 text-xs">
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2 text-amber-200">
+                  <div className="flex items-center gap-2 font-bold text-amber-300">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>Confirmar Cancelamento & Estorno da Venda #{vendaParaEstorno.id}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    Ao confirmar, os ingredientes vinculados às fichas técnicas dos pratos desta venda retornarão imediatamente ao estoque e o valor de{' '}
+                    <strong className="text-white">R$ {vendaParaEstorno.total.toFixed(2)}</strong> será deduzido do caixa.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Itens que serão restituídos:
+                  </span>
+                  <div className="space-y-1">
+                    {vendaParaEstorno.itens.map((it, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-slate-300">
+                        <span className="font-semibold">
+                          {it.quantidade}x {it.nome}
+                        </span>
+                        <span className="font-mono text-emerald-400">R$ {it.subtotal.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">
+                    Motivo do Cancelamento / Estorno:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={motivoEstorno}
+                    onChange={(e) => setMotivoEstorno(e.target.value)}
+                    placeholder="Ex: Desistência do cliente, prato digitado incorretamente..."
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setVendaParaEstorno(null)}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmarEstorno}
+                    className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold shadow-lg shadow-rose-600/20 cursor-pointer active:scale-95"
+                  >
+                    Confirmar Estorno no Estoque
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Lista Geral de Vendas */
+              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                {vendas.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-500">
+                    Nenhuma venda registrada neste turno ainda.
+                  </div>
+                ) : (
+                  vendas.map((v) => {
+                    const isCancelada = v.status === 'cancelada';
+                    return (
+                      <div
+                        key={v.id}
+                        className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs transition-all ${
+                          isCancelada
+                            ? 'bg-rose-950/20 border-rose-500/30 opacity-75'
+                            : 'bg-slate-950/70 border-slate-800'
+                        }`}
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-white font-mono">#{v.id}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{v.dataHora}</span>
+                            {isCancelada ? (
+                              <span className="px-2 py-0.2 rounded-md bg-rose-950 text-rose-400 text-[10px] font-bold border border-rose-500/30">
+                                Estornada / Cancelada
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.2 rounded-md bg-emerald-950 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+                                Concluída
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-300 truncate">
+                            {v.itens.map((i) => `${i.quantidade}x ${i.nome}`).join(', ')}
+                          </p>
+                          {v.motivoCancelamento && (
+                            <p className="text-[10px] text-rose-300 italic">
+                              Motivo: {v.motivoCancelamento}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="text-right shrink-0 space-y-1">
+                          <span className="text-sm font-black font-mono text-emerald-400 block">
+                            R$ {v.total.toFixed(2)}
+                          </span>
+                          {!isCancelada && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVendaParaEstorno(v);
+                                setMotivoEstorno('Desistência do cliente');
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-rose-400 text-[10px] font-bold cursor-pointer transition-colors"
+                            >
+                              Estornar Pedido
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {!vendaParaEstorno && (
+              <div className="pt-2 border-t border-slate-800 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setModalEstornoAberto(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
             )}
           </div>
         </div>
