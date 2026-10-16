@@ -159,7 +159,15 @@ export default function App() {
                     }
                   />
 
-                  {/* Relatórios DRE */}
+                  {/* DRE Financeiro do Restaurante & Relatórios */}
+                  <Route
+                    path="/dre"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <Relatorios />
+                      </RotaProtegida>
+                    }
+                  />
                   <Route
                     path="/relatorios"
                     element={

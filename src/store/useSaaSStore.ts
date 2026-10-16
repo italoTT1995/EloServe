@@ -169,6 +169,7 @@ interface SaaSState {
   adicionarAviso: (aviso: Omit<AvisoGlobalSaaS, 'id' | 'criadoEm'>) => void;
   alternarStatusAviso: (id: string) => void;
   removerAviso: (id: string) => void;
+  alternarPermissaoDRE: (tenantId: string, habilitado?: boolean, operadorNome?: string) => void;
   registrarLogAuditoria: (acao: string, categoria: LogAuditoriaSaaS['categoria'], detalhes: string) => void;
   getAvisosAtivosParaTenant: (tenantId: string) => AvisoGlobalSaaS[];
   getTenantAtivo: () => TenantRestaurante;
@@ -220,6 +221,9 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
     proximoVencimento: '15/11/2026',
     instanciaWhatsAppConectada: true,
     criadoEm: '2026-01-01',
+    dreHabilitado: true,
+    drePermissaoModificadoPor: 'Italo Lemos (Super Admin)',
+    drePermissaoModificadoEm: '15/10/2026 14:00',
   },
   {
     id: 'tenant-02',
@@ -237,6 +241,7 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
     proximoVencimento: '10/11/2026',
     instanciaWhatsAppConectada: false,
     criadoEm: '2026-02-10',
+    dreHabilitado: false,
   },
   {
     id: 'tenant-03',
@@ -255,6 +260,7 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
     proximoVencimento: '11/10/2026',
     instanciaWhatsAppConectada: true,
     criadoEm: '2026-10-04',
+    dreHabilitado: false,
   },
   {
     id: 'tenant-04',
@@ -272,6 +278,7 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
     proximoVencimento: '05/10/2026',
     instanciaWhatsAppConectada: false,
     criadoEm: '2026-03-15',
+    dreHabilitado: false,
   },
   {
     id: 'tenant-05',
@@ -289,6 +296,9 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
     proximoVencimento: '20/10/2026',
     instanciaWhatsAppConectada: false,
     criadoEm: '2026-05-20',
+    dreHabilitado: true,
+    drePermissaoModificadoPor: 'Italo Lemos (Super Admin)',
+    drePermissaoModificadoEm: '14/10/2026 11:30',
   },
 ];
 
@@ -533,6 +543,34 @@ export const useSaaSStore = create<SaaSState>()(
 
       removerAviso: (id) => {
         set((state) => ({ avisos: state.avisos.filter((a) => a.id !== id) }));
+      },
+
+      alternarPermissaoDRE: (tenantId, habilitado, operadorNome = 'Super Admin (Dono do SaaS)') => {
+        const state = get();
+        const tenant = state.tenants.find((t) => t.id === tenantId);
+        if (!tenant) return;
+
+        const novoValor = habilitado !== undefined ? habilitado : !tenant.dreHabilitado;
+        const agoraTexto = new Date().toLocaleString('pt-BR');
+
+        set((s) => ({
+          tenants: s.tenants.map((t) =>
+            t.id === tenantId
+              ? {
+                  ...t,
+                  dreHabilitado: novoValor,
+                  drePermissaoModificadoPor: operadorNome,
+                  drePermissaoModificadoEm: agoraTexto,
+                }
+              : t
+          ),
+        }));
+
+        get().registrarLogAuditoria(
+          `Permissão DRE Básico ${novoValor ? 'Liberada' : 'Revogada / Bloqueada'}`,
+          'seguranca',
+          `O acesso ao DRE Básico do cliente foi ${novoValor ? 'LIBERADO' : 'REVOGADO / BLOQUEADO'} para a loja "${tenant.nomeFantasia}" (${tenant.id}) pelo operador "${operadorNome}".`
+        );
       },
 
       registrarLogAuditoria: (acao, categoria, detalhes) => {

@@ -90,6 +90,7 @@ export default function SaaSMaster() {
     adicionarAviso,
     alternarStatusAviso,
     removerAviso,
+    alternarPermissaoDRE,
     registrarLogAuditoria,
     codigoSegurancaMaster,
     masterDesbloqueado,
@@ -141,6 +142,18 @@ export default function SaaSMaster() {
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
   const [modalNovoTenant, setModalNovoTenant] = useState(false);
   const [modalCobrancaWhatsApp, setModalCobrancaWhatsApp] = useState<any | null>(null);
+  const [toastDRE, setToastDRE] = useState<string | null>(null);
+
+  function handleToggleDRETenant(tenant: TenantRestaurante) {
+    const novoStatus = !tenant.dreHabilitado;
+    alternarPermissaoDRE(tenant.id, novoStatus, 'Italo Lemos (Super Admin)');
+    setToastDRE(
+      novoStatus
+        ? `DRE Básico LIBERADO com sucesso para "${tenant.nomeFantasia}"! O estabelecimento já pode consultar resultados operacionais.`
+        : `Acesso ao DRE Básico BLOQUEADO para "${tenant.nomeFantasia}". O restaurante não poderá mais acessar o demonstrativo.`
+    );
+    setTimeout(() => setToastDRE(null), 5000);
+  }
 
   // Estados do Cofre de Segurança Master
   const [pinDigitado, setPinDigitado] = useState('');
@@ -260,6 +273,7 @@ export default function SaaSMaster() {
     valorMensalidade: 199,
     proximoVencimento: '',
     diasRestantesTrial: 7,
+    dreHabilitado: false,
   });
 
   const [sucessoSalvarEdicao, setSucessoSalvarEdicao] = useState<string | null>(null);
@@ -280,6 +294,7 @@ export default function SaaSMaster() {
         valorMensalidade: tenantEmEdicao.valorMensalidade,
         proximoVencimento: tenantEmEdicao.proximoVencimento || '',
         diasRestantesTrial: tenantEmEdicao.diasRestantesTrial || 7,
+        dreHabilitado: Boolean(tenantEmEdicao.dreHabilitado),
       });
     }
   }, [tenantEmEdicao?.id]);
@@ -287,6 +302,10 @@ export default function SaaSMaster() {
   function handleSalvarEdicaoRestaurante(e: React.FormEvent) {
     e.preventDefault();
     if (!tenantEmEdicao) return;
+
+    if (formEdicao.dreHabilitado !== tenantEmEdicao.dreHabilitado) {
+      alternarPermissaoDRE(tenantEmEdicao.id, formEdicao.dreHabilitado, 'Italo Lemos (Super Admin via Editor)');
+    }
 
     atualizarDadosTenant(tenantEmEdicao.id, {
       nomeFantasia: formEdicao.nomeFantasia,
@@ -301,6 +320,7 @@ export default function SaaSMaster() {
       valorMensalidade: Number(formEdicao.valorMensalidade),
       proximoVencimento: formEdicao.proximoVencimento,
       diasRestantesTrial: formEdicao.statusAssinatura === 'trial' ? Number(formEdicao.diasRestantesTrial) : undefined,
+      dreHabilitado: formEdicao.dreHabilitado,
     });
 
     setSucessoSalvarEdicao('Dados cadastrais e assinatura do restaurante salvos com sucesso!');
@@ -605,7 +625,7 @@ export default function SaaSMaster() {
   });
 
   // Estados da Aba DRE Executivo e Gráficos SaaS
-  const [periodoDRE, setPeriodoDRE] = useState<'mensal' | 'anual'>('mensal');
+  const [periodoDRE, setPeriodoDRE] = useState<'mensal' | 'anterior' | 'trimestral' | 'anual'>('mensal');
   const [simulacaoClientes, setSimulacaoClientes] = useState<number>(100);
   const [simulacaoTicketMedio, setSimulacaoTicketMedio] = useState<number>(199.0);
 
@@ -721,7 +741,11 @@ export default function SaaSMaster() {
       t.responsavelNome.toLowerCase().includes(busca.toLowerCase()) ||
       t.documento.includes(busca) ||
       t.cidadeUf.toLowerCase().includes(busca.toLowerCase());
-    const matchStatus = filtroStatus === 'todos' || t.statusAssinatura === filtroStatus;
+    const matchStatus =
+      filtroStatus === 'todos' ||
+      (filtroStatus === 'dre_ativo' && t.dreHabilitado) ||
+      (filtroStatus === 'dre_bloqueado' && !t.dreHabilitado) ||
+      t.statusAssinatura === filtroStatus;
     return matchBusca && matchStatus;
   });
 
@@ -1337,6 +1361,8 @@ export default function SaaSMaster() {
               {[
                 { id: 'todos', label: `Todos (${tenants.length})` },
                 { id: 'ativo', label: 'Ativos' },
+                { id: 'dre_ativo', label: 'Com DRE Liberado' },
+                { id: 'dre_bloqueado', label: 'DRE Bloqueado' },
                 { id: 'trial', label: 'Em Teste' },
                 { id: 'atrasado', label: 'Atrasados' },
                 { id: 'bloqueado', label: 'Bloqueados' },
@@ -1346,7 +1372,7 @@ export default function SaaSMaster() {
                   onClick={() => setFiltroStatus(item.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                     filtroStatus === item.id
-                      ? 'bg-purple-600 text-white shadow-sm'
+                      ? 'bg-purple-600 text-white shadow-sm font-bold'
                       : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
                   }`}
                 >
@@ -1356,16 +1382,30 @@ export default function SaaSMaster() {
             </div>
           </div>
 
+          {/* Feedback de Alteração de Permissão DRE */}
+          {toastDRE && (
+            <div className="p-3.5 rounded-2xl bg-purple-950/90 border border-purple-500/50 text-purple-200 text-xs font-bold flex items-center justify-between shadow-2xl animate-in fade-in">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0" />
+                <span>{toastDRE}</span>
+              </div>
+              <button onClick={() => setToastDRE(null)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* Tabela de Assinantes SaaS */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-x-auto shadow-xl">
-            <table className="w-full text-left text-xs min-w-[750px]">
+            <table className="w-full text-left text-xs min-w-[850px]">
               <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="py-3.5 px-5">Restaurante / Razão Social</th>
                   <th className="py-3.5 px-4">Responsável & Contato</th>
                   <th className="py-3.5 px-4">Plano</th>
                   <th className="py-3.5 px-4">Mensalidade</th>
-                  <th className="py-3.5 px-4">Status da Assinatura</th>
+                  <th className="py-3.5 px-4">Status Assinatura</th>
+                  <th className="py-3.5 px-4">DRE Básico</th>
                   <th className="py-3.5 px-4">Vencimento</th>
                   <th className="py-3.5 px-5 text-right">Ações Rápidas</th>
                 </tr>
@@ -1373,7 +1413,7 @@ export default function SaaSMaster() {
               <tbody className="divide-y divide-slate-800/60 font-medium">
                 {tenantsFiltrados.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-500 text-xs">
+                    <td colSpan={8} className="py-12 text-center text-slate-500 text-xs">
                       Nenhum restaurante encontrado com o filtro atual.
                     </td>
                   </tr>
@@ -1468,6 +1508,40 @@ export default function SaaSMaster() {
                           {tenant.statusAssinatura === 'bloqueado' && (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 text-[11px] font-bold">
                               <Lock className="w-3 h-3" /> Bloqueado
+                            </span>
+                          )}
+                        </td>
+
+                        {/* DRE Básico (Feature Gating) */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDRETenant(tenant)}
+                              className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                tenant.dreHabilitado ? 'bg-emerald-500' : 'bg-slate-700'
+                              }`}
+                              title={tenant.dreHabilitado ? 'DRE Habilitado - Clique para Bloquear' : 'DRE Bloqueado - Clique para Liberar'}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                  tenant.dreHabilitado ? 'translate-x-5' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                            <span
+                              className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                                tenant.dreHabilitado
+                                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              }`}
+                            >
+                              {tenant.dreHabilitado ? 'Liberado' : 'Bloqueado'}
+                            </span>
+                          </div>
+                          {tenant.drePermissaoModificadoEm && (
+                            <span className="text-[9px] text-slate-500 block mt-1 font-mono">
+                              Mod: {tenant.drePermissaoModificadoEm.split(' ')[0]}
                             </span>
                           )}
                         </td>
@@ -1862,6 +1936,34 @@ export default function SaaSMaster() {
                         className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-purple-500"
                       />
                     </div>
+
+                    {/* Permissão Especial DRE Básico */}
+                    <div className="pt-2 border-t border-slate-800">
+                      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-purple-950/20 border border-purple-500/30">
+                        <div className="space-y-0.5 pr-2">
+                          <label className="text-white font-bold block text-xs flex items-center gap-1.5">
+                            <BarChart3 className="w-4 h-4 text-purple-400" />
+                            <span>Módulo DRE Básico do Restaurante</span>
+                          </label>
+                          <p className="text-[11px] text-slate-400 leading-snug">
+                            Permite aos gestores desta loja visualizar o demonstrativo de lucros, CMV calculado e despesas operacionais. Se desativado, o acesso é bloqueado na interface e URLs diretas.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFormEdicao({ ...formEdicao, dreHabilitado: !formEdicao.dreHabilitado })}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            formEdicao.dreHabilitado ? 'bg-emerald-500' : 'bg-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                              formEdicao.dreHabilitado ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2070,9 +2172,10 @@ export default function SaaSMaster() {
 
       {/* CONTEÚDO DA NOVA ABA: DRE EXECUTIVO & GRÁFICOS DO SAAS */}
       {abaAtiva === 'dre_saas' && (() => {
-        const fator = periodoDRE === 'mensal' ? 1 : 12;
-        const receitaAssinaturas = mrr * fator;
-        const receitaOnboarding = (150 * (tenants.length > 0 ? 1 : 0)) * fator;
+        const fator = periodoDRE === 'anual' ? 12 : periodoDRE === 'trimestral' ? 3 : 1;
+        const receitaBaseMensal = periodoDRE === 'anterior' ? 996 : mrr;
+        const receitaAssinaturas = receitaBaseMensal * fator;
+        const receitaOnboarding = (periodoDRE === 'anterior' ? 0 : 150 * (tenants.length > 0 ? 1 : 0)) * (periodoDRE === 'anual' ? 3 : 1);
         const receitaBruta = receitaAssinaturas + receitaOnboarding;
 
         const deducoesImpostos = receitaBruta * (custosInfra.impostoSimplesPct / 100);
@@ -2126,14 +2229,14 @@ export default function SaaSMaster() {
                 </div>
                 <h3 className="text-xl font-black text-white flex items-center gap-2">
                   <TrendingUp className="w-6 h-6 text-emerald-400" />
-                  <span>DRE Executivo & Métricas da Plataforma EloServe</span>
+                  <span>DRE Executivo Corporativo da Plataforma EloServe</span>
                 </h3>
                 <p className="text-xs text-slate-400 max-w-3xl">
-                  Demonstração consolidada do resultado operacional da sua empresa de software: receitas recorrentes, custos de infraestrutura em nuvem, margem de contribuição líquida e projeção de valuation de mercado.
+                  Demonstração consolidada do resultado operacional da sua empresa fornecedora de software: receitas exclusivas de assinaturas, infraestrutura em nuvem, tributação Simples Nacional e expansão de margens de lucro.
                 </p>
               </div>
 
-              {/* Botões de Ação e Seletor Mensal / Anual */}
+              {/* Botões de Ação e Seletor de Período Multi-Opção */}
               <div className="flex items-center gap-2.5 flex-wrap shrink-0 self-start lg:self-auto">
                 <button
                   type="button"
@@ -2158,7 +2261,7 @@ export default function SaaSMaster() {
                   <span>Imprimir / PDF</span>
                 </button>
 
-                <div className="flex items-center bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+                <div className="flex items-center bg-slate-950 p-1 rounded-2xl border border-slate-800 overflow-x-auto">
                   <button
                     type="button"
                     onClick={() => setPeriodoDRE('mensal')}
@@ -2168,7 +2271,29 @@ export default function SaaSMaster() {
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Mensal (MRR)
+                    Mês Atual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPeriodoDRE('anterior')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      periodoDRE === 'anterior'
+                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Mês Anterior
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPeriodoDRE('trimestral')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      periodoDRE === 'trimestral'
+                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Trimestre
                   </button>
                   <button
                     type="button"
@@ -2235,19 +2360,87 @@ export default function SaaSMaster() {
                 </span>
               </div>
 
-              {/* GMV Global Processado */}
+              {/* ARR Contratado / Saúde SaaS */}
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400 font-medium">GMV Global dos Restaurantes</span>
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
-                    <Store className="w-4 h-4" />
+                  <span className="text-xs text-slate-400 font-medium">ARR Contratado (EloServe)</span>
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold">
+                    <TrendingUp className="w-4 h-4" />
                   </div>
                 </div>
-                <p className="text-2xl font-black text-amber-400 font-mono">
-                  R$ 384.950,00
+                <p className="text-2xl font-black text-purple-400 font-mono">
+                  R$ {(mrr * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <span className="text-[10px] text-amber-400/80 font-semibold block">
-                  Volume total movimentado no EloServe este mês
+                <span className="text-[10px] text-purple-400/80 font-semibold block">
+                  Receita recorrente anualizada da plataforma
+                </span>
+              </div>
+            </div>
+
+            {/* COMPARATIVO EXECUTIVO ENTRE PERÍODOS & GOVERNANÇA */}
+            <div className="bg-gradient-to-r from-purple-950/40 via-slate-900 to-indigo-950/40 border border-purple-500/30 p-5 rounded-3xl space-y-3 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-white">
+                      Comparativo de Desempenho vs. Mês Anterior (Setembro/2026)
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      Evolução consolidada das receitas e expansão de margens líquidas do EloServe
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-400 font-bold border border-emerald-500/30 font-mono">
+                  +13.2% Lucro Líquido
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 block">Receita Bruta SaaS</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-white">R$ 1.245,00</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">+25.0%</span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 block">Set/26: R$ 996,00</span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 block">Custos Cloud / COGS</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-white">R$ 336,11</span>
+                    <span className="text-[10px] text-amber-400 font-bold">+4.9%</span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 block">Set/26: R$ 320,38</span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 block">Lucro Operacional Líquido</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-emerald-400">R$ 697,55</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">+13.2%</span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 block">Set/26: R$ 616,24</span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <span className="text-[10px] text-slate-400 block">Margem Líquida</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-purple-300">59.6%</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">+1.8 p.p.</span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 block">Eficiência de infraestrutura</span>
+                </div>
+              </div>
+
+              {/* Compliance Rule Alert */}
+              <div className="pt-1 flex items-center gap-2 text-[11px] text-slate-400">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>
+                  <strong>Governança EloServe:</strong> O DRE Corporativo contabiliza exclusivamente mensalidades e serviços de software da própria empresa. As vendas dos restaurantes pertencem exclusivamente aos clientes e não compõem a receita da empresa franqueadora.
                 </span>
               </div>
             </div>

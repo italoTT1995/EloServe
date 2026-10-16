@@ -151,10 +151,21 @@ export default function PDV() {
     if (itens.length === 0) return;
 
     const vendaId = `VD-${Date.now().toString().slice(-6)}`;
+    const agoraDataHora =
+      new Date().toLocaleDateString('pt-BR') +
+      ' ' +
+      new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const totalBruto = getTotalBruto();
     const novaVenda: VendaRealizada = {
       id: vendaId,
-      dataHora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      tenantId: idLoja,
+      tipoOrigem: tipoPedido,
+      mesaNumero: tipoPedido === 'mesa' ? mesaNumero || undefined : undefined,
+      dataHora: agoraDataHora,
       total: totalLiquido,
+      subtotalBruto: totalBruto,
+      desconto: descontoReais,
       formaPagamento: formaSelecionada,
       itens: itens.map((it) => ({
         produtoId: it.produto.id,

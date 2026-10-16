@@ -184,6 +184,9 @@ export interface TenantRestaurante {
   diasRestantesTrial?: number;
   instanciaWhatsAppConectada: boolean;
   criadoEm: string;
+  dreHabilitado?: boolean;
+  drePermissaoModificadoPor?: string;
+  drePermissaoModificadoEm?: string;
 }
 
 // -------------------------------------------------------------
@@ -283,8 +286,13 @@ export interface ItemVendaRealizada {
 
 export interface VendaRealizada {
   id: string;
+  tenantId?: string;
+  tipoOrigem?: 'balcao' | 'mesa' | 'delivery';
+  mesaNumero?: number;
   dataHora: string;
   total: number;
+  subtotalBruto?: number;
+  desconto?: number;
   formaPagamento: FormaPagamento;
   itens: ItemVendaRealizada[];
   operador: string;
@@ -292,6 +300,17 @@ export interface VendaRealizada {
   motivoCancelamento?: string;
   canceladoEm?: string;
   canceladoPor?: string;
+}
+
+export interface DespesaOperacionalRestaurante {
+  id: string;
+  tenantId: string;
+  descricao: string;
+  categoria: 'ocupacao' | 'pessoal' | 'servicos' | 'financeiro' | 'insumos' | 'outros';
+  valor: number;
+  data: string;
+  tipo: 'fixa' | 'variavel';
+  cadastradoPor?: string;
 }
 
 // -------------------------------------------------------------

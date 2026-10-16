@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { SessaoCaixa, Mesa, PedidoKDS, VendaRealizada, ItemComandaMesa } from '../types';
+import { SessaoCaixa, Mesa, PedidoKDS, VendaRealizada, ItemComandaMesa, DespesaOperacionalRestaurante } from '../types';
 import { useEstoqueStore } from './useEstoqueStore';
 import { MESAS_POR_TENANT } from './initialMesas';
 
@@ -14,6 +14,11 @@ interface AppState {
   mesas: Mesa[];
   pedidosKDS: PedidoKDS[];
   vendas: VendaRealizada[];
+  despesasRestaurante: DespesaOperacionalRestaurante[];
+  getVendasPorTenant: (tenantId?: string) => VendaRealizada[];
+  getDespesasPorTenant: (tenantId?: string) => DespesaOperacionalRestaurante[];
+  adicionarDespesaRestaurante: (despesa: Omit<DespesaOperacionalRestaurante, 'id'>) => void;
+  removerDespesaRestaurante: (id: string) => void;
   abrirCaixa: (saldoInicial: number) => void;
   fecharCaixa: () => void;
   registrarVendaCaixa: (valor: number) => void;
@@ -159,23 +164,358 @@ export const useAppStore = create<AppState>()(
 
       vendas: [
         {
-          id: 'VD-1082',
-          dataHora: '13/10/2026 19:42',
-          total: 56.0,
-          formaPagamento: 'pix',
+          id: 'VD-2401',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'mesa',
+          mesaNumero: 24,
+          dataHora: '16/10/2026 13:42',
+          total: 109.70,
+          subtotalBruto: 109.70,
+          desconto: 0,
+          formaPagamento: 'credito',
           itens: [
-            {
-              produtoId: 'p_fg_6',
-              nome: 'Cerveja Amstel Lager 350ml',
-              quantidade: 8,
-              precoUnitario: 7.0,
-              subtotal: 56.0,
-            },
+            { produtoId: 'p_fg_1', nome: 'Picanha Bovina Angus na Parrilla 600g', quantidade: 1, precoUnitario: 89.9, subtotal: 89.9 },
+            { produtoId: 'p_fg_5', nome: 'Chopp Pilsen Artesanal 350ml', quantidade: 2, precoUnitario: 9.9, subtotal: 19.8 },
           ],
           operador: 'Italo Lemos',
           status: 'concluida',
         },
+        {
+          id: 'VD-2402',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'mesa',
+          mesaNumero: 4,
+          dataHora: '16/10/2026 13:35',
+          total: 34.30,
+          subtotalBruto: 44.30,
+          desconto: 10.0,
+          formaPagamento: 'pix',
+          itens: [
+            { produtoId: 'p_fg_3', nome: 'Batata Rústica com Alecrim', quantidade: 1, precoUnitario: 24.5, subtotal: 24.5 },
+            { produtoId: 'p_fg_5', nome: 'Chopp Pilsen Artesanal 350ml', quantidade: 2, precoUnitario: 9.9, subtotal: 19.8 },
+          ],
+          operador: 'Italo Lemos',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2403',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'mesa',
+          mesaNumero: 26,
+          dataHora: '16/10/2026 13:20',
+          total: 140.70,
+          subtotalBruto: 140.70,
+          desconto: 0,
+          formaPagamento: 'debito',
+          itens: [
+            { produtoId: 'p_fg_1', nome: 'Picanha Bovina Angus na Parrilla 600g', quantidade: 1, precoUnitario: 89.9, subtotal: 89.9 },
+            { produtoId: 'p_fg_3', nome: 'Batata Rústica com Alecrim', quantidade: 1, precoUnitario: 24.5, subtotal: 24.5 },
+            { produtoId: 'p_fg_5', nome: 'Chopp Pilsen Artesanal 350ml', quantidade: 2, precoUnitario: 9.9, subtotal: 19.8 },
+            { produtoId: 'p_fg_7', nome: 'Refrigerante Coca-Cola 350ml', quantidade: 1, precoUnitario: 6.5, subtotal: 6.5 },
+          ],
+          operador: 'Italo Lemos',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2404',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'mesa',
+          mesaNumero: 21,
+          dataHora: '16/10/2026 13:10',
+          total: 99.80,
+          subtotalBruto: 99.80,
+          desconto: 0,
+          formaPagamento: 'dinheiro',
+          itens: [
+            { produtoId: 'p_fg_1', nome: 'Picanha Bovina Angus na Parrilla 600g', quantidade: 1, precoUnitario: 89.9, subtotal: 89.9 },
+            { produtoId: 'p_fg_5', nome: 'Chopp Pilsen Artesanal 350ml', quantidade: 1, precoUnitario: 9.9, subtotal: 9.9 },
+          ],
+          operador: 'Italo Lemos',
+          status: 'cancelada',
+          motivoCancelamento: 'Cliente desistiu após demora excepcional no salão',
+          canceladoEm: '16/10/2026 13:14',
+          canceladoPor: 'Rodrigo Alvarenga',
+        },
+        {
+          id: 'VD-2405',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'delivery',
+          dataHora: '16/10/2026 12:58',
+          total: 50.50,
+          subtotalBruto: 55.50,
+          desconto: 5.0,
+          formaPagamento: 'pix',
+          itens: [
+            { produtoId: 'p_fg_3', nome: 'Batata Rústica com Alecrim', quantidade: 2, precoUnitario: 24.5, subtotal: 49.0 },
+            { produtoId: 'p_fg_7', nome: 'Refrigerante Coca-Cola 350ml', quantidade: 1, precoUnitario: 6.5, subtotal: 6.5 },
+          ],
+          operador: 'Italo Lemos',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2406',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'balcao',
+          dataHora: '16/10/2026 12:30',
+          total: 28.00,
+          subtotalBruto: 28.00,
+          desconto: 0,
+          formaPagamento: 'pix',
+          itens: [
+            { produtoId: 'p_fg_6', nome: 'Cerveja Amstel Lager 350ml', quantidade: 4, precoUnitario: 7.0, subtotal: 28.0 },
+          ],
+          operador: 'Italo Lemos',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2301',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'mesa',
+          mesaNumero: 12,
+          dataHora: '15/10/2026 21:15',
+          total: 199.40,
+          subtotalBruto: 219.40,
+          desconto: 20.0,
+          formaPagamento: 'credito',
+          itens: [
+            { produtoId: 'p_fg_1', nome: 'Picanha Bovina Angus na Parrilla 600g', quantidade: 2, precoUnitario: 89.9, subtotal: 179.8 },
+            { produtoId: 'p_fg_5', nome: 'Chopp Pilsen Artesanal 350ml', quantidade: 4, precoUnitario: 9.9, subtotal: 39.6 },
+          ],
+          operador: 'Rodrigo Alvarenga',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2302',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'mesa',
+          mesaNumero: 8,
+          dataHora: '15/10/2026 20:45',
+          total: 114.40,
+          subtotalBruto: 114.40,
+          desconto: 0,
+          formaPagamento: 'pix',
+          itens: [
+            { produtoId: 'p_fg_1', nome: 'Picanha Bovina Angus na Parrilla 600g', quantidade: 1, precoUnitario: 89.9, subtotal: 89.9 },
+            { produtoId: 'p_fg_3', nome: 'Batata Rústica com Alecrim', quantidade: 1, precoUnitario: 24.5, subtotal: 24.5 },
+          ],
+          operador: 'Rodrigo Alvarenga',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2303',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'balcao',
+          dataHora: '15/10/2026 20:10',
+          total: 42.00,
+          subtotalBruto: 42.00,
+          desconto: 0,
+          formaPagamento: 'dinheiro',
+          itens: [
+            { produtoId: 'p_fg_6', nome: 'Cerveja Amstel Lager 350ml', quantidade: 6, precoUnitario: 7.0, subtotal: 42.0 },
+          ],
+          operador: 'Rodrigo Alvarenga',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2304',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'delivery',
+          dataHora: '15/10/2026 19:30',
+          total: 89.90,
+          subtotalBruto: 89.90,
+          desconto: 0,
+          formaPagamento: 'pix',
+          itens: [
+            { produtoId: 'p_fg_1', nome: 'Picanha Bovina Angus na Parrilla 600g', quantidade: 1, precoUnitario: 89.9, subtotal: 89.9 },
+          ],
+          operador: 'Rodrigo Alvarenga',
+          status: 'cancelada',
+          motivoCancelamento: 'Endereço fora do raio de cobertura do motoboy',
+          canceladoEm: '15/10/2026 19:40',
+          canceladoPor: 'Rodrigo Alvarenga',
+        },
+        {
+          id: 'VD-2201',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'mesa',
+          dataHora: '14/10/2026 20:00',
+          total: 350.00,
+          subtotalBruto: 365.00,
+          desconto: 15.0,
+          formaPagamento: 'credito',
+          itens: [
+            { produtoId: 'p_fg_1', nome: 'Picanha Bovina Angus na Parrilla 600g', quantidade: 3, precoUnitario: 89.9, subtotal: 269.7 },
+            { produtoId: 'p_fg_3', nome: 'Batata Rústica com Alecrim', quantidade: 2, precoUnitario: 24.5, subtotal: 49.0 },
+            { produtoId: 'p_fg_5', nome: 'Chopp Pilsen Artesanal 350ml', quantidade: 4, precoUnitario: 9.9, subtotal: 39.6 },
+          ],
+          operador: 'Rodrigo Alvarenga',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2202',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'balcao',
+          dataHora: '13/10/2026 19:42',
+          total: 56.00,
+          subtotalBruto: 56.00,
+          desconto: 0,
+          formaPagamento: 'pix',
+          itens: [
+            { produtoId: 'p_fg_6', nome: 'Cerveja Amstel Lager 350ml', quantidade: 8, precoUnitario: 7.0, subtotal: 56.0 },
+          ],
+          operador: 'Italo Lemos',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2203',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'mesa',
+          dataHora: '12/10/2026 13:00',
+          total: 420.00,
+          subtotalBruto: 445.00,
+          desconto: 25.0,
+          formaPagamento: 'debito',
+          itens: [
+            { produtoId: 'p_fg_1', nome: 'Picanha Bovina Angus na Parrilla 600g', quantidade: 4, precoUnitario: 89.9, subtotal: 359.6 },
+            { produtoId: 'p_fg_5', nome: 'Chopp Pilsen Artesanal 350ml', quantidade: 8, precoUnitario: 9.9, subtotal: 79.2 },
+          ],
+          operador: 'Rodrigo Alvarenga',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2101',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'mesa',
+          dataHora: '28/09/2026 20:30',
+          total: 530.00,
+          subtotalBruto: 560.00,
+          desconto: 30.0,
+          formaPagamento: 'credito',
+          itens: [
+            { produtoId: 'p_fg_1', nome: 'Picanha Bovina Angus na Parrilla 600g', quantidade: 5, precoUnitario: 89.9, subtotal: 449.5 },
+            { produtoId: 'p_fg_5', nome: 'Chopp Pilsen Artesanal 350ml', quantidade: 11, precoUnitario: 9.9, subtotal: 108.9 },
+          ],
+          operador: 'Rodrigo Alvarenga',
+          status: 'concluida',
+        },
+        {
+          id: 'VD-2102',
+          tenantId: 'tenant-01',
+          tipoOrigem: 'delivery',
+          dataHora: '25/09/2026 21:00',
+          total: 490.00,
+          subtotalBruto: 490.00,
+          desconto: 0,
+          formaPagamento: 'pix',
+          itens: [
+            { produtoId: 'p_fg_1', nome: 'Picanha Bovina Angus na Parrilla 600g', quantidade: 4, precoUnitario: 89.9, subtotal: 359.6 },
+            { produtoId: 'p_fg_3', nome: 'Batata Rústica com Alecrim', quantidade: 5, precoUnitario: 24.5, subtotal: 122.5 },
+          ],
+          operador: 'Rodrigo Alvarenga',
+          status: 'concluida',
+        },
       ],
+
+      despesasRestaurante: [
+        {
+          id: 'desp-01',
+          tenantId: 'tenant-01',
+          descricao: 'Aluguel do Salão & Imóvel Comercial',
+          categoria: 'ocupacao',
+          valor: 3800.0,
+          data: '2026-10-05',
+          tipo: 'fixa',
+          cadastradoPor: 'Rodrigo Alvarenga',
+        },
+        {
+          id: 'desp-02',
+          tenantId: 'tenant-01',
+          descricao: 'Energia Elétrica & Gás Encanado de Cozinha',
+          categoria: 'servicos',
+          valor: 1450.0,
+          data: '2026-10-10',
+          tipo: 'variavel',
+          cadastradoPor: 'Rodrigo Alvarenga',
+        },
+        {
+          id: 'desp-03',
+          tenantId: 'tenant-01',
+          descricao: 'Água e Saneamento',
+          categoria: 'servicos',
+          valor: 380.0,
+          data: '2026-10-12',
+          tipo: 'variavel',
+          cadastradoPor: 'Rodrigo Alvarenga',
+        },
+        {
+          id: 'desp-04',
+          tenantId: 'tenant-01',
+          descricao: 'Embalagens Térmicas & Sacolas Delivery',
+          categoria: 'insumos',
+          valor: 520.0,
+          data: '2026-10-14',
+          tipo: 'variavel',
+          cadastradoPor: 'Rodrigo Alvarenga',
+        },
+        {
+          id: 'desp-05',
+          tenantId: 'tenant-01',
+          descricao: 'Internet Fibra Óptica & Telefonia',
+          categoria: 'servicos',
+          valor: 220.0,
+          data: '2026-10-08',
+          tipo: 'fixa',
+          cadastradoPor: 'Rodrigo Alvarenga',
+        },
+        {
+          id: 'desp-06',
+          tenantId: 'tenant-01',
+          descricao: 'Aluguel do Salão Comercial (Set/26)',
+          categoria: 'ocupacao',
+          valor: 3800.0,
+          data: '2026-09-05',
+          tipo: 'fixa',
+          cadastradoPor: 'Rodrigo Alvarenga',
+        },
+        {
+          id: 'desp-07',
+          tenantId: 'tenant-01',
+          descricao: 'Energia Elétrica & Gás (Set/26)',
+          categoria: 'servicos',
+          valor: 1390.0,
+          data: '2026-09-10',
+          tipo: 'variavel',
+          cadastradoPor: 'Rodrigo Alvarenga',
+        },
+      ],
+
+      getVendasPorTenant: (tenantId?: string) => {
+        const state = get();
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        return (state.vendas || []).filter((v) => !v.tenantId || v.tenantId === idAlvo);
+      },
+
+      getDespesasPorTenant: (tenantId?: string) => {
+        const state = get();
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        return (state.despesasRestaurante || []).filter((d) => d.tenantId === idAlvo);
+      },
+
+      adicionarDespesaRestaurante: (despesa) => {
+        const nova: DespesaOperacionalRestaurante = {
+          ...despesa,
+          id: `desp-${Date.now().toString().slice(-5)}`,
+        };
+        set((state) => ({
+          despesasRestaurante: [nova, ...(state.despesasRestaurante || [])],
+        }));
+      },
+
+      removerDespesaRestaurante: (id) => {
+        set((state) => ({
+          despesasRestaurante: (state.despesasRestaurante || []).filter((d) => d.id !== id),
+        }));
+      },
 
       abrirCaixa: (saldoInicial) =>
         set((state) => ({
