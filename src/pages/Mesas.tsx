@@ -23,6 +23,7 @@ import {
   Crown,
   AlertTriangle,
   ArrowUpRight,
+  ArrowRightLeft,
   Search,
   ChefHat,
   Minus,
@@ -48,7 +49,7 @@ import {
 } from '../utils/qrCodeHelper';
 
 export default function Mesas() {
-  const { getMesasPorTenant, atualizarStatusMesa, adicionarMesa, removerMesa, lancarItensComandaMesa } = useAppStore();
+  const { getMesasPorTenant, atualizarStatusMesa, adicionarMesa, removerMesa, lancarItensComandaMesa, trocarMesa } = useAppStore();
   const { funcionarios } = useFuncionarioStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
   const { fichasTecnicas } = useEstoqueStore();
@@ -119,6 +120,50 @@ export default function Mesas() {
 
   const [mesaParaUnir, setMesaParaUnir] = useState<Mesa | null>(null);
   const [mesaDestinoUniao, setMesaDestinoUniao] = useState<number>(2);
+
+  // Estados de Troca e Transferência de Mesa
+  const [mesaParaTrocar, setMesaParaTrocar] = useState<Mesa | null>(null);
+  const [mesaDestinoTroca, setMesaDestinoTroca] = useState<number | null>(null);
+  const [modoTrocaMesa, setModoTrocaMesa] = useState<'transferir' | 'unificar' | 'inverter'>('transferir');
+  const [motivoTrocaMesa, setMotivoTrocaMesa] = useState<string>('');
+
+  function handleAbrirModalTroca(mesa: Mesa) {
+    setMesaParaTrocar(mesa);
+    setMotivoTrocaMesa('');
+    if (mesa.status !== 'livre') {
+      const livres = mesas.filter((m) => m.numero !== mesa.numero && m.status === 'livre');
+      const outras = mesas.filter((m) => m.numero !== mesa.numero);
+      setMesaDestinoTroca(livres.length > 0 ? livres[0].numero : outras.length > 0 ? outras[0].numero : null);
+      setModoTrocaMesa('transferir');
+    } else {
+      const ocupadas = mesas.filter((m) => m.status !== 'livre');
+      setMesaDestinoTroca(ocupadas.length > 0 ? ocupadas[0].numero : null);
+      setModoTrocaMesa('transferir');
+    }
+  }
+
+  function handleConfirmarTrocaMesa(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!mesaParaTrocar || mesaDestinoTroca === null) return;
+
+    let numOrigem = mesaParaTrocar.numero;
+    let numDestino = mesaDestinoTroca;
+
+    // Se abriu a partir de uma mesa livre, a origem é a mesa ocupada e o destino é a mesa livre
+    if (mesaParaTrocar.status === 'livre') {
+      numOrigem = mesaDestinoTroca;
+      numDestino = mesaParaTrocar.numero;
+    }
+
+    const res = trocarMesa(numOrigem, numDestino, modoTrocaMesa, idLoja, motivoTrocaMesa);
+    if (res.sucesso) {
+      dispararToast(`🔄 ${res.mensagem}`);
+      setMesaParaTrocar(null);
+      setMesaDestinoTroca(null);
+    } else {
+      dispararToast(`⚠️ ${res.mensagem}`);
+    }
+  }
 
   // Estados de Lançamento de Pedidos e Comanda da Mesa
   const [mesaParaLancar, setMesaParaLancar] = useState<Mesa | null>(null);
@@ -607,6 +652,18 @@ export default function Mesas() {
                           >
                             <UtensilsCrossed className="w-3.5 h-3.5 text-slate-700" />
                             <span>Ver Comanda & Pedidos</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAcoesMesaId(null);
+                              handleAbrirModalTroca(mesa);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-orange-50 flex items-center gap-2.5 text-orange-600 font-bold cursor-pointer"
+                          >
+                            <ArrowRightLeft className="w-3.5 h-3.5 text-orange-500" />
+                            <span>Trocar de Mesa</span>
                           </button>
 
                           <button
@@ -1399,6 +1456,379 @@ export default function Mesas() {
                 <span>Fazer Upgrade para o Pro</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: TROCA & TRANSFERÊNCIA DE MESA                           */}
+      {/* ============================================================== */}
+      {mesaParaTrocar && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 select-none">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                  <ArrowRightLeft className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">
+                    Troca & Transferência de Mesa
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {mesaParaTrocar.status === 'livre'
+                      ? `Mesa #${mesaParaTrocar.numero} (${mesaParaTrocar.setor}) está Livre`
+                      : `Mesa #${mesaParaTrocar.numero} (${mesaParaTrocar.setor}) • ${mesaParaTrocar.responsavelNome || 'Cliente'}`}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMesaParaTrocar(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* CASO 1: A mesa onde clicou nos 3 pontos está OCUPADA (vamos transferir ELA para outra) */}
+            {mesaParaTrocar.status !== 'livre' ? (
+              <form onSubmit={handleConfirmarTrocaMesa} className="space-y-4 text-xs">
+                {/* Card Mesa Origem */}
+                <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                      Mesa de Origem (Atual)
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30">
+                      Ocupada
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-lg font-black text-white">
+                        Mesa #{mesaParaTrocar.numero}
+                      </h4>
+                      <p className="text-slate-400 text-xs">
+                        {mesaParaTrocar.setor} • {mesaParaTrocar.quantidadePessoas || 2} pessoas
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Consumo Atual:</span>
+                      <span className="text-base font-black font-mono text-emerald-400">
+                        R$ {(mesaParaTrocar.totalConsumo || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-900 text-[11px] text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
+                    <span>Cliente: <strong className="text-white">{mesaParaTrocar.responsavelNome || 'Cliente'}</strong></span>
+                    <span>Garçom: <strong className="text-purple-300">{mesaParaTrocar.garcomResponsavel || 'Lucas Oliveira'}</strong></span>
+                    <span>Itens Comanda: <strong className="text-orange-400">{mesaParaTrocar.comandaItens?.length || 0}</strong></span>
+                  </div>
+                </div>
+
+                {/* Seta indicativa */}
+                <div className="flex justify-center -my-1">
+                  <div className="p-1.5 rounded-full bg-orange-500 text-white shadow-md shadow-orange-500/30">
+                    <ArrowRightLeft className="w-4 h-4" />
+                  </div>
+                </div>
+
+                {/* Seletor Mesa Destino */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-300">
+                    Selecione a Mesa de Destino:
+                  </label>
+
+                  {/* Grid de Mesas Destino Disponíveis */}
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
+                    {mesas
+                      .filter((m) => m.numero !== mesaParaTrocar.numero)
+                      .map((m) => {
+                        const isDestLivre = m.status === 'livre';
+                        const isSelecionada = mesaDestinoTroca === m.numero;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setMesaDestinoTroca(m.numero);
+                              if (isDestLivre) {
+                                setModoTrocaMesa('transferir');
+                              } else {
+                                setModoTrocaMesa('unificar');
+                              }
+                            }}
+                            className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                              isSelecionada
+                                ? 'bg-orange-500/10 border-orange-500 ring-2 ring-orange-500/30 text-white'
+                                : isDestLivre
+                                ? 'bg-slate-950 border-slate-800 hover:border-emerald-500/40 text-slate-300'
+                                : 'bg-slate-950/80 border-slate-800/80 hover:border-amber-500/40 text-slate-400'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-extrabold text-sm text-white">#{m.numero}</span>
+                              <span
+                                className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                                  isDestLivre
+                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                    : 'bg-amber-500/20 text-amber-400'
+                                }`}
+                              >
+                                {isDestLivre ? 'Livre' : 'Ocupada'}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 truncate mt-1">{m.setor}</span>
+                            <span className="text-[9px] text-slate-500">{m.capacidade} lugares</span>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* Exibição da Ação Selecionada */}
+                {mesaDestinoTroca !== null && (() => {
+                  const mDestino = mesas.find((m) => m.numero === mesaDestinoTroca);
+                  if (!mDestino) return null;
+                  const isDestLivre = mDestino.status === 'livre';
+
+                  return (
+                    <div className="space-y-3">
+                      {isDestLivre ? (
+                        <div className="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl text-[11px] text-emerald-300 space-y-1">
+                          <p className="font-bold flex items-center gap-1.5 text-emerald-200">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span>Mesa #{mDestino.numero} está 100% Livre</span>
+                          </p>
+                          <p className="text-emerald-400/90">
+                            O atendimento, cliente <strong>{mesaParaTrocar.responsavelNome || 'Cliente'}</strong>, pedidos da comanda e pedidos no KDS serão movidos para a <strong>Mesa #{mDestino.numero}</strong>. A <strong>Mesa #{mesaParaTrocar.numero}</strong> será liberada automaticamente.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-amber-950/30 border border-amber-500/30 rounded-2xl space-y-2">
+                          <div className="text-[11px] text-amber-300">
+                            <p className="font-bold flex items-center gap-1.5 text-amber-200">
+                              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                              <span>Mesa #{mDestino.numero} já está Ocupada</span>
+                            </p>
+                            <p className="text-slate-300 mt-0.5">
+                              Cliente atual: <strong>{mDestino.responsavelNome || 'Cliente'}</strong> • Consumo atual: <strong>R$ {(mDestino.totalConsumo || 0).toFixed(2)}</strong>. Como deseja prosseguir?
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setModoTrocaMesa('unificar')}
+                              className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                                modoTrocaMesa === 'unificar'
+                                  ? 'bg-amber-500/20 border-amber-500 text-white ring-1 ring-amber-500/40'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              <span className="font-bold text-xs block text-amber-300">
+                                Unificar Comandas
+                              </span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">
+                                Soma consumos e pedidos na Mesa #{mDestino.numero} e libera a Mesa #{mesaParaTrocar.numero}.
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setModoTrocaMesa('inverter')}
+                              className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                                modoTrocaMesa === 'inverter'
+                                  ? 'bg-amber-500/20 border-amber-500 text-white ring-1 ring-amber-500/40'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              <span className="font-bold text-xs block text-purple-300">
+                                Inverter Mesas
+                              </span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">
+                                Troca as posições e comandas entre as Mesas #{mesaParaTrocar.numero} e #{mDestino.numero}.
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Motivo Opcional */}
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                          Motivo da Troca (Opcional):
+                        </label>
+                        <input
+                          type="text"
+                          value={motivoTrocaMesa}
+                          onChange={(e) => setMotivoTrocaMesa(e.target.value)}
+                          placeholder="Ex: Cliente solicitou mesa na varanda / ar-condicionado..."
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs placeholder-slate-600 focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Botões do Rodapé */}
+                <div className="pt-2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMesaParaTrocar(null)}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={mesaDestinoTroca === null}
+                    className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+                  >
+                    <ArrowRightLeft className="w-4 h-4" />
+                    <span>Confirmar Troca de Mesa</span>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* CASO 2: A mesa onde clicou nos 3 pontos está LIVRE (como no print enviado!) */
+              <div className="space-y-4 text-xs">
+                <div className="p-3.5 bg-emerald-950/20 border border-emerald-500/30 rounded-2xl text-[11px] text-emerald-300 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-sm text-white">
+                      Mesa #{mesaParaTrocar.numero}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                      Livre no Salão
+                    </span>
+                  </div>
+                  <p className="text-slate-300 mt-1">
+                    Esta mesa está desocupada. Você pode <strong>trazer e transferir</strong> um atendimento em andamento de outra mesa ocupada para cá:
+                  </p>
+                </div>
+
+                {(() => {
+                  const mesasOcupadas = mesas.filter((m) => m.status !== 'livre');
+                  if (mesasOcupadas.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-slate-500 rounded-2xl bg-slate-950 border border-dashed border-slate-800 space-y-2">
+                        <Users className="w-8 h-8 mx-auto text-slate-600 opacity-60" />
+                        <p className="font-semibold text-slate-300">
+                          Não há mesas ocupadas no momento no salão.
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Todas as mesas estão livres. Para iniciar um atendimento nesta mesa:
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const mesaAlvo = mesaParaTrocar;
+                            setMesaParaTrocar(null);
+                            setMesaParaAbrir(mesaAlvo);
+                            setFormAbertura({
+                              quantidadePessoas: mesaAlvo.capacidade,
+                              responsavelNome: '',
+                              garcomResponsavel: garconsDisponiveis[0]?.nome || 'Lucas Oliveira',
+                            });
+                          }}
+                          className="mt-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Abrir Mesa #{mesaParaTrocar.numero}</span>
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <form onSubmit={handleConfirmarTrocaMesa} className="space-y-3.5">
+                      <label className="block text-xs font-bold text-slate-300">
+                        Qual mesa ocupada deseja transferir para a Mesa #{mesaParaTrocar.numero}?
+                      </label>
+
+                      <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                        {mesasOcupadas.map((m) => {
+                          const isSelecionada = mesaDestinoTroca === m.numero;
+                          return (
+                            <div
+                              key={m.id}
+                              onClick={() => {
+                                setMesaDestinoTroca(m.numero);
+                                setModoTrocaMesa('transferir');
+                              }}
+                              className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                isSelecionada
+                                  ? 'bg-orange-500/10 border-orange-500 ring-2 ring-orange-500/30'
+                                  : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                              }`}
+                            >
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-extrabold text-sm text-white">
+                                    Mesa #{m.numero}
+                                  </span>
+                                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-slate-800 text-slate-300">
+                                    {m.setor}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 truncate">
+                                  Cliente: <strong className="text-white">{m.responsavelNome || 'Cliente'}</strong> • Garçom: <strong className="text-purple-300">{m.garcomResponsavel || 'Lucas'}</strong>
+                                </p>
+                              </div>
+
+                              <div className="text-right shrink-0">
+                                <span className="text-xs font-mono font-black text-emerald-400 block">
+                                  R$ {(m.totalConsumo || 0).toFixed(2)}
+                                </span>
+                                <span className="text-[10px] text-slate-500">
+                                  {m.comandaItens?.length || 0} itens
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Motivo Opcional */}
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                          Motivo da Troca (Opcional):
+                        </label>
+                        <input
+                          type="text"
+                          value={motivoTrocaMesa}
+                          onChange={(e) => setMotivoTrocaMesa(e.target.value)}
+                          placeholder="Ex: Mudança de ambiente / melhor acomodação..."
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs placeholder-slate-600 focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+
+                      {/* Botões */}
+                      <div className="pt-2 flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setMesaParaTrocar(null)}
+                          className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={mesaDestinoTroca === null}
+                          className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+                        >
+                          <ArrowRightLeft className="w-4 h-4" />
+                          <span>Trazer Atendimento para Cá</span>
+                        </button>
+                      </div>
+                    </form>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       )}

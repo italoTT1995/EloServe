@@ -29,6 +29,13 @@ interface AppState {
   adicionarMesa: (dados: { numero: number; capacidade: number; setor: string }, tenantId?: string) => { sucesso: boolean; mensagem?: string };
   removerMesa: (numero: number, tenantId?: string) => { sucesso: boolean; mensagem?: string };
   editarMesa: (numero: number, dados: Partial<Mesa>, tenantId?: string) => void;
+  trocarMesa: (
+    numeroOrigem: number,
+    numeroDestino: number,
+    modo?: 'transferir' | 'unificar' | 'inverter',
+    tenantId?: string,
+    motivo?: string
+  ) => { sucesso: boolean; mensagem: string };
   lancarItensComandaMesa: (
     numeroMesa: number,
     novosItens: Omit<ItemComandaMesa, 'id' | 'horario'>[],
@@ -700,6 +707,175 @@ export const useAppStore = create<AppState>()(
             mesas: novaLista,
           };
         });
+      },
+
+      trocarMesa: (numeroOrigem, numeroDestino, modo = 'transferir', tenantId, motivo) => {
+        if (numeroOrigem === numeroDestino) {
+          return { sucesso: false, mensagem: 'A mesa de origem e destino devem ser diferentes.' };
+        }
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const state = get();
+        const map = state.mesasPorTenant || MESAS_POR_TENANT;
+        const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
+
+        const mesaOrigem = listaAtual.find((m) => m.numero === numeroOrigem);
+        const mesaDestino = listaAtual.find((m) => m.numero === numeroDestino);
+
+        if (!mesaOrigem || !mesaDestino) {
+          return { sucesso: false, mensagem: 'Mesa de origem ou de destino não encontrada.' };
+        }
+
+        let novaLista = [...listaAtual];
+
+        if (modo === 'transferir') {
+          // Transfere tudo da mesa de origem para a mesa de destino e libera a origem
+          novaLista = novaLista.map((m) => {
+            if (m.numero === numeroDestino) {
+              return {
+                ...m,
+                status: mesaOrigem.status === 'livre' ? 'ocupada' : mesaOrigem.status,
+                quantidadePessoas: mesaOrigem.quantidadePessoas || 2,
+                responsavelNome: mesaOrigem.responsavelNome || 'Cliente',
+                garcomResponsavel: mesaOrigem.garcomResponsavel || 'Lucas Oliveira',
+                tempoOcupadaMin: mesaOrigem.tempoOcupadaMin || 1,
+                totalConsumo: mesaOrigem.totalConsumo || 0,
+                comandaItens: mesaOrigem.comandaItens ? [...mesaOrigem.comandaItens] : [],
+                mesasUnidas: mesaOrigem.mesasUnidas,
+                tempoChamadaGarcomMin: mesaOrigem.tempoChamadaGarcomMin || 0,
+                alertaCritico: mesaOrigem.alertaCritico || false,
+                solicitacaoTransferida: mesaOrigem.solicitacaoTransferida || false,
+              };
+            }
+            if (m.numero === numeroOrigem) {
+              return {
+                ...m,
+                status: 'livre',
+                quantidadePessoas: undefined,
+                responsavelNome: undefined,
+                garcomResponsavel: undefined,
+                tempoOcupadaMin: 0,
+                totalConsumo: 0,
+                comandaItens: [],
+                mesasUnidas: undefined,
+                tempoChamadaGarcomMin: 0,
+                alertaCritico: false,
+                solicitacaoTransferida: false,
+              };
+            }
+            return m;
+          });
+        } else if (modo === 'unificar') {
+          // Mescla comandas e consumo na mesa destino
+          const itensMesclados = [
+            ...(mesaDestino.comandaItens || []),
+            ...(mesaOrigem.comandaItens || []),
+          ];
+          const consumoTotal = Number(
+            ((mesaDestino.totalConsumo || 0) + (mesaOrigem.totalConsumo || 0)).toFixed(2)
+          );
+          const pessoasTotal = (mesaDestino.quantidadePessoas || 0) + (mesaOrigem.quantidadePessoas || 0);
+          const unidas = Array.from(
+            new Set([
+              ...(mesaDestino.mesasUnidas || []),
+              numeroOrigem,
+              ...(mesaOrigem.mesasUnidas || []),
+            ])
+          );
+
+          novaLista = novaLista.map((m) => {
+            if (m.numero === numeroDestino) {
+              return {
+                ...m,
+                status: 'ocupada',
+                quantidadePessoas: pessoasTotal || m.quantidadePessoas,
+                totalConsumo: consumoTotal,
+                comandaItens: itensMesclados,
+                mesasUnidas: unidas,
+              };
+            }
+            if (m.numero === numeroOrigem) {
+              return {
+                ...m,
+                status: 'livre',
+                quantidadePessoas: undefined,
+                responsavelNome: undefined,
+                garcomResponsavel: undefined,
+                tempoOcupadaMin: 0,
+                totalConsumo: 0,
+                comandaItens: [],
+                mesasUnidas: undefined,
+                tempoChamadaGarcomMin: 0,
+                alertaCritico: false,
+                solicitacaoTransferida: false,
+              };
+            }
+            return m;
+          });
+        } else if (modo === 'inverter') {
+          // Inverte o conteúdo das duas mesas
+          const dadosOrigem = {
+            status: mesaOrigem.status,
+            quantidadePessoas: mesaOrigem.quantidadePessoas,
+            responsavelNome: mesaOrigem.responsavelNome,
+            garcomResponsavel: mesaOrigem.garcomResponsavel,
+            tempoOcupadaMin: mesaOrigem.tempoOcupadaMin,
+            totalConsumo: mesaOrigem.totalConsumo,
+            comandaItens: mesaOrigem.comandaItens ? [...mesaOrigem.comandaItens] : [],
+            mesasUnidas: mesaOrigem.mesasUnidas,
+            tempoChamadaGarcomMin: mesaOrigem.tempoChamadaGarcomMin,
+            alertaCritico: mesaOrigem.alertaCritico,
+            solicitacaoTransferida: mesaOrigem.solicitacaoTransferida,
+          };
+          const dadosDestino = {
+            status: mesaDestino.status,
+            quantidadePessoas: mesaDestino.quantidadePessoas,
+            responsavelNome: mesaDestino.responsavelNome,
+            garcomResponsavel: mesaDestino.garcomResponsavel,
+            tempoOcupadaMin: mesaDestino.tempoOcupadaMin,
+            totalConsumo: mesaDestino.totalConsumo,
+            comandaItens: mesaDestino.comandaItens ? [...mesaDestino.comandaItens] : [],
+            mesasUnidas: mesaDestino.mesasUnidas,
+            tempoChamadaGarcomMin: mesaDestino.tempoChamadaGarcomMin,
+            alertaCritico: mesaDestino.alertaCritico,
+            solicitacaoTransferida: mesaDestino.solicitacaoTransferida,
+          };
+
+          novaLista = novaLista.map((m) => {
+            if (m.numero === numeroDestino) {
+              return { ...m, ...dadosOrigem };
+            }
+            if (m.numero === numeroOrigem) {
+              return { ...m, ...dadosDestino };
+            }
+            return m;
+          });
+        }
+
+        // Atualiza pedidos em aberto no KDS para a nova mesa
+        const novosPedidosKDS = state.pedidosKDS.map((p) => {
+          if (p.tipo === 'mesa' && p.mesaNumero === numeroOrigem && p.status !== 'pronto') {
+            return { ...p, mesaNumero: numeroDestino };
+          }
+          return p;
+        });
+
+        set((s) => ({
+          mesasPorTenant: {
+            ...map,
+            [idAlvo]: novaLista,
+          },
+          mesas: novaLista,
+          pedidosKDS: novosPedidosKDS,
+        }));
+
+        const mensagem =
+          modo === 'unificar'
+            ? `Comanda da Mesa #${numeroOrigem} unificada com a Mesa #${numeroDestino} com sucesso!`
+            : modo === 'inverter'
+            ? `Mesas #${numeroOrigem} e #${numeroDestino} invertidas com sucesso!`
+            : `Atendimento transferido da Mesa #${numeroOrigem} para a Mesa #${numeroDestino} com sucesso!`;
+
+        return { sucesso: true, mensagem };
       },
 
       lancarItensComandaMesa: (numeroMesa, novosItens, garcomNome, tenantId) => {
