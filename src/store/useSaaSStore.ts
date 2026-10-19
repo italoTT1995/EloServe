@@ -207,6 +207,9 @@ export const TENANT_GLOBAL: TenantRestaurante = {
   proximoVencimento: 'Recorrente',
   instanciaWhatsAppConectada: true,
   criadoEm: '2026-01-01',
+  couvertArtisticoAtivo: true,
+  valorCouvertPorPessoa: 12.00,
+  diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
 };
 
 const TENANTS_INICIAIS: TenantRestaurante[] = [
@@ -272,6 +275,9 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
     instanciaWhatsAppConectada: true,
     criadoEm: '2026-10-04',
     dreHabilitado: false,
+    couvertArtisticoAtivo: true,
+    valorCouvertPorPessoa: 12.00,
+    diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
   },
   {
     id: 'tenant-04',

@@ -82,7 +82,7 @@ export default function Mesas() {
   const { funcionarios } = useFuncionarioStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
   const { fichasTecnicas } = useEstoqueStore();
-  const { getTenantAtivo, mudarPlanoTenant } = useSaaSStore();
+  const { getTenantAtivo, mudarPlanoTenant, atualizarDadosTenant } = useSaaSStore();
   const tenantAtual = getTenantAtivo();
   const idLoja = (!tenantAtual || tenantAtual.id === 'global') ? 'tenant-01' : tenantAtual.id;
   const mesas = getMesasPorTenant(idLoja);
@@ -100,6 +100,33 @@ export default function Mesas() {
 
   const [setorSelecionado, setSetorSelecionado] = useState<string>('todos');
   const [menuAcoesMesaId, setMenuAcoesMesaId] = useState<number | null>(null);
+
+  // Estados de Couvert Artístico no Salão
+  const [modalCouvertAberto, setModalCouvertAberto] = useState(false);
+  const [formCouvert, setFormCouvert] = useState<{
+    ativo: boolean;
+    valorPorPessoa: number;
+    diasAoVivo: string[];
+  }>({
+    ativo: tenantAtual?.couvertArtisticoAtivo ?? true,
+    valorPorPessoa: tenantAtual?.valorCouvertPorPessoa ?? 12.0,
+    diasAoVivo: tenantAtual?.diasAoVivo || ['quinta', 'sexta', 'sabado', 'domingo'],
+  });
+
+  function handleSalvarCouvert() {
+    const targetId = tenantAtual?.id === 'global' ? 'tenant-01' : (tenantAtual?.id || 'tenant-01');
+    atualizarDadosTenant(targetId, {
+      couvertArtisticoAtivo: formCouvert.ativo,
+      valorCouvertPorPessoa: formCouvert.valorPorPessoa,
+      diasAoVivo: formCouvert.diasAoVivo,
+    });
+    dispararToast(
+      formCouvert.ativo
+        ? `🎵 Couvert Artístico configurado (R$ ${formCouvert.valorPorPessoa.toFixed(2)}/pessoa)!`
+        : 'Couvert Artístico desativado no salão.'
+    );
+    setModalCouvertAberto(false);
+  }
 
   // Modais de Criação e Limite do Plano
   const [modalCriarMesaAberto, setModalCriarMesaAberto] = useState(false);
@@ -1156,6 +1183,35 @@ export default function Mesas() {
             )}
           </button>
 
+          {/* Botão de Gestão de Couvert Artístico no Salão */}
+          <button
+            type="button"
+            onClick={() => {
+              setFormCouvert({
+                ativo: tenantAtual?.couvertArtisticoAtivo ?? true,
+                valorPorPessoa: tenantAtual?.valorCouvertPorPessoa ?? 12.0,
+                diasAoVivo: tenantAtual?.diasAoVivo || ['quinta', 'sexta', 'sabado', 'domingo'],
+              });
+              setModalCouvertAberto(true);
+            }}
+            title="Gerenciar e configurar Couvert Artístico do Salão (Música ao Vivo)"
+            className={`px-3.5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 cursor-pointer shadow-lg transition-all active:scale-95 ${
+              tenantAtual?.couvertArtisticoAtivo
+                ? 'bg-purple-950/80 border border-purple-500/50 hover:bg-purple-900/60 text-purple-300 shadow-purple-950/40'
+                : 'bg-slate-900 border border-slate-700 hover:border-purple-500/50 text-slate-300'
+            }`}
+          >
+            <Music className={`w-4 h-4 ${tenantAtual?.couvertArtisticoAtivo ? 'text-purple-400 animate-pulse' : 'text-slate-400'}`} />
+            <span>Couvert: {tenantAtual?.couvertArtisticoAtivo ? `R$ ${(tenantAtual?.valorCouvertPorPessoa ?? 12).toFixed(2)}/pes.` : 'Inativo'}</span>
+            <span className={`px-1.5 py-0.2 rounded-full font-black text-[10px] ${
+              tenantAtual?.couvertArtisticoAtivo
+                ? 'bg-purple-500 text-slate-950'
+                : 'bg-slate-800 text-slate-400'
+            }`}>
+              {tenantAtual?.couvertArtisticoAtivo ? 'Ativo' : 'Ativar'}
+            </span>
+          </button>
+
           {/* Botão Imprimir Todos os QRs */}
           <button
             onClick={() =>
@@ -1671,12 +1727,21 @@ export default function Mesas() {
                                 <span className="text-emerald-400/90 font-medium">+10% Serviço: R$ {totMesaCard.taxaServico.toFixed(2)}</span>
                               </div>
                             )}
-                            {totMesaCard.couvertTotal > 0 && (
-                              <div className="flex items-center justify-between text-[10px] text-amber-400">
-                                <span>Couvert Artístico ({totMesaCard.qtdPessoasComCouvert}x):</span>
-                                <span className="font-medium font-mono">+ R$ {totMesaCard.couvertTotal.toFixed(2)}</span>
-                              </div>
-                            )}
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-slate-400 flex items-center gap-1">
+                                <Music className="w-3 h-3 text-purple-400" />
+                                <span>Couvert Artístico:</span>
+                              </span>
+                              {totMesaCard.couvertTotal > 0 ? (
+                                <span className="font-medium font-mono text-purple-300">
+                                  {totMesaCard.qtdPessoasComCouvert}x R$ {totMesaCard.valorCouvertBase.toFixed(2)} (+R$ {totMesaCard.couvertTotal.toFixed(2)})
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 italic text-[9px]">
+                                  {totMesaCard.couvertAtivo ? 'Isento (Gerente)' : 'Inativo no Salão'}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })()}
@@ -4767,6 +4832,201 @@ export default function Mesas() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: GESTÃO RÁPIDA DE COUVERT ARTÍSTICO NO SALÃO             */}
+      {/* ============================================================== */}
+      {modalCouvertAberto && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 select-none animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden space-y-4 p-5 sm:p-6 animate-in zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                  <Music className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                    <span>Couvert Artístico & Música ao Vivo</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Defina o valor por pessoa e ative a cobrança automática nas comandas do salão.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalCouvertAberto(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Toggle Principal de Ativação */}
+            <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold text-white block">
+                  Cobrança de Couvert Artístico no Salão
+                </span>
+                <p className="text-[11px] text-slate-400">
+                  {formCouvert.ativo
+                    ? 'Ativo: adiciona o couvert automaticamente nas contas de mesas ocupadas.'
+                    : 'Inativo: nenhuma mesa será cobrada por couvert artístico.'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setFormCouvert({ ...formCouvert, ativo: !formCouvert.ativo })}
+                className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors cursor-pointer shrink-0 ${
+                  formCouvert.ativo ? 'bg-purple-600' : 'bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform shadow-sm ${
+                    formCouvert.ativo ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Configuração do Valor do Couvert */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 block">
+                Valor Cobrado por Pessoa (R$)
+              </label>
+
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-400">
+                    R$
+                  </span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="1"
+                    value={formCouvert.valorPorPessoa}
+                    onChange={(e) =>
+                      setFormCouvert({
+                        ...formCouvert,
+                        valorPorPessoa: Math.max(0, parseFloat(e.target.value) || 0),
+                      })
+                    }
+                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono font-bold text-white focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div className="flex gap-1.5 shrink-0">
+                  {[10, 12, 15, 20].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setFormCouvert({ ...formCouvert, valorPorPessoa: val })}
+                      className={`px-2.5 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                        formCouvert.valorPorPessoa === val
+                          ? 'bg-purple-600 text-white shadow-sm'
+                          : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      R$ {val}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Dias com Música ao Vivo */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300 block">
+                Dias de Apresentação / Música ao Vivo
+              </label>
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                {[
+                  { id: 'segunda', label: 'Seg' },
+                  { id: 'terca', label: 'Ter' },
+                  { id: 'quarta', label: 'Qua' },
+                  { id: 'quinta', label: 'Qui' },
+                  { id: 'sexta', label: 'Sex' },
+                  { id: 'sabado', label: 'Sáb' },
+                  { id: 'domingo', label: 'Dom' },
+                ].map((d) => {
+                  const sel = formCouvert.diasAoVivo.includes(d.id);
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => {
+                        const novos = sel
+                          ? formCouvert.diasAoVivo.filter((x) => x !== d.id)
+                          : [...formCouvert.diasAoVivo, d.id];
+                        setFormCouvert({ ...formCouvert, diasAoVivo: novos });
+                      }}
+                      className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        sel
+                          ? 'bg-purple-600 text-white shadow-sm'
+                          : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Indicador ao Vivo do Salão */}
+            {(() => {
+              const mesasOcupadas = mesas.filter((m) => m.status !== 'livre' && m.status !== 'reservada');
+              const totalPessoasOcupadas = mesasOcupadas.reduce(
+                (acc, m) => acc + ((m.pessoas && m.pessoas.length > 0) ? m.pessoas.length : (m.quantidadePessoas || 1)),
+                0
+              );
+              const totalArrecadadoEstimado = formCouvert.ativo
+                ? totalPessoasOcupadas * formCouvert.valorPorPessoa
+                : 0;
+
+              return (
+                <div className="p-3 bg-purple-950/20 border border-purple-500/20 rounded-2xl space-y-1 text-xs">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Mesas ocupadas agora:</span>
+                    <span className="font-bold text-white">{mesasOcupadas.length} mesa(s)</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Clientes no salão:</span>
+                    <span className="font-bold text-white">{totalPessoasOcupadas} pessoa(s)</span>
+                  </div>
+                  <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-800">
+                    <span className="font-bold text-purple-300">Estimativa Couvert Salão:</span>
+                    <span className="font-mono text-purple-400 font-black text-sm">
+                      R$ {totalArrecadadoEstimado.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Botões de Ação */}
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalCouvertAberto(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-800 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSalvarCouvert}
+                className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Salvar e Aplicar</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
