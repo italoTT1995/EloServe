@@ -60,6 +60,11 @@ interface AppState {
     clienteNome?: string,
     tenantId?: string
   ) => { sucesso: boolean; isenta: boolean };
+  toggleCouvertMesa: (
+    numeroMesa: number,
+    clienteNome?: string,
+    tenantId?: string
+  ) => { sucesso: boolean; isento: boolean };
   aplicarDescontoComandaMesa: (
     numeroMesa: number,
     clienteNome: string,
@@ -866,6 +871,43 @@ export const useAppStore = create<AppState>()(
         });
 
         return { sucesso: true, isenta };
+      },
+
+      toggleCouvertMesa: (numeroMesa, clienteNome, tenantId) => {
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const state = get();
+        const map = state.mesasPorTenant || MESAS_POR_TENANT;
+        const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
+        let isento = false;
+
+        const novaLista = listaAtual.map((m) => {
+          if (m.numero !== numeroMesa) return m;
+          if (clienteNome && clienteNome !== 'todos') {
+            const isentos = m.isencaoCouvertPorPessoa || [];
+            const jaIsento = isentos.includes(clienteNome);
+            isento = !jaIsento;
+            return {
+              ...m,
+              isencaoCouvertPorPessoa: jaIsento
+                ? isentos.filter((x) => x !== clienteNome)
+                : [...isentos, clienteNome],
+            };
+          } else {
+            const atual = m.couvertArtisticoAtivo !== false; // padrão true
+            isento = atual;
+            return {
+              ...m,
+              couvertArtisticoAtivo: !atual,
+            };
+          }
+        });
+
+        set({
+          mesasPorTenant: { ...map, [idAlvo]: novaLista },
+          mesas: novaLista,
+        });
+
+        return { sucesso: true, isento };
       },
 
       aplicarDescontoComandaMesa: (numeroMesa, clienteNome, valorDesconto, tenantId) => {

@@ -23,6 +23,7 @@ import {
   Search,
   Sun,
   Moon,
+  Music,
 } from 'lucide-react';
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -33,7 +34,7 @@ import { useEloBotStore } from '../store/useEloBotStore';
 import { useThemeStore } from '../store/useThemeStore';
 
 export default function PainelDono() {
-  const { tenantAtivoId, getTenantAtivo } = useSaaSStore();
+  const { tenantAtivoId, getTenantAtivo, atualizarDadosTenant } = useSaaSStore();
   const tenantAtual = getTenantAtivo();
   const currentTenantId = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
   const { usuarioLogado } = useAuthStore();
@@ -59,6 +60,24 @@ export default function PainelDono() {
   // Edição rápida de preço
   const [editandoPrecoId, setEditandoPrecoId] = useState<string | null>(null);
   const [novoPrecoValor, setNovoPrecoValor] = useState<string>('');
+
+  // Estados e Configurações de Couvert Artístico
+  const [couvertAtivo, setCouvertAtivo] = useState(tenantAtual?.couvertArtisticoAtivo ?? false);
+  const [valorCouvert, setValorCouvert] = useState<number>(tenantAtual?.valorCouvertPorPessoa ?? 12.0);
+  const [diasAoVivo, setDiasAoVivo] = useState<string[]>(tenantAtual?.diasAoVivo ?? ['quinta', 'sexta', 'sabado', 'domingo']);
+
+  function handleSalvarCouvert() {
+    atualizarDadosTenant(currentTenantId, {
+      couvertArtisticoAtivo: couvertAtivo,
+      valorCouvertPorPessoa: Number(valorCouvert) || 0,
+      diasAoVivo: diasAoVivo,
+    });
+    dispararToast(
+      couvertAtivo
+        ? `🎶 Couvert Artístico atualizado: R$ ${(Number(valorCouvert) || 0).toFixed(2)} por pessoa nos dias selecionados!`
+        : `Couvert Artístico desativado no estabelecimento.`
+    );
+  }
 
   function dispararToast(msg: string) {
     setToastMensagem(msg);
@@ -536,6 +555,152 @@ export default function PainelDono() {
           >
             Ver Todas as Mesas & Comandas &rarr;
           </Link>
+        </div>
+      </div>
+
+      {/* 3.5 CONFIGURAÇÃO DE COUVERT ARTÍSTICO & MÚSICA AO VIVO */}
+      <div className={`border rounded-2xl p-6 shadow-lg space-y-4 transition-all ${
+        isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#141416] border-slate-800/80'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-800/80">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+              <Music className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className={`text-base font-black flex items-center gap-2 ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                <span>Couvert Artístico & Música ao Vivo</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                  Gestão do Salão
+                </span>
+              </h3>
+              <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                Configure o valor cobrado por pessoa e os dias de apresentação ao vivo para aplicação automática nas comandas.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className={`text-xs font-bold ${couvertAtivo ? 'text-purple-400' : isWhite ? 'text-slate-400' : 'text-slate-500'}`}>
+              {couvertAtivo ? 'Couvert Ativo' : 'Couvert Inativo'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCouvertAtivo(!couvertAtivo)}
+              className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors cursor-pointer shrink-0 ${
+                couvertAtivo ? 'bg-purple-600' : isWhite ? 'bg-slate-300' : 'bg-slate-700'
+              }`}
+              title={couvertAtivo ? 'Desativar cobrança de couvert' : 'Ativar cobrança de couvert'}
+            >
+              <span
+                className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform shadow-sm ${
+                  couvertAtivo ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+          {/* Valor por pessoa */}
+          <div className="md:col-span-4 space-y-1.5">
+            <label className={`text-xs font-bold block ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+              Valor do Couvert por Pessoa (R$):
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-500 text-xs">
+                R$
+              </span>
+              <input
+                type="number"
+                step="0.50"
+                min="0"
+                value={valorCouvert}
+                onChange={(e) => setValorCouvert(parseFloat(e.target.value) || 0)}
+                placeholder="Ex: 12.00"
+                className={`w-full pl-9 pr-3 py-2 border rounded-xl font-mono font-bold text-sm focus:outline-none focus:border-purple-500 transition-colors ${
+                  isWhite
+                    ? 'bg-slate-50 border-slate-200 text-slate-900'
+                    : 'bg-[#0e0e10] border-slate-800 text-white'
+                }`}
+              />
+            </div>
+            <div className="flex gap-1.5 pt-1">
+              {[10.0, 12.0, 15.0, 20.0].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setValorCouvert(v)}
+                  className={`text-[10px] px-2 py-0.5 rounded-lg border cursor-pointer font-mono font-bold transition-colors ${
+                    valorCouvert === v
+                      ? 'bg-purple-600 border-purple-500 text-white'
+                      : isWhite
+                      ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                      : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-purple-500/50'
+                  }`}
+                >
+                  R$ {v.toFixed(2)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Dias com Música ao Vivo */}
+          <div className="md:col-span-5 space-y-1.5">
+            <label className={`text-xs font-bold block ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+              Dias de Música ao Vivo / Cobrança:
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { id: 'quinta', label: 'Qui' },
+                { id: 'sexta', label: 'Sex' },
+                { id: 'sabado', label: 'Sáb' },
+                { id: 'domingo', label: 'Dom' },
+                { id: 'todos_os_dias', label: 'Todos os Dias' },
+              ].map((dia) => {
+                const isSelected = diasAoVivo.includes(dia.id);
+                return (
+                  <button
+                    key={dia.id}
+                    type="button"
+                    onClick={() => {
+                      if (dia.id === 'todos_os_dias') {
+                        setDiasAoVivo(isSelected ? [] : ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo', 'todos_os_dias']);
+                      } else {
+                        setDiasAoVivo(
+                          isSelected ? diasAoVivo.filter((d) => d !== dia.id) : [...diasAoVivo, dia.id]
+                        );
+                      }
+                    }}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                        : isWhite
+                        ? 'bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-900'
+                        : 'bg-[#0e0e10] border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {dia.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className={`text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-500'}`}>
+              A cobrança será sugerida automaticamente nas comandas e contas nos dias marcados.
+            </p>
+          </div>
+
+          {/* Botão Salvar */}
+          <div className="md:col-span-3 flex justify-end">
+            <button
+              type="button"
+              onClick={handleSalvarCouvert}
+              className="w-full md:w-auto px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+            >
+              <Check className="w-4 h-4" />
+              <span>Salvar Regras de Couvert</span>
+            </button>
+          </div>
         </div>
       </div>
 

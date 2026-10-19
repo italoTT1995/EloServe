@@ -57,7 +57,32 @@ export interface ItemCarrinho {
   subtotal: number;
 }
 
-export type StatusMesa = 'livre' | 'ocupada' | 'aguardando_pagamento' | 'chamar_garcom';
+export type StatusMesa = 'livre' | 'ocupada' | 'aguardando_pagamento' | 'chamar_garcom' | 'reservada';
+
+export type StatusReserva = 'pendente' | 'confirmada' | 'cancelada' | 'concluida';
+
+export interface InformacoesEspeciaisReserva {
+  aniversario?: boolean;
+  presencaBolo?: boolean;
+  decoracao?: boolean;
+  observacoes?: string;
+}
+
+export interface ReservaMesa {
+  id: string;
+  tenantId: string;
+  clienteNome: string;
+  clienteTelefone: string;
+  data: string; // YYYY-MM-DD
+  horario: string; // HH:mm
+  quantidadePessoas: number;
+  mesaNumero?: number;
+  status: StatusReserva;
+  especiais?: InformacoesEspeciaisReserva;
+  observacoes?: string;
+  origem: 'elobot' | 'manual';
+  criadoEm: string;
+}
 
 export interface CancelamentoItemMesa {
   id: string;
@@ -115,6 +140,11 @@ export interface Mesa {
   descontosPorPessoa?: Record<string, number>;
   descontoMesa?: number;
   historicoCancelamentos?: CancelamentoItemMesa[];
+  couvertArtisticoAtivo?: boolean;
+  valorCouvertPorPessoa?: number;
+  quantidadeCouvert?: number;
+  isencaoCouvertPorPessoa?: string[];
+  reservaId?: string;
 }
 
 export type StatusProducaoKDS = 'novo' | 'em_preparo' | 'pronto';
@@ -172,6 +202,7 @@ export interface LimitesPlano {
   garcomMobileIncluso?: boolean;
   impressaoTermicaInclusa?: boolean;
   controleEstoqueIncluso?: boolean;
+  reservaMesasIncluso?: boolean;
   maxUsuarios?: number;
   maxItensCardapio?: number;
   maxPedidosMes?: number;
@@ -211,6 +242,9 @@ export interface TenantRestaurante {
   dreHabilitado?: boolean;
   drePermissaoModificadoPor?: string;
   drePermissaoModificadoEm?: string;
+  couvertArtisticoAtivo?: boolean;
+  valorCouvertPorPessoa?: number;
+  diasAoVivo?: string[];
 }
 
 // -------------------------------------------------------------
@@ -318,6 +352,9 @@ export interface VendaRealizada {
   subtotalBruto?: number;
   desconto?: number;
   taxaServico?: number;
+  taxaEntrega?: number;
+  couvertArtistico?: number;
+  quantidadeCouvert?: number;
   formaPagamento: FormaPagamento;
   itens: ItemVendaRealizada[];
   operador: string;

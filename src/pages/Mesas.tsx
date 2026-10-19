@@ -39,14 +39,20 @@ import {
   ShieldCheck,
   Percent,
   Tag,
+  Calendar,
+  Music,
+  Cake,
+  MessageSquare,
+  Phone,
 } from 'lucide-react';
 import { AdminAuthModal } from '../components/common/AdminAuthModal';
 import { useAppStore } from '../store/useAppStore';
+import { useReservaStore } from '../store/useReservaStore';
 import { useFuncionarioStore } from '../store/useFuncionarioStore';
 import { useSaaSStore, PLANOS_DISPONIVEIS } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
-import { Mesa, Produto, FormaPagamento, VendaRealizada, ItemComandaMesa } from '../types';
+import { Mesa, Produto, FormaPagamento, VendaRealizada, ItemComandaMesa, ReservaMesa } from '../types';
 import { MesaQRCodeThumbnail } from '../components/mesas/MesaQRCodeThumbnail';
 import {
   gerarQrCodeMesaDataUrl,
@@ -70,6 +76,7 @@ export default function Mesas() {
     registrarVenda,
     cancelarItemComandaMesa,
     toggleTaxaServicoMesa,
+    toggleCouvertMesa,
     aplicarDescontoComandaMesa,
   } = useAppStore();
   const { funcionarios } = useFuncionarioStore();
@@ -87,6 +94,7 @@ export default function Mesas() {
   const isPlanoIlimitado = maxMesasPermitidas >= 999;
   const totalMesasAtuais = mesas.length;
   const limiteAtingido = !isPlanoIlimitado && totalMesasAtuais >= maxMesasPermitidas;
+  const isPlanoPermiteReservas = planoAtual.limites.reservaMesasIncluso ?? false;
 
   const garconsDisponiveis = funcionarios.filter((f) => f.cargo === 'garcom' && f.ativo);
 
@@ -245,10 +253,21 @@ export default function Mesas() {
     return mesa.responsavelNome || pessoas[0] || `Mesa #${mesa.numero}`;
   }
 
-  // Helper para cálculo dos totais da comanda (Subtotal, 10% Serviço, Desconto e Total Final)
+  // Helper para cálculo dos totais da comanda (Subtotal, 10% Serviço, Couvert Artístico, Desconto e Total Final)
   function getTotaisComanda(mesa: Mesa | null, nomePessoa: string) {
     if (!mesa) {
-      return { subtotal: 0, taxaServico: 0, taxaAtiva: true, desconto: 0, total: 0, itens: [] };
+      return {
+        subtotal: 0,
+        taxaServico: 0,
+        taxaAtiva: true,
+        couvertTotal: 0,
+        couvertAtivo: false,
+        valorCouvertBase: 0,
+        qtdPessoasComCouvert: 0,
+        desconto: 0,
+        total: 0,
+        itens: [],
+      };
     }
     const todosItens = (mesa.comandaItens || []).filter((it) => !it.cancelado);
     const isTodos = nomePessoa === 'todos';
@@ -266,14 +285,185 @@ export default function Mesas() {
 
     const taxaServico = taxaAtiva ? Number((subtotal * 0.10).toFixed(2)) : 0;
 
+    // Regra: Couvert Artístico
+    // Configurado no estabelecimento e/ou na mesa
+    const valorCouvertBase = mesa.valorCouvertPorPessoa ?? tenantAtual?.valorCouvertPorPessoa ?? 12.0;
+    const couvertAtivo = mesa.couvertArtisticoAtivo !== undefined
+      ? mesa.couvertArtisticoAtivo
+      : (tenantAtual?.couvertArtisticoAtivo ?? false);
+
+    let couvertTotal = 0;
+    let qtdPessoasComCouvert = 0;
+
+    if (couvertAtivo) {
+      if (isTodos) {
+        const totalPessoasMesa = (mesa.pessoas && mesa.pessoas.length > 0) ? mesa.pessoas.length : (mesa.quantidadePessoas || 1);
+        const isentos = mesa.isencaoCouvertPorPessoa || [];
+        qtdPessoasComCouvert = Math.max(0, totalPessoasMesa - isentos.length);
+        couvertTotal = Number((qtdPessoasComCouvert * valorCouvertBase).toFixed(2));
+      } else {
+        const isento = (mesa.isencaoCouvertPorPessoa || []).includes(nomePessoa);
+        qtdPessoasComCouvert = isento ? 0 : 1;
+        couvertTotal = isento ? 0 : valorCouvertBase;
+      }
+    }
+
     // Desconto concedido pelo gerente
     const desconto = isTodos
       ? Number((mesa.descontoMesa || 0).toFixed(2))
       : Number(((mesa.descontosPorPessoa && mesa.descontosPorPessoa[nomePessoa]) || 0).toFixed(2));
 
-    const total = Math.max(0, Number((subtotal + taxaServico - desconto).toFixed(2)));
+    const total = Math.max(0, Number((subtotal + taxaServico + couvertTotal - desconto).toFixed(2)));
 
-    return { subtotal, taxaServico, taxaAtiva, desconto, total, itens };
+    return {
+      subtotal,
+      taxaServico,
+      taxaAtiva,
+      couvertTotal,
+      couvertAtivo,
+      valorCouvertBase,
+      qtdPessoasComCouvert,
+      desconto,
+      total,
+      itens,
+    };
+  }
+
+  // Hook e Estados de Reserva de Mesas (Exclusivo Pro e Enterprise)
+  const {
+    getReservas,
+    adicionarReserva,
+    atualizarStatusReserva,
+    vincularMesaReserva,
+    cancelarReserva,
+    sentarReservaNaMesa,
+  } = useReservaStore();
+
+  const reservas = getReservas(idLoja);
+  const hojeStr = new Date().toISOString().split('T')[0];
+  const reservasHoje = reservas.filter((r) => r.data === hojeStr);
+  const reservasHojePendentes = reservasHoje.filter((r) => r.status === 'pendente' || r.status === 'confirmada');
+
+  const [modalReservasAberto, setModalReservasAberto] = useState(false);
+  const [filtroStatusReserva, setFiltroStatusReserva] = useState<'todas' | 'hoje' | 'pendentes' | 'confirmadas'>('hoje');
+  const [modalNovaReservaAberto, setModalNovaReservaAberto] = useState(false);
+  const [mesaSelecionadaParaSentar, setMesaSelecionadaParaSentar] = useState<number | null>(null);
+  const [formNovaReserva, setFormNovaReserva] = useState<{
+    clienteNome: string;
+    clienteTelefone: string;
+    data: string;
+    horario: string;
+    quantidadePessoas: number;
+    mesaNumero: number | undefined;
+    aniversario: boolean;
+    presencaBolo: boolean;
+    decoracao: boolean;
+    observacoes: string;
+  }>({
+    clienteNome: '',
+    clienteTelefone: '',
+    data: hojeStr,
+    horario: '20:00',
+    quantidadePessoas: 4,
+    mesaNumero: undefined,
+    aniversario: false,
+    presencaBolo: false,
+    decoracao: false,
+    observacoes: '',
+  });
+
+  function handleCriarReservaManual(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formNovaReserva.clienteNome.trim() || !formNovaReserva.clienteTelefone.trim()) {
+      dispararToast('Por favor, preencha o nome e o telefone do cliente.');
+      return;
+    }
+
+    const novaReserva = adicionarReserva({
+      tenantId: idLoja,
+      clienteNome: formNovaReserva.clienteNome.trim(),
+      clienteTelefone: formNovaReserva.clienteTelefone.trim(),
+      data: formNovaReserva.data,
+      horario: formNovaReserva.horario,
+      quantidadePessoas: formNovaReserva.quantidadePessoas,
+      mesaNumero: formNovaReserva.mesaNumero,
+      especiais: {
+        aniversario: formNovaReserva.aniversario,
+        presencaBolo: formNovaReserva.presencaBolo,
+        decoracao: formNovaReserva.decoracao,
+        observacoes: formNovaReserva.observacoes.trim() || undefined,
+      },
+      origem: 'manual',
+      status: 'confirmada',
+    });
+
+    if (formNovaReserva.mesaNumero) {
+      editarMesa(formNovaReserva.mesaNumero, { status: 'reservada', reservaId: novaReserva.id }, idLoja);
+    }
+
+    dispararToast(`📅 Reserva de ${novaReserva.clienteNome} registrada e confirmada com sucesso!`);
+    setModalNovaReservaAberto(false);
+    setFormNovaReserva({
+      clienteNome: '',
+      clienteTelefone: '',
+      data: hojeStr,
+      horario: '20:00',
+      quantidadePessoas: 4,
+      mesaNumero: undefined,
+      aniversario: false,
+      presencaBolo: false,
+      decoracao: false,
+      observacoes: '',
+    });
+  }
+
+  function handleSentarReserva(reserva: ReservaMesa, mesaNum?: number) {
+    const numeroMesaFinal = mesaNum || reserva.mesaNumero;
+    if (!numeroMesaFinal) {
+      dispararToast('Selecione uma mesa disponível para sentar os convidados.');
+      return;
+    }
+
+    sentarReservaNaMesa(reserva.id, numeroMesaFinal, idLoja);
+    editarMesa(
+      numeroMesaFinal,
+      {
+        status: 'ocupada',
+        responsavelNome: reserva.clienteNome,
+        quantidadePessoas: reserva.quantidadePessoas,
+        reservaId: reserva.id,
+        comandaItens: [],
+        totalConsumo: 0,
+      },
+      idLoja
+    );
+
+    dispararToast(`🎉 Mesa #${numeroMesaFinal} aberta para ${reserva.clienteNome}! Atendimento iniciado.`);
+    setModalReservasAberto(false);
+  }
+
+  function handleVincularMesaReserva(reservaId: string, mesaNumero: number) {
+    vincularMesaReserva(reservaId, mesaNumero, idLoja);
+    editarMesa(mesaNumero, { status: 'reservada', reservaId }, idLoja);
+    dispararToast(`Mesa #${mesaNumero} vinculada e reservada para esta reserva.`);
+  }
+
+  function handleCancelarReserva(reserva: ReservaMesa) {
+    if (confirm(`Deseja realmente cancelar a reserva de ${reserva.clienteNome}?`)) {
+      cancelarReserva(reserva.id, idLoja);
+      if (reserva.mesaNumero) {
+        const mesaLigada = mesas.find((m) => m.numero === reserva.mesaNumero);
+        if (mesaLigada && mesaLigada.status === 'reservada') {
+          editarMesa(reserva.mesaNumero, { status: 'livre', reservaId: undefined }, idLoja);
+        }
+      }
+      dispararToast(`Reserva de ${reserva.clienteNome} foi cancelada.`);
+    }
+  }
+
+  function handleConfirmarStatusReserva(reservaId: string, novoStatus: 'confirmada' | 'pendente') {
+    atualizarStatusReserva(reservaId, novoStatus, idLoja);
+    dispararToast(`Status da reserva atualizado para ${novoStatus.toUpperCase()}!`);
   }
 
   // Estados de Múltiplas Pessoas e Sub-comandas na Mesa
@@ -374,6 +564,28 @@ export default function Mesas() {
           res.isenta
             ? `Taxa de 10% removida com sucesso para ${alvoLabel} (autorizado pelo Gerente).`
             : `Taxa de 10% restaurada com sucesso para ${alvoLabel}.`
+        );
+        sincronizarMesasAbertas(mesa.numero);
+      }
+    );
+  }
+
+  // Ação 1.5 (Gerente): Retirar ou Ativar Couvert Artístico
+  function handleSolicitarToggleCouvert(mesa: Mesa, nomePessoa: string) {
+    const tot = getTotaisComanda(mesa, nomePessoa);
+    const isRetirar = tot.couvertAtivo && tot.couvertTotal > 0;
+    const alvoLabel = nomePessoa === 'todos' ? `Toda a Mesa #${mesa.numero}` : `comanda de "${nomePessoa}"`;
+
+    solicitarAutorizacaoGerente(
+      isRetirar
+        ? `Autorização do Gerente necessária para ISENTAR o Couvert Artístico da ${alvoLabel}`
+        : `Autorização do Gerente necessária para ATIVAR o Couvert Artístico da ${alvoLabel}`,
+      () => {
+        const res = toggleCouvertMesa(mesa.numero, nomePessoa, idLoja);
+        dispararToast(
+          res.isento
+            ? `Couvert Artístico isentado para ${alvoLabel} (autorizado pelo Gerente).`
+            : `Couvert Artístico ativado para ${alvoLabel}.`
         );
         sincronizarMesasAbertas(mesa.numero);
       }
@@ -529,6 +741,8 @@ export default function Mesas() {
       total: valorPago,
       subtotalBruto: totais.subtotal,
       taxaServico: totais.taxaServico,
+      couvertArtistico: totais.couvertTotal,
+      quantidadeCouvert: totais.qtdPessoasComCouvert,
       desconto: totais.desconto,
       formaPagamento: forma,
       itens: itensPagos.map((it) => ({
@@ -556,6 +770,7 @@ export default function Mesas() {
     const novosDescontos = { ...(mesaAlvo.descontosPorPessoa || {}) };
     delete novosDescontos[nomePessoa];
     const novasIsencoes = (mesaAlvo.isencaoTaxaPorPessoa || []).filter((x) => x !== nomePessoa);
+    const novasIsencoesCouvert = (mesaAlvo.isencaoCouvertPorPessoa || []).filter((x) => x !== nomePessoa);
 
     if (itensRestantes.length === 0 || novoTotalMesa <= 0) {
       // Todas as comandas foram pagas: libera a mesa
@@ -571,6 +786,10 @@ export default function Mesas() {
           descontosPorPessoa: undefined,
           isencaoTaxaPorPessoa: undefined,
           taxaServicoAtiva: undefined,
+          couvertArtisticoAtivo: undefined,
+          isencaoCouvertPorPessoa: undefined,
+          quantidadeCouvert: undefined,
+          reservaId: undefined,
         },
         idLoja
       );
@@ -921,6 +1140,22 @@ export default function Mesas() {
             </div>
           </div>
 
+          {/* Botão de Central de Reservas de Mesas */}
+          <button
+            type="button"
+            onClick={() => setModalReservasAberto(true)}
+            title="Gerenciar reservas de mesas (Integrado ao WhatsApp EloBot)"
+            className="px-3.5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/25 transition-all active:scale-95"
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Reservas</span>
+            {reservasHojePendentes.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-white text-indigo-700 font-black text-[10px]">
+                {reservasHojePendentes.length}
+              </span>
+            )}
+          </button>
+
           {/* Botão Imprimir Todos os QRs */}
           <button
             onClick={() =>
@@ -992,6 +1227,7 @@ export default function Mesas() {
       {/* Grid de Mesas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
         {mesasFiltradas.map((mesa) => {
+          const isReservada = mesa.status === 'reservada';
           const isLivre = mesa.status === 'livre';
           const isChamar = mesa.status === 'chamar_garcom';
           const isAguardando = mesa.status === 'aguardando_pagamento';
@@ -1001,7 +1237,9 @@ export default function Mesas() {
             <div
               key={mesa.id}
               className={`rounded-3xl p-5 border flex flex-col justify-between transition-all duration-200 relative overflow-hidden ${
-                isLivre
+                isReservada
+                  ? 'bg-indigo-950/40 border-indigo-500/60 ring-2 ring-indigo-500/30 shadow-lg shadow-indigo-950/40'
+                  : isLivre
                   ? 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
                   : isCritico
                   ? 'bg-rose-950/40 border-rose-500 ring-2 ring-rose-500/50 shadow-xl shadow-rose-950/40'
@@ -1044,7 +1282,9 @@ export default function Mesas() {
 
                     <span
                       className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                        isLivre
+                        isReservada
+                          ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold'
+                          : isLivre
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                           : isCritico
                           ? 'bg-rose-500 text-white font-black animate-pulse'
@@ -1055,7 +1295,9 @@ export default function Mesas() {
                           : 'bg-slate-800 text-slate-300'
                       }`}
                     >
-                      {isLivre
+                      {isReservada
+                        ? 'Reservada'
+                        : isLivre
                         ? 'Livre'
                         : isCritico
                         ? 'Alerta Crítico (>8m)'
@@ -1417,7 +1659,7 @@ export default function Mesas() {
                             <div className="flex items-center justify-between text-xs">
                               <span className="text-slate-400 flex items-center gap-1">
                                 <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                                Total a Pagar (+10%):
+                                Total da Mesa:
                               </span>
                               <span className="font-mono font-black text-emerald-400 text-sm">
                                 R$ {totMesaCard.total.toFixed(2)}
@@ -1426,7 +1668,13 @@ export default function Mesas() {
                             {totMesaCard.taxaServico > 0 && (
                               <div className="flex items-center justify-between text-[10px] text-slate-400">
                                 <span>Itens: R$ {totMesaCard.subtotal.toFixed(2)}</span>
-                                <span className="text-emerald-400/90 font-medium">+10% Garçom: R$ {totMesaCard.taxaServico.toFixed(2)}</span>
+                                <span className="text-emerald-400/90 font-medium">+10% Serviço: R$ {totMesaCard.taxaServico.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {totMesaCard.couvertTotal > 0 && (
+                              <div className="flex items-center justify-between text-[10px] text-amber-400">
+                                <span>Couvert Artístico ({totMesaCard.qtdPessoasComCouvert}x):</span>
+                                <span className="font-medium font-mono">+ R$ {totMesaCard.couvertTotal.toFixed(2)}</span>
                               </div>
                             )}
                           </div>
@@ -1439,7 +1687,41 @@ export default function Mesas() {
 
               {/* Ações da Mesa */}
               <div className="pt-3 border-t border-slate-800/70 space-y-1.5">
-                {isLivre ? (
+                {isReservada ? (
+                  <div className="space-y-1.5">
+                    <div className="p-2.5 rounded-xl bg-indigo-950/50 border border-indigo-500/30 text-xs space-y-1">
+                      <div className="flex items-center justify-between text-indigo-300 font-bold">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Mesa Reservada</span>
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                          {mesa.quantidadePessoas || 2} pessoas
+                        </span>
+                      </div>
+                      <p className="text-white font-bold text-[11px] truncate">
+                        {mesa.responsavelNome || 'Cliente'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const resAlvo = reservas.find((r) => r.id === mesa.reservaId || r.mesaNumero === mesa.numero);
+                        if (resAlvo) {
+                          const resSentar = sentarReservaNaMesa(resAlvo.id, mesa.numero, idLoja);
+                          dispararToast(`🎉 ${resSentar.mensagem}`);
+                        } else {
+                          editarMesa(mesa.numero, { status: 'ocupada' }, idLoja);
+                          dispararToast(`Mesa #${mesa.numero} ocupada!`);
+                        }
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer active:scale-95"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Acomodar Clientes (Ocupar)</span>
+                    </button>
+                  </div>
+                ) : isLivre ? (
                   <button
                     onClick={() => {
                       setMesaParaAbrir(mesa);
@@ -1684,6 +1966,36 @@ export default function Mesas() {
                       </div>
                     </div>
 
+                    {/* Couvert Artístico */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-400">Couvert Artístico:</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                          totaisMesa.couvertAtivo && totaisMesa.couvertTotal > 0
+                            ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {totaisMesa.couvertAtivo && totaisMesa.couvertTotal > 0
+                            ? `${totaisMesa.qtdPessoasComCouvert}x R$ ${totaisMesa.valorCouvertBase.toFixed(2)}`
+                            : 'Isento / Inativo'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-purple-400 font-bold">
+                          {totaisMesa.couvertTotal > 0 ? `+ R$ ${totaisMesa.couvertTotal.toFixed(2)}` : 'R$ 0,00'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleSolicitarToggleCouvert(mesaParaFechar, 'todos')}
+                          className="text-[10px] px-2 py-0.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center gap-1 cursor-pointer transition-all hover:border-purple-500/50"
+                          title="Apenas o Gerente pode isentar ou aplicar o couvert artístico"
+                        >
+                          <Music className="w-3 h-3 text-purple-400" />
+                          <span>{totaisMesa.couvertAtivo && totaisMesa.couvertTotal > 0 ? 'Isentar Couvert' : 'Cobrar Couvert'}</span>
+                        </button>
+                      </div>
+                    </div>
+
                     {totaisMesa.desconto > 0 ? (
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
@@ -1803,6 +2115,12 @@ export default function Mesas() {
                                       Consumo: <span className="font-mono text-slate-200">R$ {subtotalPessoa.toFixed(2)}</span>
                                       {' • '}
                                       10%: <span className="font-mono text-emerald-400 font-bold">{totPessoa.taxaAtiva ? `R$ ${totPessoa.taxaServico.toFixed(2)}` : 'Isento'}</span>
+                                      {totPessoa.couvertTotal > 0 && (
+                                        <>
+                                          {' • '}
+                                          Couvert: <span className="font-mono text-purple-400 font-bold">+R$ {totPessoa.couvertTotal.toFixed(2)}</span>
+                                        </>
+                                      )}
                                       {totPessoa.desconto > 0 && (
                                         <>
                                           {' • '}
@@ -1821,6 +2139,16 @@ export default function Mesas() {
                                       >
                                         <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
                                         <span>{totPessoa.taxaAtiva ? 'Retirar 10%' : 'Restaurar 10%'}</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSolicitarToggleCouvert(mesaParaFechar, p)}
+                                        className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-purple-300 flex items-center gap-0.5 cursor-pointer"
+                                        title="Isentar ou cobrar couvert artístico desta pessoa"
+                                      >
+                                        <Music className="w-2.5 h-2.5 text-purple-400" />
+                                        <span>{totPessoa.couvertTotal > 0 ? 'Isentar Couvert' : 'Cobrar Couvert'}</span>
                                       </button>
 
                                       <button
@@ -3239,6 +3567,12 @@ export default function Mesas() {
                                             10%: {totP.taxaAtiva ? `+R$ ${totP.taxaServico.toFixed(2)}` : 'Isento'}
                                           </span>
                                         </div>
+                                        {totP.couvertTotal > 0 && (
+                                          <div className="flex justify-between text-purple-400 font-semibold">
+                                            <span>Couvert Artístico:</span>
+                                            <span>+R$ {totP.couvertTotal.toFixed(2)}</span>
+                                          </div>
+                                        )}
                                         {totP.desconto > 0 && (
                                           <div className="flex justify-between text-rose-400 font-semibold">
                                             <span>Desconto Gerente:</span>
@@ -3254,6 +3588,15 @@ export default function Mesas() {
                                           >
                                             <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
                                             <span>{totP.taxaAtiva ? 'Retirar 10%' : 'Restaurar 10%'}</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSolicitarToggleCouvert(mesaParaLancar, p)}
+                                            className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-purple-300 flex items-center gap-0.5 cursor-pointer"
+                                            title="Isentar ou cobrar couvert artístico desta pessoa"
+                                          >
+                                            <Music className="w-2.5 h-2.5 text-purple-400" />
+                                            <span>{totP.couvertTotal > 0 ? 'Isentar Couvert' : 'Cobrar Couvert'}</span>
                                           </button>
                                           <button
                                             type="button"
@@ -3504,6 +3847,22 @@ export default function Mesas() {
                                     >
                                       <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
                                       <span>{totP.taxaAtiva ? 'Retirar 10%' : 'Restaurar 10%'}</span>
+                                    </button>
+                                  </div>
+                                  <span className="text-slate-500">•</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-slate-400">Couvert:</span>
+                                    <strong className={totP.couvertTotal > 0 ? 'text-purple-400' : 'text-slate-400'}>
+                                      {totP.couvertTotal > 0 ? `+ R$ ${totP.couvertTotal.toFixed(2)}` : 'Isento'}
+                                    </strong>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSolicitarToggleCouvert(mesaParaLancar, p)}
+                                      className="text-[10px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-purple-300 font-bold flex items-center gap-0.5 cursor-pointer ml-1"
+                                      title="Isentar ou cobrar couvert artístico (Gerente)"
+                                    >
+                                      <Music className="w-2.5 h-2.5 text-purple-400" />
+                                      <span>{totP.couvertTotal > 0 ? 'Isentar' : 'Cobrar'}</span>
                                     </button>
                                   </div>
                                 </div>
@@ -4022,6 +4381,36 @@ export default function Mesas() {
                     </div>
                   </div>
 
+                  {/* Couvert Artístico */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-400">Couvert Artístico:</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                        totPagamento.couvertAtivo && totPagamento.couvertTotal > 0
+                          ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {totPagamento.couvertAtivo && totPagamento.couvertTotal > 0
+                          ? `${totPagamento.qtdPessoasComCouvert}x R$ ${totPagamento.valorCouvertBase.toFixed(2)}`
+                          : 'Isento / Inativo'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-purple-400 font-bold">
+                        {totPagamento.couvertTotal > 0 ? `+ R$ ${totPagamento.couvertTotal.toFixed(2)}` : 'R$ 0,00'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleSolicitarToggleCouvert(modalPagamentoComanda.mesa, modalPagamentoComanda.nomePessoa)}
+                        className="text-[10px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-purple-300 font-bold flex items-center gap-1 cursor-pointer"
+                        title="Isentar ou aplicar couvert (Requer Gerente)"
+                      >
+                        <Music className="w-2.5 h-2.5 text-purple-400" />
+                        <span>{totPagamento.couvertTotal > 0 ? 'Isentar' : 'Cobrar'}</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {totPagamento.desconto > 0 ? (
                     <div className="flex items-center justify-between text-rose-400">
                       <div className="flex items-center gap-1.5">
@@ -4375,6 +4764,509 @@ export default function Mesas() {
                   className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold shadow-lg shadow-rose-600/30 cursor-pointer active:scale-95 transition-all"
                 >
                   Confirmar Cancelamento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: CENTRAL DE RESERVAS DE MESAS (EXCLUSIVO PRO/ENTERPRISE) */}
+      {/* ============================================================== */}
+      {modalReservasAberto && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 select-none">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-white">Central de Reservas de Mesas</h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                      Pro & Enterprise
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Integrado ao WhatsApp IA (ELOBOT) • Reconhece aniversários, bolos e preferências especiais
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {isPlanoPermiteReservas && (
+                  <button
+                    type="button"
+                    onClick={() => setModalNovaReservaAberto(true)}
+                    className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-orange-500/20 cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Nova Reserva</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setModalReservasAberto(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Conteúdo */}
+            {!isPlanoPermiteReservas ? (
+              /* Banner de Bloqueio por Plano Starter */
+              <div className="p-6 sm:p-8 text-center space-y-5 my-auto">
+                <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-xl">
+                  <Crown className="w-8 h-8" />
+                </div>
+                <div className="max-w-md mx-auto space-y-2">
+                  <h4 className="text-lg font-black text-white">
+                    Recurso Exclusivo dos Planos Pro e Enterprise
+                  </h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    O módulo avançado de <strong>Reserva de Mesas com integração ao WhatsApp IA (ELOBOT)</strong> não está incluso no plano <strong>{planoAtual.nome}</strong>.
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Com o Pro ou Enterprise, o robô atende seus clientes no WhatsApp 24h por dia, registra a data, horário, quantidade de pessoas, aniversários e reservas de bolo, e vincula automaticamente às mesas do salão!
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setModalReservasAberto(false)}
+                    className="px-5 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white text-xs font-bold cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      mudarPlanoTenant(idLoja, 'pro');
+                      dispararToast('🎉 Parabéns! Upgrade para o Plano Pro realizado com sucesso. Módulo de reservas liberado!');
+                    }}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 font-black text-xs shadow-lg shadow-orange-500/25 flex items-center gap-2 cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Sparkles className="w-4 h-4 text-slate-950" />
+                    <span>Fazer Upgrade para o Pro (R$ 199/mês)</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Painel de Gestão de Reservas Ativas */
+              <div className="flex-1 flex flex-col min-h-0">
+                {/* Filtros de Status */}
+                <div className="p-3 sm:p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 overflow-x-auto">
+                    {[
+                      { id: 'hoje', label: `Hoje (${reservasHoje.length})` },
+                      { id: 'pendentes', label: `Pendentes (${reservas.filter((r) => r.status === 'pendente').length})` },
+                      { id: 'confirmadas', label: `Confirmadas (${reservas.filter((r) => r.status === 'confirmada').length})` },
+                      { id: 'todas', label: `Todas (${reservas.length})` },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setFiltroStatusReserva(f.id as any)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                          filtroStatusReserva === f.id
+                            ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20'
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <span className="text-[11px] text-slate-500 hidden sm:inline">
+                    {reservas.filter((r) => r.origem === 'elobot').length} via WhatsApp IA (ELOBOT)
+                  </span>
+                </div>
+
+                {/* Lista de Reservas */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {(() => {
+                    const listaExibicao = reservas.filter((r) => {
+                      if (filtroStatusReserva === 'hoje') return r.data === hojeStr;
+                      if (filtroStatusReserva === 'pendentes') return r.status === 'pendente';
+                      if (filtroStatusReserva === 'confirmadas') return r.status === 'confirmada';
+                      return true;
+                    });
+
+                    if (listaExibicao.length === 0) {
+                      return (
+                        <div className="p-12 text-center text-slate-500 text-xs rounded-2xl bg-slate-950 border border-dashed border-slate-800 space-y-2">
+                          <Calendar className="w-8 h-8 mx-auto text-slate-600" />
+                          <p className="font-semibold text-slate-400">Nenhuma reserva encontrada para este filtro.</p>
+                          <p className="text-[11px] text-slate-500">
+                            Novas reservas recebidas pelo WhatsApp do ELOBOT aparecerão aqui em tempo real.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return listaExibicao.map((r) => {
+                      const mesasLivres = mesas.filter((m) => m.status === 'livre');
+
+                      return (
+                        <div
+                          key={r.id}
+                          className={`p-4 rounded-2xl border transition-all space-y-3 ${
+                            r.status === 'concluida'
+                              ? 'bg-slate-950/60 border-slate-800/80 opacity-75'
+                              : r.status === 'cancelada'
+                              ? 'bg-rose-950/10 border-rose-500/20 opacity-60'
+                              : r.status === 'confirmada'
+                              ? 'bg-slate-950 border-emerald-500/30 shadow-md'
+                              : 'bg-slate-950 border-amber-500/30'
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-900">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 font-black text-sm flex items-center justify-center shrink-0">
+                                {r.clienteNome.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="text-sm font-extrabold text-white">{r.clienteNome}</h4>
+                                  <span
+                                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                                      r.status === 'confirmada'
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        : r.status === 'concluida'
+                                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                        : r.status === 'cancelada'
+                                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    }`}
+                                  >
+                                    {r.status === 'concluida' ? 'Clientes Sentados' : r.status}
+                                  </span>
+                                  {r.origem === 'elobot' && (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/30 font-bold flex items-center gap-1">
+                                      <MessageSquare className="w-2.5 h-2.5" />
+                                      <span>ELOBOT</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
+                                  <a
+                                    href={`https://wa.me/55${r.clienteTelefone.replace(/\D/g, '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-mono text-emerald-400 hover:underline flex items-center gap-1"
+                                    title="Abrir WhatsApp com o cliente"
+                                  >
+                                    <Phone className="w-3 h-3" />
+                                    <span>{r.clienteTelefone}</span>
+                                  </a>
+                                  <span>•</span>
+                                  <span>{r.quantidadePessoas} pessoas</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 sm:text-right">
+                              <div>
+                                <span className="text-[10px] text-slate-500 uppercase font-bold block">Data & Horário:</span>
+                                <span className="font-mono text-xs font-bold text-white">
+                                  {r.data.split('-').reverse().join('/')} às {r.horario}
+                                </span>
+                              </div>
+
+                              <div className="pl-3 border-l border-slate-800">
+                                <span className="text-[10px] text-slate-500 uppercase font-bold block">Mesa:</span>
+                                {r.mesaNumero ? (
+                                  <span className="text-xs font-black text-amber-400 font-mono">
+                                    Mesa #{r.mesaNumero}
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-slate-500 italic">Sem mesa</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Badges de Ocasiões Especiais (Aniversário, Bolo, Decoração) */}
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                            {r.especiais?.aniversario && (
+                              <span className="px-2.5 py-1 rounded-xl bg-pink-500/10 border border-pink-500/30 text-pink-300 font-bold flex items-center gap-1 text-[11px]">
+                                <span>🎂</span>
+                                <span>Aniversário</span>
+                              </span>
+                            )}
+                            {r.especiais?.presencaBolo && (
+                              <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold flex items-center gap-1 text-[11px]">
+                                <Cake className="w-3.5 h-3.5 text-amber-400" />
+                                <span>Vai Trazer Bolo</span>
+                              </span>
+                            )}
+                            {r.especiais?.decoracao && (
+                              <span className="px-2.5 py-1 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 font-bold flex items-center gap-1 text-[11px]">
+                                <span>🎈</span>
+                                <span>Decoração Solicitada</span>
+                              </span>
+                            )}
+                            {r.especiais?.observacoes && (
+                              <span className="text-[11px] text-slate-300 italic bg-slate-900 px-2.5 py-1 rounded-xl border border-slate-800">
+                                "{r.especiais.observacoes}"
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Ações da Reserva */}
+                          {r.status !== 'concluida' && r.status !== 'cancelada' && (
+                            <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-900 text-xs">
+                              {/* Vincular Mesa Dropdown se não tiver */}
+                              {!r.mesaNumero ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-slate-400 text-[11px]">Vincular Mesa:</span>
+                                  <select
+                                    onChange={(e) => {
+                                      const num = parseInt(e.target.value);
+                                      if (num) handleVincularMesaReserva(r.id, num);
+                                    }}
+                                    defaultValue=""
+                                    className="px-2 py-1 bg-slate-900 border border-slate-800 rounded-lg text-white font-bold text-[11px] cursor-pointer"
+                                  >
+                                    <option value="" disabled>Selecione uma mesa livre...</option>
+                                    {mesasLivres.map((m) => (
+                                      <option key={m.numero} value={m.numero}>
+                                        Mesa #{m.numero} ({m.setor} - {m.capacidade} lug)
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-slate-400">
+                                  Vinculada à <strong className="text-white">Mesa #{r.mesaNumero}</strong>
+                                </div>
+                              )}
+
+                              <div className="flex items-center gap-1.5 ml-auto">
+                                {r.status === 'pendente' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleConfirmarStatusReserva(r.id, 'confirmada')}
+                                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] cursor-pointer"
+                                  >
+                                    Confirmar Reserva
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleSentarReserva(r)}
+                                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] flex items-center gap-1 cursor-pointer shadow-md shadow-amber-500/20 active:scale-95 transition-all"
+                                >
+                                  <Users className="w-3.5 h-3.5" />
+                                  <span>Sentar na Mesa {r.mesaNumero ? `#${r.mesaNumero}` : ''}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelarReserva(r)}
+                                  className="p-1.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-colors"
+                                  title="Cancelar Reserva"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: NOVA RESERVA MANUAL DE MESA (GERÊNCIA)                 */}
+      {/* ============================================================== */}
+      {modalNovaReservaAberto && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 select-none">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Criar Nova Reserva</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Preencha os dados do cliente e ocasiões especiais
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalNovaReservaAberto(false)}
+                className="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCriarReservaManual} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Nome do Cliente:</label>
+                  <input
+                    type="text"
+                    required
+                    value={formNovaReserva.clienteNome}
+                    onChange={(e) => setFormNovaReserva({ ...formNovaReserva, clienteNome: e.target.value })}
+                    placeholder="Ex: Beatriz Albuquerque"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Telefone / WhatsApp:</label>
+                  <input
+                    type="text"
+                    required
+                    value={formNovaReserva.clienteTelefone}
+                    onChange={(e) => setFormNovaReserva({ ...formNovaReserva, clienteTelefone: e.target.value })}
+                    placeholder="(31) 99999-8888"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Data:</label>
+                  <input
+                    type="date"
+                    required
+                    value={formNovaReserva.data}
+                    onChange={(e) => setFormNovaReserva({ ...formNovaReserva, data: e.target.value })}
+                    className="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Horário:</label>
+                  <input
+                    type="time"
+                    required
+                    value={formNovaReserva.horario}
+                    onChange={(e) => setFormNovaReserva({ ...formNovaReserva, horario: e.target.value })}
+                    className="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Pessoas:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    required
+                    value={formNovaReserva.quantidadePessoas}
+                    onChange={(e) => setFormNovaReserva({ ...formNovaReserva, quantidadePessoas: parseInt(e.target.value) || 1 })}
+                    className="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs text-center focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Mesa Sugerida */}
+              <div>
+                <label className="font-bold text-slate-300 block mb-1">Vincular a uma Mesa (Opcional):</label>
+                <select
+                  value={formNovaReserva.mesaNumero || ''}
+                  onChange={(e) =>
+                    setFormNovaReserva({
+                      ...formNovaReserva,
+                      mesaNumero: e.target.value ? parseInt(e.target.value) : undefined,
+                    })
+                  }
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="">A definir na chegada dos convidados</option>
+                  {mesas.map((m) => (
+                    <option key={m.numero} value={m.numero}>
+                      Mesa #{m.numero} ({m.setor} - {m.capacidade} lugares) — {m.status.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Informações Especiais */}
+              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5">
+                <span className="text-[10px] text-slate-400 uppercase font-extrabold block">
+                  Informações Especiais & Celebrações:
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer hover:border-pink-500/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={formNovaReserva.aniversario}
+                      onChange={(e) => setFormNovaReserva({ ...formNovaReserva, aniversario: e.target.checked })}
+                      className="rounded accent-pink-500 cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-pink-300">🎂 Aniversário</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer hover:border-amber-500/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={formNovaReserva.presencaBolo}
+                      onChange={(e) => setFormNovaReserva({ ...formNovaReserva, presencaBolo: e.target.checked })}
+                      className="rounded accent-amber-500 cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-amber-300">🍰 Trazer Bolo</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer hover:border-purple-500/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={formNovaReserva.decoracao}
+                      onChange={(e) => setFormNovaReserva({ ...formNovaReserva, decoracao: e.target.checked })}
+                      className="rounded accent-purple-500 cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-purple-300">🎈 Decoração</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Observações da Reserva:</label>
+                  <textarea
+                    rows={2}
+                    value={formNovaReserva.observacoes}
+                    onChange={(e) => setFormNovaReserva({ ...formNovaReserva, observacoes: e.target.value })}
+                    placeholder="Ex: Preferem mesa próxima à janela; convidados chegam juntos..."
+                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-amber-500 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalNovaReservaAberto(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-lg shadow-amber-500/20 cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Confirmar Reserva</span>
                 </button>
               </div>
             </form>

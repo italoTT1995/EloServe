@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Produto } from '../types';
 import { tocarAlertaTransbordo } from '../utils/audioAlert';
-import { useSaaSStore } from './useSaaSStore';
+import { useSaaSStore, PLANOS_DISPONIVEIS } from './useSaaSStore';
+import { useReservaStore } from './useReservaStore';
 
 export interface MensagemWhatsApp {
   id: string;
@@ -40,6 +41,17 @@ export interface PedidoRascunhoWhatsApp {
   chavePix?: string;
 }
 
+export interface RascunhoReservaWhatsApp {
+  etapa: 'data' | 'horario' | 'pessoas' | 'especiais' | 'confirmada';
+  data?: string;
+  horario?: string;
+  quantidadePessoas?: number;
+  aniversario?: boolean;
+  presencaBolo?: boolean;
+  decoracao?: boolean;
+  observacoes?: string;
+}
+
 export interface ConversaWhatsApp {
   id: string;
   clienteNome: string;
@@ -51,6 +63,7 @@ export interface ConversaWhatsApp {
   naoLidas: number;
   mensagens: MensagemWhatsApp[];
   pedidoRascunho?: PedidoRascunhoWhatsApp | null;
+  rascunhoReserva?: RascunhoReservaWhatsApp | null;
   mesa?: string | null;
   tenantId?: string | null;
   nomeLoja?: string | null;
@@ -1174,6 +1187,161 @@ export const useEloBotStore = create<EloBotState>()(
               console.warn(e);
             }
           }
+          // 1.5. RESERVA DE MESAS (Exclusivo Planos Pro e Enterprise)
+          const isIntencaoReserva =
+            lower.includes('reserva') ||
+            lower.includes('reservar') ||
+            lower.includes('guardar mesa') ||
+            lower.includes('marcar mesa') ||
+            lower.includes('agendar mesa') ||
+            lower.includes('mesa para hoje') ||
+            lower.includes('mesa pra hoje') ||
+            Boolean(conversaAtual?.rascunhoReserva && conversaAtual.rascunhoReserva.etapa !== 'confirmada');
+
+          let novoRascunhoReserva: RascunhoReservaWhatsApp | null = conversaAtual?.rascunhoReserva || null;
+
+          if (isIntencaoReserva) {
+            const { tenants } = useSaaSStore.getState();
+            const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+            const tenantObj = tenants.find((t) => t.id === idAlvo) || tenants[0];
+            const planoObj = PLANOS_DISPONIVEIS.find((p) => p.id === tenantObj?.planoId);
+            const permiteReserva = planoObj?.limites.reservaMesasIncluso ?? false;
+
+            if (!permiteReserva) {
+              respostaBot = `Olá, *${conversaAtual?.clienteNome || 'Cliente'}*! Agradecemos imensamente o seu contato com o *${nomeLoja}*! ✨🍷\n\nNo momento, o sistema de **Reserva Automatizada de Mesas via WhatsApp** está disponível exclusivamente nos planos *EloServe Pro e Enterprise*.\n\nPara verificar a disponibilidade de mesas no salão hoje ou tirar dúvidas com nossa equipe presencial, digite *"falar com atendente"* ou venha nos visitar!`;
+              tipoResposta = 'aviso';
+            } else {
+              // Extração inteligente de dados do texto
+              const r: RascunhoReservaWhatsApp = novoRascunhoReserva ? { ...novoRascunhoReserva } : { etapa: 'data' };
+
+              // Extrair data
+              if (lower.includes('hoje')) {
+                const hojeIso = new Date().toISOString().split('T')[0];
+                r.data = hojeIso;
+              } else if (lower.includes('amanha') || lower.includes('amanhã')) {
+                const amanhaIso = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+                r.data = amanhaIso;
+              } else {
+                const matchData = texto.match(/\b(\d{1,2})[/\.-](\d{1,2})(?:[/\.-](\d{2,4}))?\b/);
+                if (matchData) {
+                  const dia = matchData[1].padStart(2, '0');
+                  const mes = matchData[2].padStart(2, '0');
+                  const ano = matchData[3] ? (matchData[3].length === 2 ? `20${matchData[3]}` : matchData[3]) : '2026';
+                  r.data = `${ano}-${mes}-${dia}`;
+                } else if (r.etapa === 'data' && (lower.includes('segunda') || lower.includes('terça') || lower.includes('quarta') || lower.includes('quinta') || lower.includes('sexta') || lower.includes('sábado') || lower.includes('domingo') || texto.length < 25)) {
+                  r.data = texto.trim();
+                }
+              }
+
+              // Extrair horário
+              const matchHorario = texto.match(/\b([01]?\d|2[0-3])(?::|h)([0-5]\d)?\b/i);
+              if (matchHorario) {
+                const h = matchHorario[1].padStart(2, '0');
+                const m = matchHorario[2] ? matchHorario[2].padStart(2, '0') : '00';
+                r.horario = `${h}:${m}`;
+              } else if (r.etapa === 'horario' && (texto.includes(':') || texto.includes('h') || /^\d{1,2}$/.test(texto.trim()))) {
+                const limpo = texto.trim().replace('h', '').replace('H', '');
+                if (limpo.includes(':')) {
+                  r.horario = limpo;
+                } else {
+                  const numH = parseInt(limpo, 10);
+                  if (numH >= 0 && numH <= 23) {
+                    r.horario = `${String(numH).padStart(2, '0')}:00`;
+                  }
+                }
+              }
+
+              // Extrair quantidade de pessoas
+              const matchPessoas = texto.match(/(\d{1,2})\s*(?:pessoas?|lugares?|pax|convidados?|amigos?)/i);
+              if (matchPessoas) {
+                r.quantidadePessoas = parseInt(matchPessoas[1], 10);
+              } else if (r.etapa === 'pessoas') {
+                const num = parseInt(texto.replace(/\D/g, ''), 10);
+                if (num > 0) r.quantidadePessoas = num;
+              }
+
+              // Extrair informações especiais (aniversário, bolo, decoração, observações)
+              if (lower.includes('aniversario') || lower.includes('aniversário') || lower.includes('niver')) {
+                r.aniversario = true;
+              }
+              if (lower.includes('bolo') || lower.includes('torta')) {
+                r.presencaBolo = true;
+              }
+              if (lower.includes('decoracao') || lower.includes('decoração') || lower.includes('balao') || lower.includes('balão')) {
+                r.decoracao = true;
+              }
+
+              if (r.etapa === 'especiais') {
+                const isNao = lower.trim() === 'nao' || lower.trim() === 'não' || lower.includes('nenhum') || lower.includes('tudo certo');
+                if (!isNao) {
+                  r.observacoes = texto.trim();
+                } else {
+                  r.observacoes = 'Nenhuma observação especial';
+                }
+              }
+
+              // Decisão da Próxima Pergunta ou Conclusão
+              if (!r.data) {
+                r.etapa = 'data';
+                respostaBot = `📅 *RESERVA DE MESAS — ${nomeLoja.toUpperCase()}* 🍷\nQue excelente escolha! Será um prazer receber você e seus convidados.\n\nPara qual *data* você gostaria de reservar? (Ex: *Hoje*, *Amanhã*, ou digite como *25/10*)`;
+                tipoResposta = 'aviso';
+              } else if (!r.horario) {
+                r.etapa = 'horario';
+                const dataExib = r.data === new Date().toISOString().split('T')[0] ? 'Hoje' : r.data;
+                respostaBot = `Perfeito! Reserva para *${dataExib}*.\n\nE qual o *horário* desejado? (Ex: *19:30*, *20:00*, *21:00*)`;
+                tipoResposta = 'aviso';
+              } else if (!r.quantidadePessoas) {
+                r.etapa = 'pessoas';
+                respostaBot = `Anotado: às *${r.horario}*!\n\nA mesa será para *quantas pessoas*? (Ex: *4 pessoas*)`;
+                tipoResposta = 'aviso';
+              } else if (r.etapa !== 'especiais' && !r.observacoes && r.aniversario === undefined && r.presencaBolo === undefined) {
+                r.etapa = 'especiais';
+                respostaBot = `Excelente! Mesa para *${r.quantidadePessoas} pessoas* no dia *${r.data}* às *${r.horario}*! 🎉\n\nÉ alguma *ocasião especial*? Por exemplo: *aniversário*, *presença de bolo*, ou alguma preferência de ambiente? (Se não tiver nenhuma observação, basta responder *não* ou *tudo certo*)`;
+                tipoResposta = 'aviso';
+              } else {
+                // Conclusão e Registro da Reserva no useReservaStore!
+                r.etapa = 'confirmada';
+                const telCliente = conversaAtual?.clienteTelefone || '(31) 99876-5432';
+                const nomeCliente = conversaAtual?.clienteNome || 'Cliente WhatsApp';
+
+                const especiaisObj = {
+                  aniversario: r.aniversario || false,
+                  presencaBolo: r.presencaBolo || false,
+                  decoracao: r.decoracao || false,
+                  observacoes: r.observacoes,
+                };
+
+                const obsFinal = r.observacoes || (r.aniversario ? 'Comemoração de Aniversário' : undefined);
+
+                const resCriada = useReservaStore.getState().adicionarReserva({
+                  tenantId: idAlvo,
+                  clienteNome: nomeCliente,
+                  clienteTelefone: telCliente,
+                  data: r.data,
+                  horario: r.horario,
+                  quantidadePessoas: r.quantidadePessoas || 2,
+                  status: 'pendente',
+                  origem: 'elobot',
+                  especiais: especiaisObj,
+                  observacoes: obsFinal,
+                });
+
+                const listaEspeciais: string[] = [];
+                if (r.aniversario) listaEspeciais.push('🎂 Aniversário');
+                if (r.presencaBolo) listaEspeciais.push('🍰 Presença de Bolo');
+                if (r.decoracao) listaEspeciais.push('🎈 Decoração');
+                if (r.observacoes && !r.observacoes.toLowerCase().includes('nenhum') && !listaEspeciais.some((x) => r.observacoes?.includes(x))) {
+                  listaEspeciais.push(r.observacoes);
+                }
+                const textoEspeciais = listaEspeciais.length > 0 ? listaEspeciais.join(' • ') : 'Nenhuma';
+
+                respostaBot = `🎉 *RESERVA REGISTRADA COM SUCESSO!* 🥂\n\nOlá, *${nomeCliente}*! Sua solicitação de reserva já foi enviada para o salão do *${nomeLoja}*:\n\n📋 *Resumo da Reserva:*\n• *Identificador:* #${resCriada.id}\n• *Data:* ${resCriada.data}\n• *Horário:* ${resCriada.horario}\n• *Pessoas:* ${resCriada.quantidadePessoas} pessoas\n• *Ocasião / Observações:* ${textoEspeciais}\n\nNossa equipe já foi notificada no painel de mesas e deixará seu espaço pronto! Caso precise alterar o horário ou o número de pessoas, basta me avisar por aqui. Até logo! ✨🍽️`;
+                tipoResposta = 'aviso';
+              }
+
+              novoRascunhoReserva = r;
+            }
+          }
           // 2. Consulta de Cardápio / Mesa QR Code / Opções
           else if (
             (mesaDetectada && (lower.includes('ver o cardapio') || lower.includes('fazer meu pedido') || lower.includes('estou na') || lower.includes('to na') || lower.startsWith('ola') || lower.startsWith('oi'))) ||
@@ -1424,6 +1592,7 @@ export const useEloBotStore = create<EloBotState>()(
                         ultimaMensagem: respostaBot,
                         ultimaHora: horaResposta,
                         pedidoRascunho: novoRascunho,
+                        rascunhoReserva: novoRascunhoReserva,
                         mensagens: [...c.mensagens, novaMsgBot],
                       }
                     : c
