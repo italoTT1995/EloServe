@@ -69,6 +69,7 @@ export interface ItemComandaMesa {
   observacoes?: string;
   horario: string;
   garcomNome?: string;
+  clienteNome?: string;
   statusKDS?: StatusProducaoKDS;
 }
 
@@ -84,6 +85,7 @@ export interface Mesa {
   qrCodeUrl?: string;
   quantidadePessoas?: number;
   responsavelNome?: string;
+  pessoas?: string[];
   garcomResponsavel?: string;
   tempoChamadaGarcomMin?: number;
   garcomAtendeu?: boolean;

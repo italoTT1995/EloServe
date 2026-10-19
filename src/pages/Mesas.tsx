@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   ArrowRightLeft,
+  UserPlus,
   Search,
   ChefHat,
   Minus,
@@ -49,7 +50,17 @@ import {
 } from '../utils/qrCodeHelper';
 
 export default function Mesas() {
-  const { getMesasPorTenant, atualizarStatusMesa, adicionarMesa, removerMesa, editarMesa, lancarItensComandaMesa, trocarMesa } = useAppStore();
+  const {
+    getMesasPorTenant,
+    atualizarStatusMesa,
+    adicionarMesa,
+    removerMesa,
+    editarMesa,
+    adicionarPessoaMesa,
+    removerPessoaMesa,
+    lancarItensComandaMesa,
+    trocarMesa,
+  } = useAppStore();
   const { funcionarios } = useFuncionarioStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
   const { fichasTecnicas } = useEstoqueStore();
@@ -188,6 +199,64 @@ export default function Mesas() {
     setMesaParaEditarNome(null);
   }
 
+  // Helper para obter todas as pessoas da mesa
+  function getPessoasDaMesa(mesa: Mesa | null): string[] {
+    if (!mesa) return [];
+    const lista: string[] = [];
+    if (mesa.responsavelNome) lista.push(mesa.responsavelNome);
+    if (mesa.pessoas && mesa.pessoas.length > 0) {
+      mesa.pessoas.forEach((p) => {
+        if (!lista.includes(p)) lista.push(p);
+      });
+    }
+    if (mesa.comandaItens && mesa.comandaItens.length > 0) {
+      mesa.comandaItens.forEach((it) => {
+        if (
+          it.clienteNome &&
+          it.clienteNome !== 'Geral (Mesa)' &&
+          it.clienteNome !== 'Mesa (Compartilhado)' &&
+          !lista.includes(it.clienteNome)
+        ) {
+          lista.push(it.clienteNome);
+        }
+      });
+    }
+    return lista.length > 0 ? lista : [mesa.responsavelNome || `Mesa #${mesa.numero}`];
+  }
+
+  // Estados de Múltiplas Pessoas na Mesa
+  const [modalAdicionarPessoa, setModalAdicionarPessoa] = useState<Mesa | null>(null);
+  const [nomeNovaPessoa, setNomeNovaPessoa] = useState<string>('');
+  const [pessoaSelecionadaLancamento, setPessoaSelecionadaLancamento] = useState<string>('Mesa (Compartilhado)');
+  const [modoVisualizacaoComanda, setModoVisualizacaoComanda] = useState<'por_pessoa' | 'todos'>('por_pessoa');
+  const [tipoDivisaoConta, setTipoDivisaoConta] = useState<'por_pessoa' | 'igualitaria'>('por_pessoa');
+  const [pessoasPagas, setPessoasPagas] = useState<string[]>([]);
+
+  function handleConfirmarAdicionarPessoa(e: React.FormEvent) {
+    e.preventDefault();
+    if (!modalAdicionarPessoa) return;
+    const nome = nomeNovaPessoa.trim();
+    if (!nome) return;
+
+    adicionarPessoaMesa(modalAdicionarPessoa.numero, nome, idLoja);
+    dispararToast(`👤 "${nome}" adicionado(a) à Mesa #${modalAdicionarPessoa.numero}!`);
+
+    if (mesaParaLancar && mesaParaLancar.numero === modalAdicionarPessoa.numero) {
+      const pessoasAtuais = getPessoasDaMesa(mesaParaLancar);
+      if (!pessoasAtuais.includes(nome)) {
+        setMesaParaLancar({
+          ...mesaParaLancar,
+          pessoas: [...pessoasAtuais, nome],
+          quantidadePessoas: Math.max(mesaParaLancar.quantidadePessoas || 1, pessoasAtuais.length + 1),
+        });
+      }
+      setPessoaSelecionadaLancamento(nome);
+    }
+
+    setNomeNovaPessoa('');
+    setModalAdicionarPessoa(null);
+  }
+
   // Estados de Lançamento de Pedidos e Comanda da Mesa
   const [mesaParaLancar, setMesaParaLancar] = useState<Mesa | null>(null);
   const [abaModalComanda, setAbaModalComanda] = useState<'cardapio' | 'itens_consumidos'>('cardapio');
@@ -197,37 +266,43 @@ export default function Mesas() {
     produto: Produto;
     quantidade: number;
     observacoes: string;
+    clienteNome?: string;
   }[]>([]);
 
-  function handleAdicionarItemCarrinhoMesa(produto: Produto) {
+  function handleAdicionarItemCarrinhoMesa(produto: Produto, paraPessoa?: string) {
+    const alvo = paraPessoa !== undefined ? paraPessoa : pessoaSelecionadaLancamento;
     setCarrinhoMesa((prev) => {
-      const existente = prev.find((it) => it.produto.id === produto.id);
+      const existente = prev.find(
+        (it) => it.produto.id === produto.id && (it.clienteNome || 'Mesa (Compartilhado)') === alvo
+      );
       if (existente) {
         return prev.map((it) =>
-          it.produto.id === produto.id ? { ...it, quantidade: it.quantidade + 1 } : it
+          it.produto.id === produto.id && (it.clienteNome || 'Mesa (Compartilhado)') === alvo
+            ? { ...it, quantidade: it.quantidade + 1 }
+            : it
         );
       }
-      return [...prev, { produto, quantidade: 1, observacoes: '' }];
+      return [...prev, { produto, quantidade: 1, observacoes: '', clienteNome: alvo }];
     });
   }
 
-  function handleAlterarQtdItemCarrinhoMesa(produtoId: string, delta: number) {
+  function handleAlterarQtdItemCarrinhoMesa(produtoId: string, delta: number, clienteNome?: string) {
     setCarrinhoMesa((prev) =>
       prev
         .map((it) => {
-          if (it.produto.id === produtoId) {
+          if (it.produto.id === produtoId && it.clienteNome === clienteNome) {
             const novaQtd = it.quantidade + delta;
             return novaQtd > 0 ? { ...it, quantidade: novaQtd } : null;
           }
           return it;
         })
-        .filter(Boolean) as { produto: Produto; quantidade: number; observacoes: string }[]
+        .filter(Boolean) as { produto: Produto; quantidade: number; observacoes: string; clienteNome?: string }[]
     );
   }
 
-  function handleAlterarObsItemCarrinhoMesa(produtoId: string, observacoes: string) {
+  function handleAlterarObsItemCarrinhoMesa(produtoId: string, observacoes: string, clienteNome?: string) {
     setCarrinhoMesa((prev) =>
-      prev.map((it) => (it.produto.id === produtoId ? { ...it, observacoes } : it))
+      prev.map((it) => (it.produto.id === produtoId && it.clienteNome === clienteNome ? { ...it, observacoes } : it))
     );
   }
 
@@ -243,6 +318,7 @@ export default function Mesas() {
       subtotal: Number((it.produto.precoVenda * it.quantidade).toFixed(2)),
       observacoes: it.observacoes.trim() || undefined,
       garcomNome: mesaParaLancar.garcomResponsavel || 'Lucas Oliveira',
+      clienteNome: it.clienteNome || pessoaSelecionadaLancamento || mesaParaLancar.responsavelNome || 'Geral (Mesa)',
     }));
 
     const res = lancarItensComandaMesa(
@@ -708,6 +784,21 @@ export default function Mesas() {
                             <span>Editar Nome / Responsável</span>
                           </button>
 
+                          {!isLivre && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMenuAcoesMesaId(null);
+                                setModalAdicionarPessoa(mesa);
+                                setNomeNovaPessoa('');
+                              }}
+                              className="w-full px-3 py-1.5 text-left hover:bg-cyan-50 flex items-center gap-2.5 text-cyan-700 font-bold cursor-pointer"
+                            >
+                              <UserPlus className="w-3.5 h-3.5 text-cyan-600" />
+                              <span>Pessoas / Sub-comandas</span>
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => {
@@ -740,6 +831,7 @@ export default function Mesas() {
                               setMenuAcoesMesaId(null);
                               setMesaParaFechar(mesa);
                               setPessoasDivisao(mesa.quantidadePessoas || 2);
+                              setPessoasPagas([]);
                             }}
                             className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
                           >
@@ -828,6 +920,52 @@ export default function Mesas() {
                         <div className="flex justify-between">
                           <span className="text-slate-400">Ocupantes:</span>
                           <span className="text-slate-200 font-bold">{mesa.quantidadePessoas || 2} pessoas</span>
+                        </div>
+                      </div>
+
+                      {/* Pessoas / Sub-comandas na Mesa */}
+                      <div className="p-2 bg-slate-950/70 rounded-xl border border-slate-800/80 space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400 font-semibold flex items-center gap-1">
+                            <Users className="w-3 h-3 text-cyan-400" />
+                            Pessoas na mesa ({getPessoasDaMesa(mesa).length}):
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setModalAdicionarPessoa(mesa);
+                              setNomeNovaPessoa('');
+                            }}
+                            className="text-cyan-400 hover:text-cyan-300 text-[10px] font-bold flex items-center gap-0.5 cursor-pointer hover:underline"
+                            title="Adicionar outra pessoa/comanda individual a esta mesa"
+                          >
+                            <UserPlus className="w-3 h-3" />
+                            <span>+ Pessoa</span>
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pr-0.5">
+                          {getPessoasDaMesa(mesa).map((p, pIdx) => {
+                            const itensPessoa = (mesa.comandaItens || []).filter(
+                              (it) => (it.clienteNome || mesa.responsavelNome || `Mesa #${mesa.numero}`) === p
+                            );
+                            const totalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+                            return (
+                              <span
+                                key={pIdx}
+                                className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-700/80 text-slate-200 flex items-center gap-1"
+                                title={`${p}: R$ ${totalPessoa.toFixed(2)} (${itensPessoa.length} itens)`}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                                <span className="font-semibold truncate max-w-[80px]">{p}</span>
+                                {totalPessoa > 0 && (
+                                  <span className="text-[9px] text-emerald-400 font-mono font-bold">
+                                    R${totalPessoa.toFixed(0)}
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -978,6 +1116,7 @@ export default function Mesas() {
                         onClick={() => {
                           setMesaParaFechar(mesa);
                           setPessoasDivisao(mesa.quantidadePessoas || 2);
+                          setPessoasPagas([]);
                         }}
                         className="py-2 px-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
                       >
@@ -1098,84 +1237,241 @@ export default function Mesas() {
       )}
 
       {/* ============================================================== */}
-      {/* MODAL: DIVISÃO IGUALITÁRIA DA CONTA (SEÇÃO 4.14 - 4.15)        */}
+      {/* MODAL: DIVISÃO & FECHAMENTO DA CONTA (INDIVIDUAL OU IGUALITÁRIO) */}
       {/* ============================================================== */}
-      {mesaParaFechar && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Split className="w-5 h-5 text-purple-400" />
-                <span>Fechamento & Divisão da Conta — Mesa #{mesaParaFechar.numero}</span>
-              </h3>
-              <button onClick={() => setMesaParaFechar(null)} className="text-slate-400 hover:text-white cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {mesaParaFechar && (() => {
+        const pessoasMesa = getPessoasDaMesa(mesaParaFechar);
+        const itensConsumidos = mesaParaFechar.comandaItens || [];
+        const itensCompartilhados = itensConsumidos.filter(
+          (it) => !it.clienteNome || it.clienteNome === 'Mesa (Compartilhado)' || it.clienteNome === 'Geral (Mesa)'
+        );
+        const totalCompartilhado = itensCompartilhados.reduce((sum, it) => sum + it.subtotal, 0);
+        const cotaCompartilhada = pessoasMesa.length > 0 ? totalCompartilhado / pessoasMesa.length : 0;
+        const totalGeral = mesaParaFechar.totalConsumo || 0;
 
-            <div className="space-y-4 text-xs">
-              {/* Total da Conta */}
-              <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Consumido:</span>
-                  <p className="text-white font-bold text-xs">{mesaParaFechar.responsavelNome || 'Cliente'}</p>
+        return (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    <Split className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-white">
+                      Fechar Conta — Mesa #{mesaParaFechar.numero}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      {mesaParaFechar.setor} • {pessoasMesa.length} {pessoasMesa.length === 1 ? 'pessoa' : 'pessoas na mesa'}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xl font-black text-emerald-400 font-mono">
-                  R$ {(mesaParaFechar.totalConsumo || 120).toFixed(2)}
-                </span>
+                <button
+                  onClick={() => setMesaParaFechar(null)}
+                  className="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-slate-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              {/* Ajuste de Pessoas para Divisão Igualitária (Seção 4.14) */}
-              <div className="p-3.5 bg-purple-950/30 border border-purple-500/30 rounded-2xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-slate-300 font-bold">Dividir a conta entre quantas pessoas?</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="30"
-                    value={pessoasDivisao}
-                    onChange={(e) => setPessoasDivisao(parseInt(e.target.value) || 1)}
-                    className="w-16 px-2.5 py-1 bg-slate-950 border border-purple-500/40 rounded-xl text-white font-mono font-bold text-center"
-                  />
-                </div>
-
-                <div className="pt-2 border-t border-purple-500/20 flex items-center justify-between">
-                  <span className="text-purple-300 font-bold">Valor por pessoa (Divisão Igualitária):</span>
-                  <span className="text-base font-black text-white font-mono bg-purple-900/50 px-3 py-1 rounded-xl">
-                    R$ {((mesaParaFechar.totalConsumo || 120) / Math.max(1, pessoasDivisao)).toFixed(2)}
+              <div className="space-y-4 text-xs">
+                {/* Total da Conta */}
+                <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Consumido na Mesa:</span>
+                    <p className="text-white font-bold text-xs">{mesaParaFechar.responsavelNome || 'Cliente'}</p>
+                  </div>
+                  <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
+                    R$ {totalGeral.toFixed(2)}
                   </span>
                 </div>
-              </div>
 
-              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-[11px] text-slate-400">
-                💡 Conforme a regra de fechamento (Seção 4.15), a divisão é sempre igualitária pelo total da comanda única, evitando filas e cálculo item a item.
-              </div>
+                {/* Seleção do Modo de Divisão */}
+                <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-2xl border border-slate-800 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setTipoDivisaoConta('por_pessoa')}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      tipoDivisaoConta === 'por_pessoa'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Por Consumo Individual</span>
+                  </button>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setMesaParaFechar(null)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer"
-                >
-                  Voltar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    atualizarStatusMesa(mesaParaFechar.numero, 'livre', idLoja);
-                    mesaParaFechar.totalConsumo = 0;
-                    dispararToast(`Conta da Mesa #${mesaParaFechar.numero} quitada e mesa liberada!`);
-                    setMesaParaFechar(null);
-                  }}
-                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer"
-                >
-                  Confirmar Pagamento & Liberar Mesa
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoDivisaoConta('igualitaria')}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      tipoDivisaoConta === 'igualitaria'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Split className="w-3.5 h-3.5" />
+                    <span>Divisão Igualitária</span>
+                  </button>
+                </div>
+
+                {/* Modo 1: Por Consumo de Cada Pessoa */}
+                {tipoDivisaoConta === 'por_pessoa' ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span>Comandas individuais dos ocupantes:</span>
+                      <span className="font-bold text-slate-300">
+                        {pessoasPagas.length} de {pessoasMesa.length} quitadas
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      {pessoasMesa.map((p) => {
+                        const itensPessoa = itensConsumidos.filter(
+                          (it) => (it.clienteNome || mesaParaFechar.responsavelNome || `Mesa #${mesaParaFechar.numero}`) === p
+                        );
+                        const subtotalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+                        const totalFinalPessoa = subtotalPessoa + cotaCompartilhada;
+                        const isPago = pessoasPagas.includes(p);
+
+                        return (
+                          <div
+                            key={p}
+                            className={`p-3 rounded-2xl border transition-all ${
+                              isPago
+                                ? 'bg-emerald-950/20 border-emerald-500/40 text-slate-300'
+                                : 'bg-slate-950 border-slate-800'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
+                                      isPago
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                    }`}
+                                  >
+                                    {isPago ? <Check className="w-3.5 h-3.5" /> : p.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="font-extrabold text-xs text-white truncate">{p}</span>
+                                  {isPago && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                                      Pago
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="text-[10px] text-slate-400 pl-8 space-y-0.5">
+                                  {itensPessoa.length === 0 ? (
+                                    <span className="text-slate-500 italic block">Nenhum item individual</span>
+                                  ) : (
+                                    <span className="block truncate max-w-[220px]">
+                                      {itensPessoa.map((it) => `${it.quantidade}x ${it.nome}`).join(', ')}
+                                    </span>
+                                  )}
+                                  {cotaCompartilhada > 0 && (
+                                    <span className="text-amber-400/90 block">
+                                      + R$ {cotaCompartilhada.toFixed(2)} cota compartilhada da mesa
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
+                                <span className="font-mono font-black text-emerald-400 text-sm">
+                                  R$ {totalFinalPessoa.toFixed(2)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPessoasPagas((prev) =>
+                                      isPago ? prev.filter((x) => x !== p) : [...prev, p]
+                                    );
+                                  }}
+                                  className={`text-[10px] px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1 ${
+                                    isPago
+                                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-500/40'
+                                      : 'bg-purple-600 hover:bg-purple-500 text-white shadow-sm'
+                                  }`}
+                                >
+                                  {isPago ? (
+                                    <>
+                                      <Check className="w-3 h-3 text-emerald-400" />
+                                      <span>Quitado (desfazer)</span>
+                                    </>
+                                  ) : (
+                                    <span>Receber deste</span>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {totalCompartilhado > 0 && (
+                      <div className="p-2.5 bg-amber-950/20 border border-amber-500/30 rounded-xl text-[11px] text-amber-300 flex items-center justify-between">
+                        <span>🍽️ Itens compartilhados da mesa ({itensCompartilhados.length} itens):</span>
+                        <strong className="font-mono">
+                          R$ {totalCompartilhado.toFixed(2)} (R$ {cotaCompartilhada.toFixed(2)} / pessoa)
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Modo 2: Divisão Igualitária */
+                  <div className="p-3.5 bg-purple-950/30 border border-purple-500/30 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-slate-300 font-bold">Dividir a conta entre quantas pessoas?</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={pessoasDivisao}
+                        onChange={(e) => setPessoasDivisao(parseInt(e.target.value) || 1)}
+                        className="w-16 px-2.5 py-1 bg-slate-950 border border-purple-500/40 rounded-xl text-white font-mono font-bold text-center"
+                      />
+                    </div>
+
+                    <div className="pt-2 border-t border-purple-500/20 flex items-center justify-between">
+                      <span className="text-purple-300 font-bold">Valor por pessoa (Divisão Igualitária):</span>
+                      <span className="text-base font-black text-white font-mono bg-purple-900/50 px-3 py-1 rounded-xl">
+                        R$ {(totalGeral / Math.max(1, pessoasDivisao)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setMesaParaFechar(null)}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      atualizarStatusMesa(mesaParaFechar.numero, 'livre', idLoja);
+                      mesaParaFechar.totalConsumo = 0;
+                      dispararToast(`Conta da Mesa #${mesaParaFechar.numero} quitada e mesa liberada com sucesso!`);
+                      setMesaParaFechar(null);
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Confirmar Pagamento & Liberar Mesa</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ============================================================== */}
       {/* MODAL: QR CODE DA MESA COM SIMULADOR DO CLIENTE (SEÇÃO 4.12)  */}
@@ -1708,10 +2004,10 @@ export default function Mesas() {
                               }`}
                             >
                               <span className="font-bold text-xs block text-amber-300">
-                                Unificar Comandas
+                                👥 Juntar Pessoas na Mesma Mesa
                               </span>
                               <span className="text-[10px] text-slate-400 block mt-0.5">
-                                Soma consumos e pedidos na Mesa #{mDestino.numero} e libera a Mesa #{mesaParaTrocar.numero}.
+                                Agrupa os clientes e preserva as comandas individuais ({mesaParaTrocar.responsavelNome || 'Cliente'} e {mDestino.responsavelNome || 'Cliente'}) na Mesa #{mDestino.numero}.
                               </span>
                             </button>
 
@@ -2021,6 +2317,59 @@ export default function Mesas() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-full">
                   {/* Coluna Esquerda: Catálogo do Cardápio (7 cols) */}
                   <div className="lg:col-span-7 space-y-3.5">
+                    {/* Barra de Atribuição: Lançar item para quem? */}
+                    <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-cyan-400" />
+                          <span className="text-xs font-black text-white uppercase tracking-wider">
+                            Lançar para quem?
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalAdicionarPessoa(mesaParaLancar);
+                            setNomeNovaPessoa('');
+                          }}
+                          className="px-2.5 py-1 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" />
+                          <span>+ Nova Pessoa</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                        <button
+                          type="button"
+                          onClick={() => setPessoaSelecionadaLancamento('Mesa (Compartilhado)')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                            pessoaSelecionadaLancamento === 'Mesa (Compartilhado)'
+                              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
+                              : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <span>🍽️ Mesa (Compartilhado)</span>
+                        </button>
+
+                        {getPessoasDaMesa(mesaParaLancar).map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setPessoaSelecionadaLancamento(p)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                              pessoaSelecionadaLancamento === p
+                                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20 font-black'
+                                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:text-white'
+                            }`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                            <span>{p}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Barra de Busca e Filtros de Categoria */}
                     <div className="space-y-2">
                       <div className="relative">
@@ -2075,7 +2424,9 @@ export default function Mesas() {
                           const temFicha = fichasTecnicas.some(
                             (f) => f.produtoId === prod.id && f.componentes && f.componentes.length > 0
                           );
-                          const noCarrinho = carrinhoMesa.find((it) => it.produto.id === prod.id);
+                          const noCarrinho = carrinhoMesa.find(
+                            (it) => it.produto.id === prod.id && (it.clienteNome || 'Mesa (Compartilhado)') === pessoaSelecionadaLancamento
+                          );
 
                           return (
                             <div
@@ -2144,14 +2495,14 @@ export default function Mesas() {
                           <UtensilsCrossed className="w-7 h-7 mx-auto text-slate-600 opacity-60" />
                           <p className="font-semibold text-slate-400">Nenhum prato adicionado ao lote.</p>
                           <p className="text-[11px] text-slate-500">
-                            Selecione os itens do cardápio ao lado para montar o pedido desta mesa.
+                            Selecione para quem é o item acima e clique em Adicionar no cardápio.
                           </p>
                         </div>
                       ) : (
                         <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
-                          {carrinhoMesa.map((it) => (
+                          {carrinhoMesa.map((it, cIdx) => (
                             <div
-                              key={it.produto.id}
+                              key={`${it.produto.id}_${it.clienteNome || 'mesa'}_${cIdx}`}
                               className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2"
                             >
                               <div className="flex items-center justify-between gap-2">
@@ -2163,11 +2514,19 @@ export default function Mesas() {
                                 </span>
                               </div>
 
+                              {/* Atribuição de Pessoa no Card do Item do Carrinho */}
+                              <div className="flex items-center justify-between text-[11px] bg-slate-950/80 px-2 py-1 rounded-lg border border-slate-800/60">
+                                <span className="text-slate-400 text-[10px]">Para:</span>
+                                <span className="text-[10px] font-bold text-cyan-300">
+                                  {it.clienteNome || 'Mesa (Compartilhado)'}
+                                </span>
+                              </div>
+
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
                                   <button
                                     type="button"
-                                    onClick={() => handleAlterarQtdItemCarrinhoMesa(it.produto.id, -1)}
+                                    onClick={() => handleAlterarQtdItemCarrinhoMesa(it.produto.id, -1, it.clienteNome)}
                                     className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
                                   >
                                     <Minus className="w-3 h-3" />
@@ -2177,7 +2536,7 @@ export default function Mesas() {
                                   </span>
                                   <button
                                     type="button"
-                                    onClick={() => handleAlterarQtdItemCarrinhoMesa(it.produto.id, 1)}
+                                    onClick={() => handleAlterarQtdItemCarrinhoMesa(it.produto.id, 1, it.clienteNome)}
                                     className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
                                   >
                                     <Plus className="w-3 h-3" />
@@ -2188,15 +2547,15 @@ export default function Mesas() {
                                   type="text"
                                   value={it.observacoes}
                                   onChange={(e) =>
-                                    handleAlterarObsItemCarrinhoMesa(it.produto.id, e.target.value)
+                                    handleAlterarObsItemCarrinhoMesa(it.produto.id, e.target.value, it.clienteNome)
                                   }
-                                  placeholder="Obs: sem cebola, ponto..."
+                                  placeholder="Obs: sem gelo, ponto..."
                                   className="flex-1 px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
                                 />
 
                                 <button
                                   type="button"
-                                  onClick={() => handleAlterarQtdItemCarrinhoMesa(it.produto.id, -it.quantidade)}
+                                  onClick={() => handleAlterarQtdItemCarrinhoMesa(it.produto.id, -it.quantidade, it.clienteNome)}
                                   className="p-1.5 text-slate-500 hover:text-rose-400 cursor-pointer"
                                   title="Remover item"
                                 >
@@ -2271,6 +2630,49 @@ export default function Mesas() {
                     </div>
                   </div>
 
+                  {/* Alternador de Visualização: Sub-comandas por Pessoa vs Lista Completa */}
+                  <div className="flex items-center justify-between gap-2 p-1.5 bg-slate-950 rounded-2xl border border-slate-800 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setModoVisualizacaoComanda('por_pessoa')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          modoVisualizacaoComanda === 'por_pessoa'
+                            ? 'bg-cyan-600 text-white shadow-md'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Sub-comandas por Pessoa ({getPessoasDaMesa(mesaParaLancar).length})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setModoVisualizacaoComanda('todos')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          modoVisualizacaoComanda === 'todos'
+                            ? 'bg-cyan-600 text-white shadow-md'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Lista Geral da Mesa</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalAdicionarPessoa(mesaParaLancar);
+                        setNomeNovaPessoa('');
+                      }}
+                      className="px-2.5 py-1 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>+ Adicionar Pessoa</span>
+                    </button>
+                  </div>
+
                   {!mesaParaLancar.comandaItens || mesaParaLancar.comandaItens.length === 0 ? (
                     <div className="p-12 text-center text-slate-500 text-xs rounded-2xl bg-slate-950 border border-dashed border-slate-800 space-y-2">
                       <UtensilsCrossed className="w-8 h-8 mx-auto text-slate-600" />
@@ -2285,66 +2687,216 @@ export default function Mesas() {
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead>
-                            <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] font-semibold">
-                              <th className="py-2.5 px-3">Horário</th>
-                              <th className="py-2.5 px-3">Item / Prato</th>
-                              <th className="py-2.5 px-3">Qtd</th>
-                              <th className="py-2.5 px-3">Unitário</th>
-                              <th className="py-2.5 px-3">Subtotal</th>
-                              <th className="py-2.5 px-3">KDS Cozinha</th>
-                              <th className="py-2.5 px-3 text-right">Lançado Por</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800/60">
-                            {mesaParaLancar.comandaItens.map((item, idx) => (
-                              <tr key={item.id || idx} className="hover:bg-slate-950/60 transition-colors">
-                                <td className="py-2.5 px-3 font-mono text-slate-400">{item.horario}</td>
-                                <td className="py-2.5 px-3">
-                                  <span className="font-bold text-white block">{item.nome}</span>
-                                  {item.observacoes && (
-                                    <span className="text-[11px] text-amber-300 italic block mt-0.5">
-                                      "{item.observacoes}"
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-2.5 px-3 font-mono font-bold text-orange-400">
-                                  {item.quantidade}x
-                                </td>
-                                <td className="py-2.5 px-3 font-mono text-slate-300">
-                                  R$ {item.precoUnitario.toFixed(2)}
-                                </td>
-                                <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
-                                  R$ {item.subtotal.toFixed(2)}
-                                </td>
-                                <td className="py-2.5 px-3">
-                                  <span
-                                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-block ${
-                                      item.statusKDS === 'pronto'
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                        : item.statusKDS === 'em_preparo'
-                                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
-                                        : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                                    }`}
+                    <div className="space-y-3">
+                      {modoVisualizacaoComanda === 'por_pessoa' ? (
+                        <div className="space-y-3">
+                          {/* Grid das sub-comandas de cada pessoa */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {getPessoasDaMesa(mesaParaLancar).map((p, idx) => {
+                              const itensPessoa = mesaParaLancar.comandaItens!.filter(
+                                (it) => (it.clienteNome || mesaParaLancar.responsavelNome || `Mesa #${mesaParaLancar.numero}`) === p
+                              );
+                              const subtotalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5 flex flex-col justify-between"
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between pb-2 border-b border-slate-900">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-full bg-cyan-500/20 text-cyan-300 font-bold flex items-center justify-center text-xs border border-cyan-500/30">
+                                          {p.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                          <h5 className="font-extrabold text-white text-xs">{p}</h5>
+                                          <span className="text-[10px] text-slate-400">
+                                            {itensPessoa.length} {itensPessoa.length === 1 ? 'item' : 'itens'}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <div className="text-right">
+                                        <span className="text-[10px] text-slate-400 block">Subtotal:</span>
+                                        <span className="font-mono font-black text-emerald-400 text-sm">
+                                          R$ {subtotalPessoa.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {itensPessoa.length === 0 ? (
+                                      <p className="text-[11px] text-slate-500 italic py-2">
+                                        Nenhum item individual lançado para {p} ainda.
+                                      </p>
+                                    ) : (
+                                      <div className="space-y-1.5 pt-2 max-h-48 overflow-y-auto pr-1">
+                                        {itensPessoa.map((it, itIdx) => (
+                                          <div
+                                            key={it.id || itIdx}
+                                            className="p-2 rounded-xl bg-slate-900 border border-slate-800/80 flex items-center justify-between text-[11px]"
+                                          >
+                                            <div className="min-w-0 pr-2">
+                                              <span className="font-bold text-white block truncate">
+                                                <span className="text-orange-400 mr-1">{it.quantidade}x</span>
+                                                {it.nome}
+                                              </span>
+                                              {it.observacoes && (
+                                                <span className="text-[10px] text-amber-300 italic block truncate">
+                                                  "{it.observacoes}"
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                              <span className="font-mono font-bold text-slate-200 block">
+                                                R$ {it.subtotal.toFixed(2)}
+                                              </span>
+                                              <span
+                                                className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase inline-block ${
+                                                  it.statusKDS === 'pronto'
+                                                    ? 'text-emerald-400 bg-emerald-500/10'
+                                                    : it.statusKDS === 'em_preparo'
+                                                    ? 'text-amber-400 bg-amber-500/10'
+                                                    : 'text-blue-400 bg-blue-500/10'
+                                                }`}
+                                              >
+                                                {it.statusKDS === 'pronto' ? 'Pronto' : it.statusKDS === 'em_preparo' ? 'Preparo' : 'Fila'}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPessoaSelecionadaLancamento(p);
+                                      setAbaModalComanda('cardapio');
+                                    }}
+                                    className="w-full py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-cyan-200 border border-cyan-500/20 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
                                   >
-                                    {item.statusKDS === 'pronto'
-                                      ? 'Pronto / Servido'
-                                      : item.statusKDS === 'em_preparo'
-                                      ? 'Em Preparo'
-                                      : 'Fila da Cozinha'}
+                                    <Plus className="w-3 h-3 text-cyan-400" />
+                                    <span>+ Lançar Pedido para {p}</span>
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Card Itens Compartilhados da Mesa */}
+                          {(() => {
+                            const compartilhados = mesaParaLancar.comandaItens!.filter(
+                              (it) => !it.clienteNome || it.clienteNome === 'Mesa (Compartilhado)' || it.clienteNome === 'Geral (Mesa)'
+                            );
+                            if (compartilhados.length === 0) return null;
+                            const totalComp = compartilhados.reduce((sum, it) => sum + it.subtotal, 0);
+                            const totalPessoas = getPessoasDaMesa(mesaParaLancar).length;
+                            const porPessoa = totalPessoas > 0 ? totalComp / totalPessoas : 0;
+
+                            return (
+                              <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-2xl space-y-2">
+                                <div className="flex items-center justify-between pb-1.5 border-b border-amber-500/20">
+                                  <span className="font-extrabold text-amber-300 text-xs flex items-center gap-1.5">
+                                    <span>🍽️ Itens Compartilhados da Mesa</span>
                                   </span>
-                                </td>
-                                <td className="py-2.5 px-3 text-right text-slate-400 text-[11px]">
-                                  {item.garcomNome || 'Lucas Oliveira'}
-                                </td>
+                                  <div className="text-right">
+                                    <span className="text-[10px] text-slate-400 block font-semibold">Total Compartilhado:</span>
+                                    <span className="font-mono font-black text-amber-400 text-xs">
+                                      R$ {totalComp.toFixed(2)} (R$ {porPessoa.toFixed(2)} / pessoa)
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                                  {compartilhados.map((it, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-[11px]"
+                                    >
+                                      <span className="font-bold text-white truncate">
+                                        <span className="text-amber-400 mr-1">{it.quantidade}x</span>
+                                        {it.nome}
+                                      </span>
+                                      <span className="font-mono font-bold text-emerald-400 shrink-0">
+                                        R$ {it.subtotal.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      ) : (
+                        /* Modo 2: Lista Completa da Mesa em Tabela */
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] font-semibold">
+                                <th className="py-2.5 px-3">Horário</th>
+                                <th className="py-2.5 px-3">Cliente / Pessoa</th>
+                                <th className="py-2.5 px-3">Item / Prato</th>
+                                <th className="py-2.5 px-3">Qtd</th>
+                                <th className="py-2.5 px-3">Unitário</th>
+                                <th className="py-2.5 px-3">Subtotal</th>
+                                <th className="py-2.5 px-3">KDS Cozinha</th>
+                                <th className="py-2.5 px-3 text-right">Lançado Por</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {mesaParaLancar.comandaItens.map((item, idx) => (
+                                <tr key={item.id || idx} className="hover:bg-slate-950/60 transition-colors">
+                                  <td className="py-2.5 px-3 font-mono text-slate-400">{item.horario}</td>
+                                  <td className="py-2.5 px-3">
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-950 border border-slate-800 text-cyan-300 whitespace-nowrap">
+                                      {item.clienteNome || 'Mesa (Compartilhado)'}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    <span className="font-bold text-white block">{item.nome}</span>
+                                    {item.observacoes && (
+                                      <span className="text-[11px] text-amber-300 italic block mt-0.5">
+                                        "{item.observacoes}"
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-3 font-mono font-bold text-orange-400">
+                                    {item.quantidade}x
+                                  </td>
+                                  <td className="py-2.5 px-3 font-mono text-slate-300">
+                                    R$ {item.precoUnitario.toFixed(2)}
+                                  </td>
+                                  <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
+                                    R$ {item.subtotal.toFixed(2)}
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    <span
+                                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-block ${
+                                        item.statusKDS === 'pronto'
+                                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                          : item.statusKDS === 'em_preparo'
+                                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                      }`}
+                                    >
+                                      {item.statusKDS === 'pronto'
+                                        ? 'Pronto / Servido'
+                                        : item.statusKDS === 'em_preparo'
+                                        ? 'Em Preparo'
+                                        : 'Fila da Cozinha'}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right text-slate-400 text-[11px]">
+                                    {item.garcomNome || 'Lucas Oliveira'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
 
                       {/* Totais e Fechamento */}
                       <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-end sm:items-center justify-between gap-4">
@@ -2377,6 +2929,7 @@ export default function Mesas() {
                               setMesaParaLancar(null);
                               setMesaParaFechar(mesaAlvo);
                               setPessoasDivisao(mesaAlvo.quantidadePessoas || 2);
+                              setPessoasPagas([]);
                             }}
                             className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 flex items-center gap-1.5 cursor-pointer"
                           >
@@ -2461,6 +3014,145 @@ export default function Mesas() {
                   className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-lg shadow-orange-500/20 cursor-pointer active:scale-95 transition-all"
                 >
                   Salvar Nome
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: ADICIONAR PESSOA / SUB-COMANDA À MESA                  */}
+      {/* ============================================================== */}
+      {modalAdicionarPessoa && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-white">
+                    Pessoas na Mesa #{modalAdicionarPessoa.numero}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Gerencie comandas individuais e pessoas nesta mesa
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalAdicionarPessoa(null)}
+                className="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Lista das pessoas atuais */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 block">
+                Pessoas já registradas nesta mesa:
+              </label>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {getPessoasDaMesa(modalAdicionarPessoa).map((p, idx) => {
+                  const itensDaPessoa = (modalAdicionarPessoa.comandaItens || []).filter(
+                    (it) => (it.clienteNome || modalAdicionarPessoa.responsavelNome || `Mesa #${modalAdicionarPessoa.numero}`) === p
+                  );
+                  const subtotalPessoa = itensDaPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+
+                  return (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 font-bold flex items-center justify-center text-[11px]">
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <strong className="text-white block">{p}</strong>
+                          <span className="text-[10px] text-slate-400">
+                            {itensDaPessoa.length} {itensDaPessoa.length === 1 ? 'item lançado' : 'itens lançados'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-emerald-400 text-xs">
+                          R$ {subtotalPessoa.toFixed(2)}
+                        </span>
+                        {itensDaPessoa.length === 0 && getPessoasDaMesa(modalAdicionarPessoa).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              removerPessoaMesa(modalAdicionarPessoa.numero, p, idLoja);
+                              dispararToast(`"${p}" removido(a) da mesa.`);
+                            }}
+                            className="p-1 rounded text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                            title="Remover pessoa sem pedidos"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Form para adicionar nova pessoa */}
+            <form onSubmit={handleConfirmarAdicionarPessoa} className="space-y-3 pt-2 border-t border-slate-800 text-xs">
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">
+                  Nome da Nova Pessoa:
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={nomeNovaPessoa}
+                  onChange={(e) => setNomeNovaPessoa(e.target.value)}
+                  placeholder="Ex: Mariana, Lucas, Amigo 1..."
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold text-sm focus:outline-none focus:border-cyan-500"
+                />
+
+                {/* Sugestões rápidas de nomes */}
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span className="text-[10px] text-slate-500 mr-0.5">Sugestões:</span>
+                  {[
+                    `Pessoa ${getPessoasDaMesa(modalAdicionarPessoa).length + 1}`,
+                    'Amigo',
+                    'Convidado',
+                    'Criança',
+                  ].map((sugestao) => (
+                    <button
+                      key={sugestao}
+                      type="button"
+                      onClick={() => setNomeNovaPessoa(sugestao)}
+                      className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 hover:border-cyan-500 transition-colors cursor-pointer"
+                    >
+                      {sugestao}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalAdicionarPessoa(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer"
+                >
+                  Fechar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!nomeNovaPessoa.trim()}
+                  className="flex-1 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold shadow-lg shadow-cyan-600/20 cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Adicionar à Mesa</span>
                 </button>
               </div>
             </form>

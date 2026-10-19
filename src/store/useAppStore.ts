@@ -29,6 +29,8 @@ interface AppState {
   adicionarMesa: (dados: { numero: number; capacidade: number; setor: string }, tenantId?: string) => { sucesso: boolean; mensagem?: string };
   removerMesa: (numero: number, tenantId?: string) => { sucesso: boolean; mensagem?: string };
   editarMesa: (numero: number, dados: Partial<Mesa>, tenantId?: string) => void;
+  adicionarPessoaMesa: (numeroMesa: number, nomePessoa: string, tenantId?: string) => void;
+  removerPessoaMesa: (numeroMesa: number, nomePessoa: string, tenantId?: string) => void;
   trocarMesa: (
     numeroOrigem: number,
     numeroDestino: number,
@@ -709,6 +711,55 @@ export const useAppStore = create<AppState>()(
         });
       },
 
+      adicionarPessoaMesa: (numeroMesa, nomePessoa, tenantId) => {
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        set((state) => {
+          const map = state.mesasPorTenant || MESAS_POR_TENANT;
+          const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
+          const novaLista = listaAtual.map((m) => {
+            if (m.numero !== numeroMesa) return m;
+            const pessoasAtuais = m.pessoas && m.pessoas.length > 0
+              ? m.pessoas
+              : [m.responsavelNome || `Mesa #${numeroMesa}`];
+            const nomeFormatado = nomePessoa.trim();
+            if (!nomeFormatado || pessoasAtuais.includes(nomeFormatado)) return m;
+            const novasPessoas = [...pessoasAtuais, nomeFormatado];
+            return {
+              ...m,
+              pessoas: novasPessoas,
+              quantidadePessoas: Math.max(m.quantidadePessoas || 1, novasPessoas.length),
+            };
+          });
+          return {
+            mesasPorTenant: { ...map, [idAlvo]: novaLista },
+            mesas: novaLista,
+          };
+        });
+      },
+
+      removerPessoaMesa: (numeroMesa, nomePessoa, tenantId) => {
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        set((state) => {
+          const map = state.mesasPorTenant || MESAS_POR_TENANT;
+          const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
+          const novaLista = listaAtual.map((m) => {
+            if (m.numero !== numeroMesa) return m;
+            const pessoasAtuais = m.pessoas && m.pessoas.length > 0
+              ? m.pessoas
+              : [m.responsavelNome || `Mesa #${numeroMesa}`];
+            const filtradas = pessoasAtuais.filter((p) => p !== nomePessoa);
+            return {
+              ...m,
+              pessoas: filtradas.length > 0 ? filtradas : [m.responsavelNome || `Mesa #${numeroMesa}`],
+            };
+          });
+          return {
+            mesasPorTenant: { ...map, [idAlvo]: novaLista },
+            mesas: novaLista,
+          };
+        });
+      },
+
       trocarMesa: (numeroOrigem, numeroDestino, modo = 'transferir', tenantId, motivo) => {
         if (numeroOrigem === numeroDestino) {
           return { sucesso: false, mensagem: 'A mesa de origem e destino devem ser diferentes.' };
@@ -765,11 +816,26 @@ export const useAppStore = create<AppState>()(
             return m;
           });
         } else if (modo === 'unificar') {
-          // Mescla comandas e consumo na mesa destino
-          const itensMesclados = [
-            ...(mesaDestino.comandaItens || []),
-            ...(mesaOrigem.comandaItens || []),
-          ];
+          // Preserva pessoas separadas dentro da mesma mesa
+          const pessoasOrigem = mesaOrigem.pessoas && mesaOrigem.pessoas.length > 0
+            ? mesaOrigem.pessoas
+            : [mesaOrigem.responsavelNome || `Mesa #${numeroOrigem}`];
+          const pessoasDestino = mesaDestino.pessoas && mesaDestino.pessoas.length > 0
+            ? mesaDestino.pessoas
+            : [mesaDestino.responsavelNome || `Mesa #${numeroDestino}`];
+          const pessoasUnificadas = Array.from(new Set([...pessoasDestino, ...pessoasOrigem]));
+
+          // Cada item preserva a pessoa que pediu
+          const itensOrigemAjustados = (mesaOrigem.comandaItens || []).map((it) => ({
+            ...it,
+            clienteNome: it.clienteNome || mesaOrigem.responsavelNome || `Mesa #${numeroOrigem}`,
+          }));
+          const itensDestinoAjustados = (mesaDestino.comandaItens || []).map((it) => ({
+            ...it,
+            clienteNome: it.clienteNome || mesaDestino.responsavelNome || `Mesa #${numeroDestino}`,
+          }));
+          const itensMesclados = [...itensDestinoAjustados, ...itensOrigemAjustados];
+
           const consumoTotal = Number(
             ((mesaDestino.totalConsumo || 0) + (mesaOrigem.totalConsumo || 0)).toFixed(2)
           );
@@ -787,7 +853,9 @@ export const useAppStore = create<AppState>()(
               return {
                 ...m,
                 status: 'ocupada',
-                quantidadePessoas: pessoasTotal || m.quantidadePessoas,
+                quantidadePessoas: Math.max(pessoasTotal, pessoasUnificadas.length),
+                responsavelNome: mesaDestino.responsavelNome || mesaOrigem.responsavelNome,
+                pessoas: pessoasUnificadas,
                 totalConsumo: consumoTotal,
                 comandaItens: itensMesclados,
                 mesasUnidas: unidas,
@@ -799,6 +867,7 @@ export const useAppStore = create<AppState>()(
                 status: 'livre',
                 quantidadePessoas: undefined,
                 responsavelNome: undefined,
+                pessoas: undefined,
                 garcomResponsavel: undefined,
                 tempoOcupadaMin: 0,
                 totalConsumo: 0,
@@ -894,6 +963,7 @@ export const useAppStore = create<AppState>()(
           id: `cmd_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           horario: agoraHora,
           garcomNome: garcomNome || mesa.garcomResponsavel || 'Garçom',
+          clienteNome: it.clienteNome || mesa.responsavelNome || `Mesa #${numeroMesa}`,
           statusKDS: 'novo',
         }));
 
@@ -910,7 +980,9 @@ export const useAppStore = create<AppState>()(
           nomeCliente: mesa.responsavelNome || `Mesa #${numeroMesa}`,
           status: 'novo',
           itens: itensCompletos.map((it) => ({
-            nome: it.nome,
+            nome: it.clienteNome && it.clienteNome !== mesa.responsavelNome
+              ? `${it.nome} (${it.clienteNome})`
+              : it.nome,
             quantidade: it.quantidade,
             observacoes: it.observacoes || undefined,
           })),
