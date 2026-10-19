@@ -33,13 +33,15 @@ import {
   Download,
   Copy,
   ExternalLink,
+  CreditCard,
+  User,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useFuncionarioStore } from '../store/useFuncionarioStore';
 import { useSaaSStore, PLANOS_DISPONIVEIS } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
-import { Mesa, Produto } from '../types';
+import { Mesa, Produto, FormaPagamento, VendaRealizada, ItemComandaMesa } from '../types';
 import { MesaQRCodeThumbnail } from '../components/mesas/MesaQRCodeThumbnail';
 import {
   gerarQrCodeMesaDataUrl,
@@ -60,6 +62,7 @@ export default function Mesas() {
     removerPessoaMesa,
     lancarItensComandaMesa,
     trocarMesa,
+    registrarVenda,
   } = useAppStore();
   const { funcionarios } = useFuncionarioStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
@@ -224,13 +227,29 @@ export default function Mesas() {
     return lista.length > 0 ? lista : [mesa.responsavelNome || `Mesa #${mesa.numero}`];
   }
 
-  // Estados de Múltiplas Pessoas na Mesa
+  // Helper para identificar a quem pertence cada item da comanda
+  function getDonoDoItem(it: ItemComandaMesa, mesa: Mesa | null): string {
+    if (!mesa) return 'Cliente';
+    const pessoas = getPessoasDaMesa(mesa);
+    if (it.clienteNome && pessoas.includes(it.clienteNome)) {
+      return it.clienteNome;
+    }
+    return mesa.responsavelNome || pessoas[0] || `Mesa #${mesa.numero}`;
+  }
+
+  // Estados de Múltiplas Pessoas e Sub-comandas na Mesa
   const [modalAdicionarPessoa, setModalAdicionarPessoa] = useState<Mesa | null>(null);
   const [nomeNovaPessoa, setNomeNovaPessoa] = useState<string>('');
-  const [pessoaSelecionadaLancamento, setPessoaSelecionadaLancamento] = useState<string>('Mesa (Compartilhado)');
-  const [modoVisualizacaoComanda, setModoVisualizacaoComanda] = useState<'por_pessoa' | 'todos'>('por_pessoa');
+  const [pessoaSelecionadaLancamento, setPessoaSelecionadaLancamento] = useState<string>('');
+  const [pessoaAtivaComanda, setPessoaAtivaComanda] = useState<string>('todos');
+  const [modalPagamentoComanda, setModalPagamentoComanda] = useState<{
+    mesa: Mesa;
+    nomePessoa: string;
+    valor: number;
+    itens: ItemComandaMesa[];
+  } | null>(null);
+  const [formaPagamentoComanda, setFormaPagamentoComanda] = useState<FormaPagamento>('pix');
   const [tipoDivisaoConta, setTipoDivisaoConta] = useState<'por_pessoa' | 'igualitaria'>('por_pessoa');
-  const [pessoasPagas, setPessoasPagas] = useState<string[]>([]);
 
   function handleConfirmarAdicionarPessoa(e: React.FormEvent) {
     e.preventDefault();
@@ -251,10 +270,147 @@ export default function Mesas() {
         });
       }
       setPessoaSelecionadaLancamento(nome);
+      setPessoaAtivaComanda(nome);
     }
 
     setNomeNovaPessoa('');
     setModalAdicionarPessoa(null);
+  }
+
+  // Transferência rápida de item entre pessoas da mesma mesa
+  function handleReatribuirItem(itemId: string, novoDono: string) {
+    if (!mesaParaLancar) return;
+    const novosItens = (mesaParaLancar.comandaItens || []).map((it) =>
+      it.id === itemId ? { ...it, clienteNome: novoDono } : it
+    );
+    editarMesa(mesaParaLancar.numero, { comandaItens: novosItens }, idLoja);
+    setMesaParaLancar({ ...mesaParaLancar, comandaItens: novosItens });
+    dispararToast(`Item transferido para a comanda de "${novoDono}"!`);
+  }
+
+  // Pagamento da comanda individual ou de toda a mesa
+  function handleConfirmarPagamentoComanda(
+    mesaAlvo: Mesa,
+    nomePessoa: string,
+    forma: FormaPagamento
+  ) {
+    const todosItens = mesaAlvo.comandaItens || [];
+    const isTodos = nomePessoa === 'todos';
+    const itensPagos = isTodos
+      ? todosItens
+      : todosItens.filter((it) => getDonoDoItem(it, mesaAlvo) === nomePessoa);
+
+    const valorPago = Number(
+      itensPagos.reduce((sum, it) => sum + it.subtotal, 0).toFixed(2)
+    );
+
+    if (valorPago <= 0 && !isTodos) {
+      dispararToast(`A comanda de "${nomePessoa}" não possui valor pendente.`);
+      setModalPagamentoComanda(null);
+      return;
+    }
+
+    // 1. Registra venda no caixa do sistema
+    const agoraTexto =
+      new Date().toLocaleDateString('pt-BR') +
+      ' ' +
+      new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const novaVenda: VendaRealizada = {
+      id: `venda_${Date.now()}`,
+      tenantId: idLoja,
+      tipoOrigem: 'mesa',
+      mesaNumero: mesaAlvo.numero,
+      dataHora: agoraTexto,
+      total: valorPago,
+      subtotalBruto: valorPago,
+      desconto: 0,
+      formaPagamento: forma,
+      itens: itensPagos.map((it) => ({
+        produtoId: it.produtoId,
+        nome: `${it.nome} (${isTodos ? getDonoDoItem(it, mesaAlvo) : nomePessoa})`,
+        quantidade: it.quantidade,
+        precoUnitario: it.precoUnitario,
+        subtotal: it.subtotal,
+      })),
+      operador: mesaAlvo.garcomResponsavel || 'Caixa Salão',
+      status: 'concluida',
+    };
+    registrarVenda(novaVenda);
+
+    // 2. Atualiza os itens e o saldo da mesa
+    const itensRestantes = isTodos
+      ? []
+      : todosItens.filter((it) => getDonoDoItem(it, mesaAlvo) !== nomePessoa);
+
+    const novoTotalMesa = Number(
+      itensRestantes.reduce((sum, it) => sum + it.subtotal, 0).toFixed(2)
+    );
+
+    if (itensRestantes.length === 0 || novoTotalMesa <= 0) {
+      // Todas as comandas foram pagas: libera a mesa
+      editarMesa(
+        mesaAlvo.numero,
+        {
+          status: 'livre',
+          totalConsumo: 0,
+          comandaItens: [],
+          pessoas: undefined,
+          responsavelNome: undefined,
+        },
+        idLoja
+      );
+      dispararToast(
+        `🎉 Comanda de "${isTodos ? 'todos' : nomePessoa}" (R$ ${valorPago.toFixed(2)}) quitada via ${forma.toUpperCase()}! Todas as contas pagas, Mesa #${mesaAlvo.numero} liberada.`
+      );
+      setModalPagamentoComanda(null);
+      if (mesaParaLancar && mesaParaLancar.numero === mesaAlvo.numero) {
+        setMesaParaLancar(null);
+      }
+      if (mesaParaFechar && mesaParaFechar.numero === mesaAlvo.numero) {
+        setMesaParaFechar(null);
+      }
+    } else {
+      // Outras pessoas continuam na mesa com seus consumos
+      editarMesa(
+        mesaAlvo.numero,
+        {
+          totalConsumo: novoTotalMesa,
+          comandaItens: itensRestantes,
+        },
+        idLoja
+      );
+      dispararToast(
+        `✅ Comanda de "${nomePessoa}" (R$ ${valorPago.toFixed(2)}) quitada via ${forma.toUpperCase()}! Restam R$ ${novoTotalMesa.toFixed(2)} na Mesa #${mesaAlvo.numero}.`
+      );
+      setModalPagamentoComanda(null);
+      if (mesaParaLancar && mesaParaLancar.numero === mesaAlvo.numero) {
+        setMesaParaLancar({
+          ...mesaParaLancar,
+          totalConsumo: novoTotalMesa,
+          comandaItens: itensRestantes,
+        });
+        setPessoaAtivaComanda('todos');
+      }
+      if (mesaParaFechar && mesaParaFechar.numero === mesaAlvo.numero) {
+        setMesaParaFechar({
+          ...mesaParaFechar,
+          totalConsumo: novoTotalMesa,
+          comandaItens: itensRestantes,
+        });
+      }
+    }
+  }
+
+  // Abertura centralizada da comanda
+  function abrirComandaMesa(mesa: Mesa, aba: 'cardapio' | 'itens_consumidos' = 'cardapio', pessoaAlvo?: string) {
+    const pessoas = getPessoasDaMesa(mesa);
+    const alvo = pessoaAlvo || pessoas[0] || mesa.responsavelNome || `Mesa #${mesa.numero}`;
+    setPessoaSelecionadaLancamento(alvo);
+    setPessoaAtivaComanda(aba === 'itens_consumidos' && pessoas.length > 1 ? 'todos' : alvo);
+    setAbaModalComanda(aba);
+    setCarrinhoMesa([]);
+    setMesaParaLancar(mesa);
   }
 
   // Estados de Lançamento de Pedidos e Comanda da Mesa
@@ -270,14 +426,15 @@ export default function Mesas() {
   }[]>([]);
 
   function handleAdicionarItemCarrinhoMesa(produto: Produto, paraPessoa?: string) {
-    const alvo = paraPessoa !== undefined ? paraPessoa : pessoaSelecionadaLancamento;
+    const pessoas = getPessoasDaMesa(mesaParaLancar);
+    const alvo = paraPessoa !== undefined ? paraPessoa : (pessoaSelecionadaLancamento || pessoas[0] || 'Cliente');
     setCarrinhoMesa((prev) => {
       const existente = prev.find(
-        (it) => it.produto.id === produto.id && (it.clienteNome || 'Mesa (Compartilhado)') === alvo
+        (it) => it.produto.id === produto.id && (it.clienteNome || pessoas[0] || 'Cliente') === alvo
       );
       if (existente) {
         return prev.map((it) =>
-          it.produto.id === produto.id && (it.clienteNome || 'Mesa (Compartilhado)') === alvo
+          it.produto.id === produto.id && (it.clienteNome || pessoas[0] || 'Cliente') === alvo
             ? { ...it, quantidade: it.quantidade + 1 }
             : it
         );
@@ -310,6 +467,7 @@ export default function Mesas() {
     if (e) e.preventDefault();
     if (!mesaParaLancar || carrinhoMesa.length === 0) return;
 
+    const defaultPessoa = getPessoasDaMesa(mesaParaLancar)[0] || mesaParaLancar.responsavelNome || `Mesa #${mesaParaLancar.numero}`;
     const novosItens = carrinhoMesa.map((it) => ({
       produtoId: it.produto.id,
       nome: it.produto.nome,
@@ -318,7 +476,7 @@ export default function Mesas() {
       subtotal: Number((it.produto.precoVenda * it.quantidade).toFixed(2)),
       observacoes: it.observacoes.trim() || undefined,
       garcomNome: mesaParaLancar.garcomResponsavel || 'Lucas Oliveira',
-      clienteNome: it.clienteNome || pessoaSelecionadaLancamento || mesaParaLancar.responsavelNome || 'Geral (Mesa)',
+      clienteNome: it.clienteNome || defaultPessoa,
     }));
 
     const res = lancarItensComandaMesa(
@@ -831,7 +989,6 @@ export default function Mesas() {
                               setMenuAcoesMesaId(null);
                               setMesaParaFechar(mesa);
                               setPessoasDivisao(mesa.quantidadePessoas || 2);
-                              setPessoasPagas([]);
                             }}
                             className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
                           >
@@ -947,23 +1104,30 @@ export default function Mesas() {
                         <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pr-0.5">
                           {getPessoasDaMesa(mesa).map((p, pIdx) => {
                             const itensPessoa = (mesa.comandaItens || []).filter(
-                              (it) => (it.clienteNome || mesa.responsavelNome || `Mesa #${mesa.numero}`) === p
+                              (it) => getDonoDoItem(it, mesa) === p
                             );
                             const totalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
                             return (
-                              <span
+                              <button
                                 key={pIdx}
-                                className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-700/80 text-slate-200 flex items-center gap-1"
-                                title={`${p}: R$ ${totalPessoa.toFixed(2)} (${itensPessoa.length} itens)`}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  abrirComandaMesa(mesa, 'itens_consumidos', p);
+                                }}
+                                className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 text-slate-200 flex items-center gap-1 cursor-pointer transition-all"
+                                title={`Abrir comanda de ${p}: R$ ${totalPessoa.toFixed(2)} (${itensPessoa.length} itens)`}
                               >
                                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
                                 <span className="font-semibold truncate max-w-[80px]">{p}</span>
-                                {totalPessoa > 0 && (
+                                {totalPessoa > 0 ? (
                                   <span className="text-[9px] text-emerald-400 font-mono font-bold">
                                     R${totalPessoa.toFixed(0)}
                                   </span>
+                                ) : (
+                                  <span className="text-[9px] text-slate-500">R$0</span>
                                 )}
-                              </span>
+                              </button>
                             );
                           })}
                         </div>
@@ -1082,11 +1246,7 @@ export default function Mesas() {
                     {/* Botão Principal de Lançamento de Pedidos */}
                     <button
                       type="button"
-                      onClick={() => {
-                        setMesaParaLancar(mesa);
-                        setAbaModalComanda('cardapio');
-                        setCarrinhoMesa([]);
-                      }}
+                      onClick={() => abrirComandaMesa(mesa, 'cardapio')}
                       className="w-full py-2.5 px-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/20 cursor-pointer active:scale-95"
                     >
                       <Plus className="w-4 h-4" />
@@ -1101,10 +1261,7 @@ export default function Mesas() {
                     <div className="grid grid-cols-2 gap-1.5">
                       <button
                         type="button"
-                        onClick={() => {
-                          setMesaParaLancar(mesa);
-                          setAbaModalComanda('itens_consumidos');
-                        }}
+                        onClick={() => abrirComandaMesa(mesa, 'itens_consumidos')}
                         className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <FileText className="w-3.5 h-3.5 text-emerald-400" />
@@ -1116,7 +1273,6 @@ export default function Mesas() {
                         onClick={() => {
                           setMesaParaFechar(mesa);
                           setPessoasDivisao(mesa.quantidadePessoas || 2);
-                          setPessoasPagas([]);
                         }}
                         className="py-2 px-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
                       >
@@ -1237,20 +1393,15 @@ export default function Mesas() {
       )}
 
       {/* ============================================================== */}
-      {/* MODAL: DIVISÃO & FECHAMENTO DA CONTA (INDIVIDUAL OU IGUALITÁRIO) */}
+      {/* MODAL: FECHAMENTO DA CONTA (POR COMANDA OU QUITAÇÃO TOTAL)   */}
       {/* ============================================================== */}
       {mesaParaFechar && (() => {
         const pessoasMesa = getPessoasDaMesa(mesaParaFechar);
         const itensConsumidos = mesaParaFechar.comandaItens || [];
-        const itensCompartilhados = itensConsumidos.filter(
-          (it) => !it.clienteNome || it.clienteNome === 'Mesa (Compartilhado)' || it.clienteNome === 'Geral (Mesa)'
-        );
-        const totalCompartilhado = itensCompartilhados.reduce((sum, it) => sum + it.subtotal, 0);
-        const cotaCompartilhada = pessoasMesa.length > 0 ? totalCompartilhado / pessoasMesa.length : 0;
         const totalGeral = mesaParaFechar.totalConsumo || 0;
 
         return (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 select-none">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
               <div className="flex justify-between items-center pb-2 border-b border-slate-800">
                 <div className="flex items-center gap-2">
@@ -1262,7 +1413,7 @@ export default function Mesas() {
                       Fechar Conta — Mesa #{mesaParaFechar.numero}
                     </h3>
                     <p className="text-[11px] text-slate-400">
-                      {mesaParaFechar.setor} • {pessoasMesa.length} {pessoasMesa.length === 1 ? 'pessoa' : 'pessoas na mesa'}
+                      {mesaParaFechar.setor} • {pessoasMesa.length} {pessoasMesa.length === 1 ? 'pessoa' : 'pessoas com comanda'}
                     </p>
                   </div>
                 </div>
@@ -1278,7 +1429,7 @@ export default function Mesas() {
                 {/* Total da Conta */}
                 <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Consumido na Mesa:</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Total a Pagar da Mesa:</span>
                     <p className="text-white font-bold text-xs">{mesaParaFechar.responsavelNome || 'Cliente'}</p>
                   </div>
                   <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
@@ -1298,7 +1449,7 @@ export default function Mesas() {
                     }`}
                   >
                     <Users className="w-3.5 h-3.5" />
-                    <span>Por Consumo Individual</span>
+                    <span>Comandas por Pessoa</span>
                   </button>
 
                   <button
@@ -1319,61 +1470,43 @@ export default function Mesas() {
                 {tipoDivisaoConta === 'por_pessoa' ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Comandas individuais dos ocupantes:</span>
+                      <span>Comandas individuais dos clientes na mesa:</span>
                       <span className="font-bold text-slate-300">
-                        {pessoasPagas.length} de {pessoasMesa.length} quitadas
+                        {pessoasMesa.length} {pessoasMesa.length === 1 ? 'cliente' : 'clientes'}
                       </span>
                     </div>
 
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                       {pessoasMesa.map((p) => {
                         const itensPessoa = itensConsumidos.filter(
-                          (it) => (it.clienteNome || mesaParaFechar.responsavelNome || `Mesa #${mesaParaFechar.numero}`) === p
+                          (it) => getDonoDoItem(it, mesaParaFechar) === p
                         );
                         const subtotalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
-                        const totalFinalPessoa = subtotalPessoa + cotaCompartilhada;
-                        const isPago = pessoasPagas.includes(p);
 
                         return (
                           <div
                             key={p}
                             className={`p-3 rounded-2xl border transition-all ${
-                              isPago
-                                ? 'bg-emerald-950/20 border-emerald-500/40 text-slate-300'
+                              subtotalPessoa === 0
+                                ? 'bg-slate-950/40 border-slate-800/60 opacity-60'
                                 : 'bg-slate-950 border-slate-800'
                             }`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="space-y-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <div
-                                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                                      isPago
-                                        ? 'bg-emerald-500 text-white'
-                                        : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                                    }`}
-                                  >
-                                    {isPago ? <Check className="w-3.5 h-3.5" /> : p.charAt(0).toUpperCase()}
+                                  <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center justify-center text-[11px] font-bold">
+                                    {p.charAt(0).toUpperCase()}
                                   </div>
                                   <span className="font-extrabold text-xs text-white truncate">{p}</span>
-                                  {isPago && (
-                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
-                                      Pago
-                                    </span>
-                                  )}
                                 </div>
 
                                 <div className="text-[10px] text-slate-400 pl-8 space-y-0.5">
                                   {itensPessoa.length === 0 ? (
-                                    <span className="text-slate-500 italic block">Nenhum item individual</span>
+                                    <span className="text-slate-500 italic block">Nenhum item pendente</span>
                                   ) : (
                                     <span className="block truncate max-w-[220px]">
                                       {itensPessoa.map((it) => `${it.quantidade}x ${it.nome}`).join(', ')}
-                                    </span>
-                                  )}
-                                  {cotaCompartilhada > 0 && (
-                                    <span className="text-amber-400/90 block">
-                                      + R$ {cotaCompartilhada.toFixed(2)} cota compartilhada da mesa
                                     </span>
                                   )}
                                 </div>
@@ -1381,45 +1514,31 @@ export default function Mesas() {
 
                               <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                                 <span className="font-mono font-black text-emerald-400 text-sm">
-                                  R$ {totalFinalPessoa.toFixed(2)}
+                                  R$ {subtotalPessoa.toFixed(2)}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setPessoasPagas((prev) =>
-                                      isPago ? prev.filter((x) => x !== p) : [...prev, p]
-                                    );
-                                  }}
-                                  className={`text-[10px] px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1 ${
-                                    isPago
-                                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-500/40'
-                                      : 'bg-purple-600 hover:bg-purple-500 text-white shadow-sm'
-                                  }`}
-                                >
-                                  {isPago ? (
-                                    <>
-                                      <Check className="w-3 h-3 text-emerald-400" />
-                                      <span>Quitado (desfazer)</span>
-                                    </>
-                                  ) : (
+                                {subtotalPessoa > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setModalPagamentoComanda({
+                                        mesa: mesaParaFechar,
+                                        nomePessoa: p,
+                                        valor: subtotalPessoa,
+                                        itens: itensPessoa,
+                                      });
+                                    }}
+                                    className="text-[10px] px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm"
+                                  >
+                                    <CreditCard className="w-3 h-3" />
                                     <span>Receber deste</span>
-                                  )}
-                                </button>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
                         );
                       })}
                     </div>
-
-                    {totalCompartilhado > 0 && (
-                      <div className="p-2.5 bg-amber-950/20 border border-amber-500/30 rounded-xl text-[11px] text-amber-300 flex items-center justify-between">
-                        <span>🍽️ Itens compartilhados da mesa ({itensCompartilhados.length} itens):</span>
-                        <strong className="font-mono">
-                          R$ {totalCompartilhado.toFixed(2)} (R$ {cotaCompartilhada.toFixed(2)} / pessoa)
-                        </strong>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   /* Modo 2: Divisão Igualitária */
@@ -1456,15 +1575,18 @@ export default function Mesas() {
                   <button
                     type="button"
                     onClick={() => {
-                      atualizarStatusMesa(mesaParaFechar.numero, 'livre', idLoja);
-                      mesaParaFechar.totalConsumo = 0;
-                      dispararToast(`Conta da Mesa #${mesaParaFechar.numero} quitada e mesa liberada com sucesso!`);
-                      setMesaParaFechar(null);
+                      setModalPagamentoComanda({
+                        mesa: mesaParaFechar,
+                        nomePessoa: 'todos',
+                        valor: totalGeral,
+                        itens: itensConsumidos,
+                      });
                     }}
-                    className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                    disabled={totalGeral <= 0}
+                    className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5"
                   >
                     <Check className="w-4 h-4" />
-                    <span>Confirmar Pagamento & Liberar Mesa</span>
+                    <span>Quitar Toda a Mesa & Liberar</span>
                   </button>
                 </div>
               </div>
@@ -2323,7 +2445,7 @@ export default function Mesas() {
                         <div className="flex items-center gap-2">
                           <Users className="w-4 h-4 text-cyan-400" />
                           <span className="text-xs font-black text-white uppercase tracking-wider">
-                            Lançar para quem?
+                            Lançar para quem na mesa?
                           </span>
                         </div>
                         <button
@@ -2335,38 +2457,40 @@ export default function Mesas() {
                           className="px-2.5 py-1 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
                         >
                           <UserPlus className="w-3.5 h-3.5" />
-                          <span>+ Nova Pessoa</span>
+                          <span>+ Adicionar Pessoa</span>
                         </button>
                       </div>
 
                       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                        <button
-                          type="button"
-                          onClick={() => setPessoaSelecionadaLancamento('Mesa (Compartilhado)')}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                            pessoaSelecionadaLancamento === 'Mesa (Compartilhado)'
-                              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
-                              : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          <span>🍽️ Mesa (Compartilhado)</span>
-                        </button>
+                        {getPessoasDaMesa(mesaParaLancar).map((p) => {
+                          const pessoas = getPessoasDaMesa(mesaParaLancar);
+                          const isSelecionada = (pessoaSelecionadaLancamento || pessoas[0]) === p;
+                          const itensPessoa = (mesaParaLancar.comandaItens || []).filter(
+                            (it) => getDonoDoItem(it, mesaParaLancar) === p
+                          );
+                          const totalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
 
-                        {getPessoasDaMesa(mesaParaLancar).map((p) => (
-                          <button
-                            key={p}
-                            type="button"
-                            onClick={() => setPessoaSelecionadaLancamento(p)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                              pessoaSelecionadaLancamento === p
-                                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20 font-black'
-                                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:text-white'
-                            }`}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                            <span>{p}</span>
-                          </button>
-                        ))}
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => setPessoaSelecionadaLancamento(p)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                                isSelecionada
+                                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20 font-black'
+                                  : 'bg-slate-900 border border-slate-800 text-slate-300 hover:text-white'
+                              }`}
+                            >
+                              <User className="w-3 h-3" />
+                              <span>{p}</span>
+                              {totalPessoa > 0 && (
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${isSelecionada ? 'bg-slate-950/25 text-slate-950 font-black' : 'bg-slate-800 text-emerald-400 font-bold'}`}>
+                                  R$ {totalPessoa.toFixed(0)}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -2424,8 +2548,10 @@ export default function Mesas() {
                           const temFicha = fichasTecnicas.some(
                             (f) => f.produtoId === prod.id && f.componentes && f.componentes.length > 0
                           );
+                          const pessoas = getPessoasDaMesa(mesaParaLancar);
+                          const pessoaAtiva = pessoaSelecionadaLancamento || pessoas[0] || 'Cliente';
                           const noCarrinho = carrinhoMesa.find(
-                            (it) => it.produto.id === prod.id && (it.clienteNome || 'Mesa (Compartilhado)') === pessoaSelecionadaLancamento
+                            (it) => it.produto.id === prod.id && (it.clienteNome || pessoas[0] || 'Cliente') === pessoaAtiva
                           );
 
                           return (
@@ -2516,9 +2642,9 @@ export default function Mesas() {
 
                               {/* Atribuição de Pessoa no Card do Item do Carrinho */}
                               <div className="flex items-center justify-between text-[11px] bg-slate-950/80 px-2 py-1 rounded-lg border border-slate-800/60">
-                                <span className="text-slate-400 text-[10px]">Para:</span>
+                                <span className="text-slate-400 text-[10px]">Para comanda de:</span>
                                 <span className="text-[10px] font-bold text-cyan-300">
-                                  {it.clienteNome || 'Mesa (Compartilhado)'}
+                                  {it.clienteNome || getPessoasDaMesa(mesaParaLancar)[0] || 'Cliente'}
                                 </span>
                               </div>
 
@@ -2630,34 +2756,57 @@ export default function Mesas() {
                     </div>
                   </div>
 
-                  {/* Alternador de Visualização: Sub-comandas por Pessoa vs Lista Completa */}
+                  {/* Navegação de Comandas por Pessoa */}
                   <div className="flex items-center justify-between gap-2 p-1.5 bg-slate-950 rounded-2xl border border-slate-800 flex-wrap">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-1">
                       <button
                         type="button"
-                        onClick={() => setModoVisualizacaoComanda('por_pessoa')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                          modoVisualizacaoComanda === 'por_pessoa'
+                        onClick={() => setPessoaAtivaComanda('todos')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                          pessoaAtivaComanda === 'todos'
                             ? 'bg-cyan-600 text-white shadow-md'
-                            : 'text-slate-400 hover:text-white'
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
                         }`}
                       >
                         <Users className="w-3.5 h-3.5" />
-                        <span>Sub-comandas por Pessoa ({getPessoasDaMesa(mesaParaLancar).length})</span>
+                        <span>👥 Todas as Comandas</span>
+                        <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-md bg-slate-950/40 text-emerald-400 font-black">
+                          R$ {(mesaParaLancar.totalConsumo || 0).toFixed(0)}
+                        </span>
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setModoVisualizacaoComanda('todos')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                          modoVisualizacaoComanda === 'todos'
-                            ? 'bg-cyan-600 text-white shadow-md'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Lista Geral da Mesa</span>
-                      </button>
+                      {getPessoasDaMesa(mesaParaLancar).map((p) => {
+                        const itensPessoa = (mesaParaLancar.comandaItens || []).filter(
+                          (it) => getDonoDoItem(it, mesaParaLancar) === p
+                        );
+                        const subtotalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+                        const isAtiva = pessoaAtivaComanda === p;
+
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setPessoaAtivaComanda(p)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                              isAtiva
+                                ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
+                                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:text-white'
+                            }`}
+                          >
+                            <User className="w-3.5 h-3.5" />
+                            <span>{p}</span>
+                            <span
+                              className={`font-mono text-[10px] px-1.5 py-0.2 rounded-md font-bold ${
+                                isAtiva
+                                  ? 'bg-slate-950/20 text-slate-950 font-black'
+                                  : 'bg-slate-950 text-emerald-400'
+                              }`}
+                            >
+                              R$ {subtotalPessoa.toFixed(0)}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
 
                     <button
@@ -2666,7 +2815,7 @@ export default function Mesas() {
                         setModalAdicionarPessoa(mesaParaLancar);
                         setNomeNovaPessoa('');
                       }}
-                      className="px-2.5 py-1 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+                      className="px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shrink-0"
                     >
                       <UserPlus className="w-3.5 h-3.5" />
                       <span>+ Adicionar Pessoa</span>
@@ -2680,45 +2829,46 @@ export default function Mesas() {
                       <button
                         type="button"
                         onClick={() => setAbaModalComanda('cardapio')}
-                        className="mt-2 px-4 py-2 rounded-xl bg-orange-500 text-white font-bold text-xs cursor-pointer inline-flex items-center gap-1.5"
+                        className="mt-2 px-4 py-2 rounded-xl bg-orange-500 text-white font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shadow-md shadow-orange-500/20"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Abrir Cardápio e Lançar Itens</span>
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {modoVisualizacaoComanda === 'por_pessoa' ? (
-                        <div className="space-y-3">
-                          {/* Grid das sub-comandas de cada pessoa */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-4">
+                      {/* VISTA 1: TODAS AS COMANDAS */}
+                      {pessoaAtivaComanda === 'todos' ? (
+                        <div className="space-y-4">
+                          {/* Cards Individuais de Cada Pessoa com botão direto de pagamento */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {getPessoasDaMesa(mesaParaLancar).map((p, idx) => {
                               const itensPessoa = mesaParaLancar.comandaItens!.filter(
-                                (it) => (it.clienteNome || mesaParaLancar.responsavelNome || `Mesa #${mesaParaLancar.numero}`) === p
+                                (it) => getDonoDoItem(it, mesaParaLancar) === p
                               );
                               const subtotalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
 
                               return (
                                 <div
                                   key={idx}
-                                  className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5 flex flex-col justify-between"
+                                  className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3 flex flex-col justify-between hover:border-slate-700 transition-all"
                                 >
                                   <div>
                                     <div className="flex items-center justify-between pb-2 border-b border-slate-900">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-full bg-cyan-500/20 text-cyan-300 font-bold flex items-center justify-center text-xs border border-cyan-500/30">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-7 h-7 rounded-full bg-cyan-500/20 text-cyan-300 font-bold flex items-center justify-center text-xs border border-cyan-500/30 shrink-0">
                                           {p.charAt(0).toUpperCase()}
                                         </div>
-                                        <div>
-                                          <h5 className="font-extrabold text-white text-xs">{p}</h5>
+                                        <div className="min-w-0">
+                                          <h5 className="font-extrabold text-white text-xs truncate">{p}</h5>
                                           <span className="text-[10px] text-slate-400">
                                             {itensPessoa.length} {itensPessoa.length === 1 ? 'item' : 'itens'}
                                           </span>
                                         </div>
                                       </div>
 
-                                      <div className="text-right">
-                                        <span className="text-[10px] text-slate-400 block">Subtotal:</span>
+                                      <div className="text-right shrink-0">
+                                        <span className="text-[9px] text-slate-400 block font-semibold">Subtotal:</span>
                                         <span className="font-mono font-black text-emerald-400 text-sm">
                                           R$ {subtotalPessoa.toFixed(2)}
                                         </span>
@@ -2726,48 +2876,220 @@ export default function Mesas() {
                                     </div>
 
                                     {itensPessoa.length === 0 ? (
-                                      <p className="text-[11px] text-slate-500 italic py-2">
-                                        Nenhum item individual lançado para {p} ainda.
+                                      <p className="text-[11px] text-slate-500 italic py-3 text-center">
+                                        Nenhum item lançado ainda.
                                       </p>
                                     ) : (
-                                      <div className="space-y-1.5 pt-2 max-h-48 overflow-y-auto pr-1">
+                                      <div className="space-y-1.5 pt-2 max-h-36 overflow-y-auto pr-1">
                                         {itensPessoa.map((it, itIdx) => (
                                           <div
                                             key={it.id || itIdx}
-                                            className="p-2 rounded-xl bg-slate-900 border border-slate-800/80 flex items-center justify-between text-[11px]"
+                                            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800/80 flex items-center justify-between text-[11px]"
                                           >
-                                            <div className="min-w-0 pr-2">
-                                              <span className="font-bold text-white block truncate">
-                                                <span className="text-orange-400 mr-1">{it.quantidade}x</span>
-                                                {it.nome}
-                                              </span>
-                                              {it.observacoes && (
-                                                <span className="text-[10px] text-amber-300 italic block truncate">
-                                                  "{it.observacoes}"
-                                                </span>
-                                              )}
+                                            <div className="min-w-0 pr-1 truncate">
+                                              <span className="text-orange-400 font-bold mr-1">{it.quantidade}x</span>
+                                              <span className="text-white font-medium">{it.nome}</span>
                                             </div>
-                                            <div className="text-right shrink-0">
-                                              <span className="font-mono font-bold text-slate-200 block">
-                                                R$ {it.subtotal.toFixed(2)}
-                                              </span>
-                                              <span
-                                                className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase inline-block ${
-                                                  it.statusKDS === 'pronto'
-                                                    ? 'text-emerald-400 bg-emerald-500/10'
-                                                    : it.statusKDS === 'em_preparo'
-                                                    ? 'text-amber-400 bg-amber-500/10'
-                                                    : 'text-blue-400 bg-blue-500/10'
-                                                }`}
-                                              >
-                                                {it.statusKDS === 'pronto' ? 'Pronto' : it.statusKDS === 'em_preparo' ? 'Preparo' : 'Fila'}
-                                              </span>
-                                            </div>
+                                            <span className="font-mono font-bold text-slate-200 shrink-0">
+                                              R$ {it.subtotal.toFixed(2)}
+                                            </span>
                                           </div>
                                         ))}
                                       </div>
                                     )}
                                   </div>
+
+                                  <div className="space-y-1.5 pt-2 border-t border-slate-900">
+                                    {subtotalPessoa > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setModalPagamentoComanda({
+                                            mesa: mesaParaLancar,
+                                            nomePessoa: p,
+                                            valor: subtotalPessoa,
+                                            itens: itensPessoa,
+                                          });
+                                        }}
+                                        className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
+                                      >
+                                        <CreditCard className="w-3.5 h-3.5" />
+                                        <span>Pagar Comanda de {p}</span>
+                                      </button>
+                                    )}
+                                    <div className="flex gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => setPessoaAtivaComanda(p)}
+                                        className="flex-1 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-bold border border-slate-800 cursor-pointer text-center"
+                                      >
+                                        Ver Detalhes
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPessoaSelecionadaLancamento(p);
+                                          setAbaModalComanda('cardapio');
+                                        }}
+                                        className="flex-1 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-400 text-[10px] font-bold border border-cyan-500/20 cursor-pointer text-center"
+                                      >
+                                        + Lançar
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Tabela Unificada de Pedidos com Seletor de Troca de Dono */}
+                          <div className="space-y-2 pt-2">
+                            <div className="flex items-center justify-between text-xs text-slate-400">
+                              <span className="font-bold text-slate-300">Todos os pedidos detalhados no salão:</span>
+                              <span className="text-[11px] text-slate-500">
+                                Você pode transferir itens entre pessoas se lançado por engano.
+                              </span>
+                            </div>
+
+                            <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] font-semibold bg-slate-900/60">
+                                    <th className="py-2.5 px-3">Horário</th>
+                                    <th className="py-2.5 px-3">Pessoa / Comanda</th>
+                                    <th className="py-2.5 px-3">Item / Prato</th>
+                                    <th className="py-2.5 px-3">Qtd</th>
+                                    <th className="py-2.5 px-3">Unitário</th>
+                                    <th className="py-2.5 px-3">Subtotal</th>
+                                    <th className="py-2.5 px-3">KDS Cozinha</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/60">
+                                  {mesaParaLancar.comandaItens.map((item, idx) => {
+                                    const dono = getDonoDoItem(item, mesaParaLancar);
+                                    const pessoasDisponiveis = getPessoasDaMesa(mesaParaLancar);
+
+                                    return (
+                                      <tr key={item.id || idx} className="hover:bg-slate-900/40 transition-colors">
+                                        <td className="py-2.5 px-3 font-mono text-slate-400">{item.horario}</td>
+                                        <td className="py-2.5 px-3">
+                                          {pessoasDisponiveis.length > 1 ? (
+                                            <select
+                                              value={dono}
+                                              onChange={(e) => handleReatribuirItem(item.id, e.target.value)}
+                                              title="Clique para transferir este item para outra pessoa da mesa"
+                                              className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-slate-900 border border-cyan-500/40 text-cyan-300 cursor-pointer focus:outline-none focus:border-cyan-400"
+                                            >
+                                              {pessoasDisponiveis.map((p) => (
+                                                <option key={p} value={p}>
+                                                  👤 {p}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          ) : (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-900 border border-slate-800 text-cyan-300">
+                                              {dono}
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-2.5 px-3">
+                                          <span className="font-bold text-white block">{item.nome}</span>
+                                          {item.observacoes && (
+                                            <span className="text-[11px] text-amber-300 italic block mt-0.5">
+                                              "{item.observacoes}"
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-2.5 px-3 font-mono font-bold text-orange-400">
+                                          {item.quantidade}x
+                                        </td>
+                                        <td className="py-2.5 px-3 font-mono text-slate-300">
+                                          R$ {item.precoUnitario.toFixed(2)}
+                                        </td>
+                                        <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
+                                          R$ {item.subtotal.toFixed(2)}
+                                        </td>
+                                        <td className="py-2.5 px-3">
+                                          <span
+                                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-block ${
+                                              item.statusKDS === 'pronto'
+                                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                : item.statusKDS === 'em_preparo'
+                                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                                                : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                            }`}
+                                          >
+                                            {item.statusKDS === 'pronto'
+                                              ? 'Pronto / Servido'
+                                              : item.statusKDS === 'em_preparo'
+                                              ? 'Em Preparo'
+                                              : 'Fila da Cozinha'}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        /* VISTA 2: COMANDA FOCADA NA PESSOA SELECIONADA */
+                        (() => {
+                          const p = pessoaAtivaComanda;
+                          const itensPessoa = mesaParaLancar.comandaItens!.filter(
+                            (it) => getDonoDoItem(it, mesaParaLancar) === p
+                          );
+                          const subtotalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+                          const pessoasDisponiveis = getPessoasDaMesa(mesaParaLancar);
+
+                          return (
+                            <div className="space-y-4">
+                              {/* Header da Comanda Individual */}
+                              <div className="p-4 bg-slate-950 rounded-2xl border border-cyan-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-300 font-black text-base flex items-center justify-center border border-cyan-500/40 shrink-0">
+                                    {p.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="text-base font-black text-white">Comanda de {p}</h4>
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-bold">
+                                        Mesa #{mesaParaLancar.numero}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-400">
+                                      {itensPessoa.length} {itensPessoa.length === 1 ? 'item consumido' : 'itens consumidos'} nesta comanda
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 self-end sm:self-auto">
+                                  <div className="text-right">
+                                    <span className="text-[10px] text-slate-400 block font-semibold">Subtotal a Pagar:</span>
+                                    <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
+                                      R$ {subtotalPessoa.toFixed(2)}
+                                    </span>
+                                  </div>
+
+                                  {subtotalPessoa > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setModalPagamentoComanda({
+                                          mesa: mesaParaLancar,
+                                          nomePessoa: p,
+                                          valor: subtotalPessoa,
+                                          itens: itensPessoa,
+                                        });
+                                      }}
+                                      className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                                    >
+                                      <CreditCard className="w-4 h-4" />
+                                      <span>Pagar Comanda (R$ {subtotalPessoa.toFixed(2)})</span>
+                                    </button>
+                                  )}
 
                                   <button
                                     type="button"
@@ -2775,127 +3097,110 @@ export default function Mesas() {
                                       setPessoaSelecionadaLancamento(p);
                                       setAbaModalComanda('cardapio');
                                     }}
-                                    className="w-full py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-cyan-200 border border-cyan-500/20 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                    className="px-3 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md shadow-orange-500/20"
                                   >
-                                    <Plus className="w-3 h-3 text-cyan-400" />
-                                    <span>+ Lançar Pedido para {p}</span>
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Lançar Itens</span>
                                   </button>
                                 </div>
-                              );
-                            })}
-                          </div>
-
-                          {/* Card Itens Compartilhados da Mesa */}
-                          {(() => {
-                            const compartilhados = mesaParaLancar.comandaItens!.filter(
-                              (it) => !it.clienteNome || it.clienteNome === 'Mesa (Compartilhado)' || it.clienteNome === 'Geral (Mesa)'
-                            );
-                            if (compartilhados.length === 0) return null;
-                            const totalComp = compartilhados.reduce((sum, it) => sum + it.subtotal, 0);
-                            const totalPessoas = getPessoasDaMesa(mesaParaLancar).length;
-                            const porPessoa = totalPessoas > 0 ? totalComp / totalPessoas : 0;
-
-                            return (
-                              <div className="p-3.5 bg-amber-950/20 border border-amber-500/30 rounded-2xl space-y-2">
-                                <div className="flex items-center justify-between pb-1.5 border-b border-amber-500/20">
-                                  <span className="font-extrabold text-amber-300 text-xs flex items-center gap-1.5">
-                                    <span>🍽️ Itens Compartilhados da Mesa</span>
-                                  </span>
-                                  <div className="text-right">
-                                    <span className="text-[10px] text-slate-400 block font-semibold">Total Compartilhado:</span>
-                                    <span className="font-mono font-black text-amber-400 text-xs">
-                                      R$ {totalComp.toFixed(2)} (R$ {porPessoa.toFixed(2)} / pessoa)
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
-                                  {compartilhados.map((it, idx) => (
-                                    <div
-                                      key={idx}
-                                      className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-[11px]"
-                                    >
-                                      <span className="font-bold text-white truncate">
-                                        <span className="text-amber-400 mr-1">{it.quantidade}x</span>
-                                        {it.nome}
-                                      </span>
-                                      <span className="font-mono font-bold text-emerald-400 shrink-0">
-                                        R$ {it.subtotal.toFixed(2)}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
                               </div>
-                            );
-                          })()}
-                        </div>
-                      ) : (
-                        /* Modo 2: Lista Completa da Mesa em Tabela */
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-xs">
-                            <thead>
-                              <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] font-semibold">
-                                <th className="py-2.5 px-3">Horário</th>
-                                <th className="py-2.5 px-3">Cliente / Pessoa</th>
-                                <th className="py-2.5 px-3">Item / Prato</th>
-                                <th className="py-2.5 px-3">Qtd</th>
-                                <th className="py-2.5 px-3">Unitário</th>
-                                <th className="py-2.5 px-3">Subtotal</th>
-                                <th className="py-2.5 px-3">KDS Cozinha</th>
-                                <th className="py-2.5 px-3 text-right">Lançado Por</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/60">
-                              {mesaParaLancar.comandaItens.map((item, idx) => (
-                                <tr key={item.id || idx} className="hover:bg-slate-950/60 transition-colors">
-                                  <td className="py-2.5 px-3 font-mono text-slate-400">{item.horario}</td>
-                                  <td className="py-2.5 px-3">
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-950 border border-slate-800 text-cyan-300 whitespace-nowrap">
-                                      {item.clienteNome || 'Mesa (Compartilhado)'}
-                                    </span>
-                                  </td>
-                                  <td className="py-2.5 px-3">
-                                    <span className="font-bold text-white block">{item.nome}</span>
-                                    {item.observacoes && (
-                                      <span className="text-[11px] text-amber-300 italic block mt-0.5">
-                                        "{item.observacoes}"
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="py-2.5 px-3 font-mono font-bold text-orange-400">
-                                    {item.quantidade}x
-                                  </td>
-                                  <td className="py-2.5 px-3 font-mono text-slate-300">
-                                    R$ {item.precoUnitario.toFixed(2)}
-                                  </td>
-                                  <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
-                                    R$ {item.subtotal.toFixed(2)}
-                                  </td>
-                                  <td className="py-2.5 px-3">
-                                    <span
-                                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-block ${
-                                        item.statusKDS === 'pronto'
-                                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                          : item.statusKDS === 'em_preparo'
-                                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
-                                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                                      }`}
-                                    >
-                                      {item.statusKDS === 'pronto'
-                                        ? 'Pronto / Servido'
-                                        : item.statusKDS === 'em_preparo'
-                                        ? 'Em Preparo'
-                                        : 'Fila da Cozinha'}
-                                    </span>
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right text-slate-400 text-[11px]">
-                                    {item.garcomNome || 'Lucas Oliveira'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+
+                              {/* Tabela de Itens desta Pessoa */}
+                              {itensPessoa.length === 0 ? (
+                                <div className="p-10 text-center text-slate-500 text-xs rounded-2xl bg-slate-950 border border-dashed border-slate-800 space-y-2">
+                                  <UtensilsCrossed className="w-7 h-7 mx-auto text-slate-600" />
+                                  <p className="font-semibold text-slate-400">Nenhum item lançado para {p} ainda.</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPessoaSelecionadaLancamento(p);
+                                      setAbaModalComanda('cardapio');
+                                    }}
+                                    className="mt-2 px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs cursor-pointer inline-flex items-center gap-1"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Lançar Pedidos para {p}</span>
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
+                                  <table className="w-full text-left text-xs">
+                                    <thead>
+                                      <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] font-semibold bg-slate-900/60">
+                                        <th className="py-2.5 px-3">Horário</th>
+                                        <th className="py-2.5 px-3">Item / Prato</th>
+                                        <th className="py-2.5 px-3">Qtd</th>
+                                        <th className="py-2.5 px-3">Unitário</th>
+                                        <th className="py-2.5 px-3">Subtotal</th>
+                                        <th className="py-2.5 px-3">KDS Cozinha</th>
+                                        {pessoasDisponiveis.length > 1 && (
+                                          <th className="py-2.5 px-3 text-right">Mover Item</th>
+                                        )}
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60">
+                                      {itensPessoa.map((item, idx) => (
+                                        <tr key={item.id || idx} className="hover:bg-slate-900/40 transition-colors">
+                                          <td className="py-2.5 px-3 font-mono text-slate-400">{item.horario}</td>
+                                          <td className="py-2.5 px-3">
+                                            <span className="font-bold text-white block">{item.nome}</span>
+                                            {item.observacoes && (
+                                              <span className="text-[11px] text-amber-300 italic block mt-0.5">
+                                                "{item.observacoes}"
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="py-2.5 px-3 font-mono font-bold text-orange-400">
+                                            {item.quantidade}x
+                                          </td>
+                                          <td className="py-2.5 px-3 font-mono text-slate-300">
+                                            R$ {item.precoUnitario.toFixed(2)}
+                                          </td>
+                                          <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
+                                            R$ {item.subtotal.toFixed(2)}
+                                          </td>
+                                          <td className="py-2.5 px-3">
+                                            <span
+                                              className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-block ${
+                                                item.statusKDS === 'pronto'
+                                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                  : item.statusKDS === 'em_preparo'
+                                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                                                  : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                              }`}
+                                            >
+                                              {item.statusKDS === 'pronto'
+                                                ? 'Pronto'
+                                                : item.statusKDS === 'em_preparo'
+                                                ? 'Em Preparo'
+                                                : 'Fila Cozinha'}
+                                            </span>
+                                          </td>
+                                          {pessoasDisponiveis.length > 1 && (
+                                            <td className="py-2.5 px-3 text-right">
+                                              <select
+                                                value={p}
+                                                onChange={(e) => handleReatribuirItem(item.id, e.target.value)}
+                                                className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-700 text-slate-300 cursor-pointer focus:outline-none focus:border-cyan-400"
+                                                title="Mover este item para outra pessoa da mesa"
+                                              >
+                                                {pessoasDisponiveis.map((outro) => (
+                                                  <option key={outro} value={outro}>
+                                                    {outro === p ? `Pertence a ${p}` : `Mover para ${outro}`}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            </td>
+                                          )}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()
                       )}
 
                       {/* Totais e Fechamento */}
@@ -2929,7 +3234,6 @@ export default function Mesas() {
                               setMesaParaLancar(null);
                               setMesaParaFechar(mesaAlvo);
                               setPessoasDivisao(mesaAlvo.quantidadePessoas || 2);
-                              setPessoasPagas([]);
                             }}
                             className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 flex items-center gap-1.5 cursor-pointer"
                           >
@@ -3156,6 +3460,121 @@ export default function Mesas() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: PAGAMENTO DE COMANDA INDIVIDUAL OU TOTAL DA MESA       */}
+      {/* ============================================================== */}
+      {modalPagamentoComanda && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 select-none">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">
+                    {modalPagamentoComanda.nomePessoa === 'todos'
+                      ? `Quitar Toda a Mesa #${modalPagamentoComanda.mesa.numero}`
+                      : `Pagar Comanda — ${modalPagamentoComanda.nomePessoa}`}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Mesa #{modalPagamentoComanda.mesa.numero} • {modalPagamentoComanda.mesa.setor}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalPagamentoComanda(null)}
+                className="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Valor do Pagamento */}
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                Valor da Comanda
+              </span>
+              <div className="text-3xl font-black text-emerald-400 font-mono">
+                R$ {modalPagamentoComanda.valor.toFixed(2)}
+              </div>
+              <span className="text-[11px] text-slate-500 block">
+                {modalPagamentoComanda.itens.length} {modalPagamentoComanda.itens.length === 1 ? 'item a liquidar' : 'itens a liquidar'}
+              </span>
+            </div>
+
+            {/* Lista resumida de itens sendo pagos */}
+            <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800/80 max-h-36 overflow-y-auto space-y-1">
+              {modalPagamentoComanda.itens.map((it, idx) => (
+                <div key={it.id || idx} className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-300 truncate pr-2">
+                    <span className="text-orange-400 font-bold mr-1">{it.quantidade}x</span>
+                    {it.nome}
+                  </span>
+                  <span className="font-mono font-bold text-emerald-400 shrink-0">
+                    R$ {it.subtotal.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Seleção da Forma de Pagamento */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 block">
+                Forma de Pagamento do Cliente:
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'pix', label: 'PIX', icon: '⚡' },
+                  { id: 'cartao_credito', label: 'Cartão Crédito', icon: '💳' },
+                  { id: 'cartao_debito', label: 'Cartão Débito', icon: '💳' },
+                  { id: 'dinheiro', label: 'Dinheiro', icon: '💵' },
+                ].map((fp) => (
+                  <button
+                    key={fp.id}
+                    type="button"
+                    onClick={() => setFormaPagamentoComanda(fp.id as FormaPagamento)}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                      formaPagamentoComanda === fp.id
+                        ? 'bg-emerald-500/20 border-emerald-500 text-white ring-2 ring-emerald-500/30'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>{fp.icon}</span>
+                    <span>{fp.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Ações */}
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalPagamentoComanda(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold text-xs cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleConfirmarPagamentoComanda(
+                    modalPagamentoComanda.mesa,
+                    modalPagamentoComanda.nomePessoa,
+                    formaPagamentoComanda
+                  )
+                }
+                className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+              >
+                <Check className="w-4 h-4 text-slate-950" />
+                <span>Confirmar Recebimento</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
