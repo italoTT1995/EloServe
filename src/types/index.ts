@@ -59,6 +59,19 @@ export interface ItemCarrinho {
 
 export type StatusMesa = 'livre' | 'ocupada' | 'aguardando_pagamento' | 'chamar_garcom';
 
+export interface CancelamentoItemMesa {
+  id: string;
+  itemId: string;
+  produtoId: string;
+  nome: string;
+  quantidade: number;
+  subtotal: number;
+  clienteNome?: string;
+  motivo: string;
+  canceladoPor: string;
+  horario: string;
+}
+
 export interface ItemComandaMesa {
   id: string;
   produtoId: string;
@@ -71,6 +84,10 @@ export interface ItemComandaMesa {
   garcomNome?: string;
   clienteNome?: string;
   statusKDS?: StatusProducaoKDS;
+  cancelado?: boolean;
+  motivoCancelamento?: string;
+  canceladoPor?: string;
+  canceladoEm?: string;
 }
 
 export interface Mesa {
@@ -93,6 +110,11 @@ export interface Mesa {
   solicitacaoTransferida?: boolean;
   mesasUnidas?: number[];
   comandaItens?: ItemComandaMesa[];
+  taxaServicoAtiva?: boolean;
+  isencaoTaxaPorPessoa?: string[];
+  descontosPorPessoa?: Record<string, number>;
+  descontoMesa?: number;
+  historicoCancelamentos?: CancelamentoItemMesa[];
 }
 
 export type StatusProducaoKDS = 'novo' | 'em_preparo' | 'pronto';
@@ -295,6 +317,7 @@ export interface VendaRealizada {
   total: number;
   subtotalBruto?: number;
   desconto?: number;
+  taxaServico?: number;
   formaPagamento: FormaPagamento;
   itens: ItemVendaRealizada[];
   operador: string;

@@ -48,6 +48,24 @@ interface AppState {
   avancarStatusKDS: (pedidoId: string) => void;
   alternarPerfil: (perfil: 'admin' | 'caixa' | 'garcom') => void;
   validarPinAdmin: (pin: string) => boolean;
+  cancelarItemComandaMesa: (
+    numeroMesa: number,
+    itemId: string,
+    motivo: string,
+    gerenteNome?: string,
+    tenantId?: string
+  ) => { sucesso: boolean; mensagem: string; itemCancelado?: ItemComandaMesa };
+  toggleTaxaServicoMesa: (
+    numeroMesa: number,
+    clienteNome?: string,
+    tenantId?: string
+  ) => { sucesso: boolean; isenta: boolean };
+  aplicarDescontoComandaMesa: (
+    numeroMesa: number,
+    clienteNome: string,
+    valorDesconto: number,
+    tenantId?: string
+  ) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -757,6 +775,126 @@ export const useAppStore = create<AppState>()(
             mesasPorTenant: { ...map, [idAlvo]: novaLista },
             mesas: novaLista,
           };
+        });
+      },
+
+      cancelarItemComandaMesa: (numeroMesa, itemId, motivo, gerenteNome, tenantId) => {
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const state = get();
+        const map = state.mesasPorTenant || MESAS_POR_TENANT;
+        const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
+        const mesa = listaAtual.find((m) => m.numero === numeroMesa);
+        if (!mesa || !mesa.comandaItens) {
+          return { sucesso: false, mensagem: 'Mesa ou itens não encontrados.' };
+        }
+
+        const itemAlvo = mesa.comandaItens.find((it) => it.id === itemId);
+        if (!itemAlvo) {
+          return { sucesso: false, mensagem: 'Item não encontrado na comanda.' };
+        }
+
+        const novosItens = mesa.comandaItens.filter((it) => it.id !== itemId);
+        const novoTotal = Number(novosItens.reduce((sum, it) => sum + it.subtotal, 0).toFixed(2));
+
+        const registroCancelamento = {
+          id: `canc_${Date.now()}`,
+          itemId: itemAlvo.id,
+          produtoId: itemAlvo.produtoId,
+          nome: itemAlvo.nome,
+          quantidade: itemAlvo.quantidade,
+          subtotal: itemAlvo.subtotal,
+          clienteNome: itemAlvo.clienteNome,
+          motivo: motivo || 'Cancelado pelo Gerente',
+          canceladoPor: gerenteNome || 'Gerente',
+          horario: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+
+        const novaLista = listaAtual.map((m) => {
+          if (m.numero !== numeroMesa) return m;
+          return {
+            ...m,
+            comandaItens: novosItens,
+            totalConsumo: novoTotal,
+            historicoCancelamentos: [...(m.historicoCancelamentos || []), registroCancelamento],
+          };
+        });
+
+        set({
+          mesasPorTenant: { ...map, [idAlvo]: novaLista },
+          mesas: novaLista,
+        });
+
+        return {
+          sucesso: true,
+          mensagem: `Item "${itemAlvo.nome}" cancelado com sucesso.`,
+          itemCancelado: itemAlvo,
+        };
+      },
+
+      toggleTaxaServicoMesa: (numeroMesa, clienteNome, tenantId) => {
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const state = get();
+        const map = state.mesasPorTenant || MESAS_POR_TENANT;
+        const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
+        let isenta = false;
+
+        const novaLista = listaAtual.map((m) => {
+          if (m.numero !== numeroMesa) return m;
+          if (clienteNome && clienteNome !== 'todos') {
+            const isentos = m.isencaoTaxaPorPessoa || [];
+            const jaIsento = isentos.includes(clienteNome);
+            isenta = !jaIsento;
+            return {
+              ...m,
+              isencaoTaxaPorPessoa: jaIsento
+                ? isentos.filter((x) => x !== clienteNome)
+                : [...isentos, clienteNome],
+            };
+          } else {
+            const atual = m.taxaServicoAtiva !== false; // padrão true
+            isenta = atual; // se estava ativo, agora fica isento
+            return {
+              ...m,
+              taxaServicoAtiva: !atual,
+            };
+          }
+        });
+
+        set({
+          mesasPorTenant: { ...map, [idAlvo]: novaLista },
+          mesas: novaLista,
+        });
+
+        return { sucesso: true, isenta };
+      },
+
+      aplicarDescontoComandaMesa: (numeroMesa, clienteNome, valorDesconto, tenantId) => {
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const state = get();
+        const map = state.mesasPorTenant || MESAS_POR_TENANT;
+        const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
+
+        const novaLista = listaAtual.map((m) => {
+          if (m.numero !== numeroMesa) return m;
+          if (clienteNome && clienteNome !== 'todos') {
+            return {
+              ...m,
+              descontosPorPessoa: {
+                ...(m.descontosPorPessoa || {}),
+                [clienteNome]: Math.max(0, valorDesconto),
+              },
+            };
+          } else {
+            return {
+              ...m,
+              descontoMesa: Math.max(0, valorDesconto),
+            };
+          }
+        });
+
+        set({
+          mesasPorTenant: { ...map, [idAlvo]: novaLista },
+          mesas: novaLista,
         });
       },
 

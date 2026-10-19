@@ -35,7 +35,12 @@ import {
   ExternalLink,
   CreditCard,
   User,
+  ShieldAlert,
+  ShieldCheck,
+  Percent,
+  Tag,
 } from 'lucide-react';
+import { AdminAuthModal } from '../components/common/AdminAuthModal';
 import { useAppStore } from '../store/useAppStore';
 import { useFuncionarioStore } from '../store/useFuncionarioStore';
 import { useSaaSStore, PLANOS_DISPONIVEIS } from '../store/useSaaSStore';
@@ -63,6 +68,9 @@ export default function Mesas() {
     lancarItensComandaMesa,
     trocarMesa,
     registrarVenda,
+    cancelarItemComandaMesa,
+    toggleTaxaServicoMesa,
+    aplicarDescontoComandaMesa,
   } = useAppStore();
   const { funcionarios } = useFuncionarioStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
@@ -237,6 +245,37 @@ export default function Mesas() {
     return mesa.responsavelNome || pessoas[0] || `Mesa #${mesa.numero}`;
   }
 
+  // Helper para cálculo dos totais da comanda (Subtotal, 10% Serviço, Desconto e Total Final)
+  function getTotaisComanda(mesa: Mesa | null, nomePessoa: string) {
+    if (!mesa) {
+      return { subtotal: 0, taxaServico: 0, taxaAtiva: true, desconto: 0, total: 0, itens: [] };
+    }
+    const todosItens = (mesa.comandaItens || []).filter((it) => !it.cancelado);
+    const isTodos = nomePessoa === 'todos';
+    const itens = isTodos
+      ? todosItens
+      : todosItens.filter((it) => getDonoDoItem(it, mesa) === nomePessoa);
+
+    const subtotal = Number(itens.reduce((sum, it) => sum + it.subtotal, 0).toFixed(2));
+
+    // Regra: 10% de taxa de serviço SEMPRE INCLUSO por padrão
+    // Somente o gerente pode isentar/retirar
+    const taxaAtiva = isTodos
+      ? mesa.taxaServicoAtiva !== false
+      : (mesa.taxaServicoAtiva !== false && !(mesa.isencaoTaxaPorPessoa || []).includes(nomePessoa));
+
+    const taxaServico = taxaAtiva ? Number((subtotal * 0.10).toFixed(2)) : 0;
+
+    // Desconto concedido pelo gerente
+    const desconto = isTodos
+      ? Number((mesa.descontoMesa || 0).toFixed(2))
+      : Number(((mesa.descontosPorPessoa && mesa.descontosPorPessoa[nomePessoa]) || 0).toFixed(2));
+
+    const total = Math.max(0, Number((subtotal + taxaServico - desconto).toFixed(2)));
+
+    return { subtotal, taxaServico, taxaAtiva, desconto, total, itens };
+  }
+
   // Estados de Múltiplas Pessoas e Sub-comandas na Mesa
   const [modalAdicionarPessoa, setModalAdicionarPessoa] = useState<Mesa | null>(null);
   const [nomeNovaPessoa, setNomeNovaPessoa] = useState<string>('');
@@ -250,6 +289,174 @@ export default function Mesas() {
   } | null>(null);
   const [formaPagamentoComanda, setFormaPagamentoComanda] = useState<FormaPagamento>('pix');
   const [tipoDivisaoConta, setTipoDivisaoConta] = useState<'por_pessoa' | 'igualitaria'>('por_pessoa');
+
+  // Estados para Autorização de Gerente e Ações Restritas (10%, Desconto e Cancelamento)
+  const [modalAuth, setModalAuth] = useState<{
+    isOpen: boolean;
+    actionTitle: string;
+    onSuccess: () => void;
+  }>({
+    isOpen: false,
+    actionTitle: '',
+    onSuccess: () => {},
+  });
+
+  function solicitarAutorizacaoGerente(titulo: string, callback: () => void) {
+    setModalAuth({
+      isOpen: true,
+      actionTitle: titulo,
+      onSuccess: callback,
+    });
+  }
+
+  // Estado e Modal de Desconto do Gerente
+  const [modalDescontoGerente, setModalDescontoGerente] = useState<{
+    mesa: Mesa;
+    nomePessoa: string;
+    valorAtual: number;
+    subtotalComanda: number;
+  } | null>(null);
+  const [formDesconto, setFormDesconto] = useState<{
+    tipo: 'reais' | 'porcentagem';
+    valor: number;
+    motivo: string;
+  }>({
+    tipo: 'reais',
+    valor: 0,
+    motivo: 'Cortesia do Gerente',
+  });
+
+  // Estado e Modal de Cancelamento de Item (Gerente)
+  const [modalCancelarItem, setModalCancelarItem] = useState<{
+    mesa: Mesa;
+    item: ItemComandaMesa;
+  } | null>(null);
+  const [motivoCancelamentoItem, setMotivoCancelamentoItem] = useState<string>('Cliente desistiu');
+
+  // Sincroniza qualquer alteração das mesas nos modais abertos
+  function sincronizarMesasAbertas(numeroMesa: number) {
+    const mesaAtualizada = useAppStore
+      .getState()
+      .getMesasPorTenant(idLoja)
+      .find((m) => m.numero === numeroMesa);
+    if (!mesaAtualizada) return;
+
+    if (mesaParaLancar && mesaParaLancar.numero === numeroMesa) {
+      setMesaParaLancar({ ...mesaAtualizada });
+    }
+    if (mesaParaFechar && mesaParaFechar.numero === numeroMesa) {
+      setMesaParaFechar({ ...mesaAtualizada });
+    }
+    if (modalPagamentoComanda && modalPagamentoComanda.mesa.numero === numeroMesa) {
+      const novosTot = getTotaisComanda(mesaAtualizada, modalPagamentoComanda.nomePessoa);
+      setModalPagamentoComanda({
+        ...modalPagamentoComanda,
+        mesa: mesaAtualizada,
+        valor: novosTot.total,
+        itens: novosTot.itens,
+      });
+    }
+  }
+
+  // Ação 1 (Gerente): Retirar ou Restaurar 10%
+  function handleSolicitarToggle10(mesa: Mesa, nomePessoa: string) {
+    const tot = getTotaisComanda(mesa, nomePessoa);
+    const isRetirar = tot.taxaAtiva;
+    const alvoLabel = nomePessoa === 'todos' ? `Toda a Mesa #${mesa.numero}` : `comanda de "${nomePessoa}"`;
+
+    solicitarAutorizacaoGerente(
+      isRetirar
+        ? `Autorização do Gerente necessária para RETIRAR os 10% de serviço da ${alvoLabel}`
+        : `Autorização do Gerente necessária para RESTAURAR os 10% de serviço da ${alvoLabel}`,
+      () => {
+        const res = toggleTaxaServicoMesa(mesa.numero, nomePessoa, idLoja);
+        dispararToast(
+          res.isenta
+            ? `Taxa de 10% removida com sucesso para ${alvoLabel} (autorizado pelo Gerente).`
+            : `Taxa de 10% restaurada com sucesso para ${alvoLabel}.`
+        );
+        sincronizarMesasAbertas(mesa.numero);
+      }
+    );
+  }
+
+  // Ação 2 (Gerente): Conceder Desconto na Comanda
+  function handleAbrirDescontoGerente(mesa: Mesa, nomePessoa: string) {
+    const alvoLabel = nomePessoa === 'todos' ? `Toda a Mesa #${mesa.numero}` : `comanda de "${nomePessoa}"`;
+    solicitarAutorizacaoGerente(
+      `Autorização do Gerente necessária para APLICAR DESCONTO na ${alvoLabel}`,
+      () => {
+        const tot = getTotaisComanda(mesa, nomePessoa);
+        setModalDescontoGerente({
+          mesa,
+          nomePessoa,
+          valorAtual: tot.desconto,
+          subtotalComanda: tot.subtotal + tot.taxaServico,
+        });
+        setFormDesconto({
+          tipo: 'reais',
+          valor: tot.desconto > 0 ? tot.desconto : 0,
+          motivo: 'Cortesia do Gerente',
+        });
+      }
+    );
+  }
+
+  function handleConfirmarDescontoGerente(e: React.FormEvent) {
+    e.preventDefault();
+    if (!modalDescontoGerente) return;
+    const { mesa, nomePessoa, subtotalComanda } = modalDescontoGerente;
+
+    let valorFinal = 0;
+    if (formDesconto.tipo === 'reais') {
+      valorFinal = Math.min(subtotalComanda, Math.max(0, Number(formDesconto.valor) || 0));
+    } else {
+      const pct = Math.min(100, Math.max(0, Number(formDesconto.valor) || 0));
+      valorFinal = Number(((subtotalComanda * pct) / 100).toFixed(2));
+    }
+
+    aplicarDescontoComandaMesa(mesa.numero, nomePessoa, valorFinal, idLoja);
+    dispararToast(
+      valorFinal > 0
+        ? `Desconto de R$ ${valorFinal.toFixed(2)} concedido com sucesso pelo Gerente!`
+        : `Desconto removido da comanda.`
+    );
+    setModalDescontoGerente(null);
+    sincronizarMesasAbertas(mesa.numero);
+  }
+
+  // Ação 3 (Gerente): Cancelar Item da Comanda
+  function handleSolicitarCancelarItem(mesa: Mesa, item: ItemComandaMesa) {
+    solicitarAutorizacaoGerente(
+      `Autorização do Gerente necessária para CANCELAR o item "${item.nome}" (R$ ${item.subtotal.toFixed(2)}) da Mesa #${mesa.numero}`,
+      () => {
+        setModalCancelarItem({ mesa, item });
+        setMotivoCancelamentoItem('Cliente desistiu');
+      }
+    );
+  }
+
+  function handleConfirmarCancelarItem(e: React.FormEvent) {
+    e.preventDefault();
+    if (!modalCancelarItem) return;
+    const { mesa, item } = modalCancelarItem;
+
+    const res = cancelarItemComandaMesa(
+      mesa.numero,
+      item.id,
+      motivoCancelamentoItem,
+      'Gerente',
+      idLoja
+    );
+
+    if (res.sucesso) {
+      dispararToast(`🚨 ${res.mensagem}`);
+      setModalCancelarItem(null);
+      sincronizarMesasAbertas(mesa.numero);
+    } else {
+      dispararToast(`⚠️ ${res.mensagem}`);
+    }
+  }
 
   function handleConfirmarAdicionarPessoa(e: React.FormEvent) {
     e.preventDefault();
@@ -288,7 +495,7 @@ export default function Mesas() {
     dispararToast(`Item transferido para a comanda de "${novoDono}"!`);
   }
 
-  // Pagamento da comanda individual ou de toda a mesa
+  // Pagamento da comanda individual ou de toda a mesa com 10% e desconto aplicados
   function handleConfirmarPagamentoComanda(
     mesaAlvo: Mesa,
     nomePessoa: string,
@@ -296,19 +503,16 @@ export default function Mesas() {
   ) {
     const todosItens = mesaAlvo.comandaItens || [];
     const isTodos = nomePessoa === 'todos';
-    const itensPagos = isTodos
-      ? todosItens
-      : todosItens.filter((it) => getDonoDoItem(it, mesaAlvo) === nomePessoa);
+    const totais = getTotaisComanda(mesaAlvo, nomePessoa);
 
-    const valorPago = Number(
-      itensPagos.reduce((sum, it) => sum + it.subtotal, 0).toFixed(2)
-    );
-
-    if (valorPago <= 0 && !isTodos) {
+    if (totais.total <= 0 && totais.subtotal <= 0 && !isTodos) {
       dispararToast(`A comanda de "${nomePessoa}" não possui valor pendente.`);
       setModalPagamentoComanda(null);
       return;
     }
+
+    const valorPago = totais.total;
+    const itensPagos = totais.itens;
 
     // 1. Registra venda no caixa do sistema
     const agoraTexto =
@@ -323,8 +527,9 @@ export default function Mesas() {
       mesaNumero: mesaAlvo.numero,
       dataHora: agoraTexto,
       total: valorPago,
-      subtotalBruto: valorPago,
-      desconto: 0,
+      subtotalBruto: totais.subtotal,
+      taxaServico: totais.taxaServico,
+      desconto: totais.desconto,
       formaPagamento: forma,
       itens: itensPagos.map((it) => ({
         produtoId: it.produtoId,
@@ -347,6 +552,11 @@ export default function Mesas() {
       itensRestantes.reduce((sum, it) => sum + it.subtotal, 0).toFixed(2)
     );
 
+    // Limpa descontos e isenções dessa pessoa
+    const novosDescontos = { ...(mesaAlvo.descontosPorPessoa || {}) };
+    delete novosDescontos[nomePessoa];
+    const novasIsencoes = (mesaAlvo.isencaoTaxaPorPessoa || []).filter((x) => x !== nomePessoa);
+
     if (itensRestantes.length === 0 || novoTotalMesa <= 0) {
       // Todas as comandas foram pagas: libera a mesa
       editarMesa(
@@ -357,6 +567,10 @@ export default function Mesas() {
           comandaItens: [],
           pessoas: undefined,
           responsavelNome: undefined,
+          descontoMesa: undefined,
+          descontosPorPessoa: undefined,
+          isencaoTaxaPorPessoa: undefined,
+          taxaServicoAtiva: undefined,
         },
         idLoja
       );
@@ -377,6 +591,8 @@ export default function Mesas() {
         {
           totalConsumo: novoTotalMesa,
           comandaItens: itensRestantes,
+          descontosPorPessoa: novosDescontos,
+          isencaoTaxaPorPessoa: novasIsencoes,
         },
         idLoja
       );
@@ -384,21 +600,8 @@ export default function Mesas() {
         `✅ Comanda de "${nomePessoa}" (R$ ${valorPago.toFixed(2)}) quitada via ${forma.toUpperCase()}! Restam R$ ${novoTotalMesa.toFixed(2)} na Mesa #${mesaAlvo.numero}.`
       );
       setModalPagamentoComanda(null);
-      if (mesaParaLancar && mesaParaLancar.numero === mesaAlvo.numero) {
-        setMesaParaLancar({
-          ...mesaParaLancar,
-          totalConsumo: novoTotalMesa,
-          comandaItens: itensRestantes,
-        });
-        setPessoaAtivaComanda('todos');
-      }
-      if (mesaParaFechar && mesaParaFechar.numero === mesaAlvo.numero) {
-        setMesaParaFechar({
-          ...mesaParaFechar,
-          totalConsumo: novoTotalMesa,
-          comandaItens: itensRestantes,
-        });
-      }
+      sincronizarMesasAbertas(mesaAlvo.numero);
+      setPessoaAtivaComanda('todos');
     }
   }
 
@@ -1103,10 +1306,7 @@ export default function Mesas() {
                         </div>
                         <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pr-0.5">
                           {getPessoasDaMesa(mesa).map((p, pIdx) => {
-                            const itensPessoa = (mesa.comandaItens || []).filter(
-                              (it) => getDonoDoItem(it, mesa) === p
-                            );
-                            const totalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+                            const totP = getTotaisComanda(mesa, p);
                             return (
                               <button
                                 key={pIdx}
@@ -1116,13 +1316,13 @@ export default function Mesas() {
                                   abrirComandaMesa(mesa, 'itens_consumidos', p);
                                 }}
                                 className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 text-slate-200 flex items-center gap-1 cursor-pointer transition-all"
-                                title={`Abrir comanda de ${p}: R$ ${totalPessoa.toFixed(2)} (${itensPessoa.length} itens)`}
+                                title={`Abrir comanda de ${p}: R$ ${totP.total.toFixed(2)} (${totP.itens.length} itens - 10% incluso)`}
                               >
                                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
                                 <span className="font-semibold truncate max-w-[80px]">{p}</span>
-                                {totalPessoa > 0 ? (
+                                {totP.total > 0 ? (
                                   <span className="text-[9px] text-emerald-400 font-mono font-bold">
-                                    R${totalPessoa.toFixed(0)}
+                                    R${totP.total.toFixed(0)}
                                   </span>
                                 ) : (
                                   <span className="text-[9px] text-slate-500">R$0</span>
@@ -1210,15 +1410,28 @@ export default function Mesas() {
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-800">
-                        <span className="text-slate-400 flex items-center gap-1">
-                          <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                          Consumo Acumulado:
-                        </span>
-                        <span className="font-mono font-black text-emerald-400 text-sm">
-                          R$ {mesa.totalConsumo ? mesa.totalConsumo.toFixed(2) : '0,00'}
-                        </span>
-                      </div>
+                      {(() => {
+                        const totMesaCard = getTotaisComanda(mesa, 'todos');
+                        return (
+                          <div className="pt-1.5 border-t border-slate-800 space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-400 flex items-center gap-1">
+                                <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                                Total a Pagar (+10%):
+                              </span>
+                              <span className="font-mono font-black text-emerald-400 text-sm">
+                                R$ {totMesaCard.total.toFixed(2)}
+                              </span>
+                            </div>
+                            {totMesaCard.taxaServico > 0 && (
+                              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                <span>Itens: R$ {totMesaCard.subtotal.toFixed(2)}</span>
+                                <span className="text-emerald-400/90 font-medium">+10% Garçom: R$ {totMesaCard.taxaServico.toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1397,8 +1610,7 @@ export default function Mesas() {
       {/* ============================================================== */}
       {mesaParaFechar && (() => {
         const pessoasMesa = getPessoasDaMesa(mesaParaFechar);
-        const itensConsumidos = mesaParaFechar.comandaItens || [];
-        const totalGeral = mesaParaFechar.totalConsumo || 0;
+        const totaisMesa = getTotaisComanda(mesaParaFechar, 'todos');
 
         return (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 select-none">
@@ -1426,15 +1638,89 @@ export default function Mesas() {
               </div>
 
               <div className="space-y-4 text-xs">
-                {/* Total da Conta */}
-                <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Total a Pagar da Mesa:</span>
-                    <p className="text-white font-bold text-xs">{mesaParaFechar.responsavelNome || 'Cliente'}</p>
+                {/* Total da Conta e Resumo Financeiro da Mesa */}
+                <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Total a Pagar da Mesa:</span>
+                      <p className="text-white font-bold text-xs">{mesaParaFechar.responsavelNome || 'Cliente'}</p>
+                    </div>
+                    <span className="text-2xl font-black text-emerald-400 font-mono">
+                      R$ {totaisMesa.total.toFixed(2)}
+                    </span>
                   </div>
-                  <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
-                    R$ {totalGeral.toFixed(2)}
-                  </span>
+
+                  {/* Detalhamento dos 10% e Desconto com Ações de Gerente */}
+                  <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-[11px]">
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Subtotal dos itens consumidos:</span>
+                      <span className="font-mono text-slate-200 font-semibold">R$ {totaisMesa.subtotal.toFixed(2)}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-400">10% Serviço (Garçom):</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-bold ${
+                          totaisMesa.taxaAtiva
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        }`}>
+                          {totaisMesa.taxaAtiva ? 'Incluso por Padrão' : 'Isento pelo Gerente'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-emerald-400 font-bold">
+                          {totaisMesa.taxaAtiva ? `+ R$ ${totaisMesa.taxaServico.toFixed(2)}` : 'R$ 0,00'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleSolicitarToggle10(mesaParaFechar, 'todos')}
+                          className="text-[10px] px-2 py-0.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center gap-1 cursor-pointer transition-all hover:border-amber-500/50"
+                          title="Apenas o Gerente pode retirar ou restaurar os 10%"
+                        >
+                          <ShieldAlert className="w-3 h-3 text-amber-400" />
+                          <span>{totaisMesa.taxaAtiva ? 'Retirar 10%' : 'Restaurar 10%'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {totaisMesa.desconto > 0 ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400">Desconto do Gerente:</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold">
+                            Aplicado
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-rose-400 font-bold">
+                            - R$ {totaisMesa.desconto.toFixed(2)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirDescontoGerente(mesaParaFechar, 'todos')}
+                            className="text-[10px] px-2 py-0.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center gap-1 cursor-pointer hover:border-purple-500/50"
+                            title="Alterar ou remover desconto do gerente"
+                          >
+                            <Tag className="w-3 h-3 text-purple-400" />
+                            <span>Alterar</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleAbrirDescontoGerente(mesaParaFechar, 'todos')}
+                          className="text-[10px] px-2 py-0.5 rounded-lg border border-slate-700/80 bg-slate-900 hover:bg-slate-800 text-purple-300 font-bold flex items-center gap-1 cursor-pointer hover:border-purple-500/50"
+                          title="Conceder desconto geral na mesa (Requer PIN do Gerente)"
+                        >
+                          <Tag className="w-3 h-3 text-purple-400" />
+                          <span>+ Dar Desconto Geral (Gerente)</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Seleção do Modo de Divisão */}
@@ -1470,7 +1756,7 @@ export default function Mesas() {
                 {tipoDivisaoConta === 'por_pessoa' ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Comandas individuais dos clientes na mesa:</span>
+                      <span>Comandas individuais dos clientes na mesa (10% incluso):</span>
                       <span className="font-bold text-slate-300">
                         {pessoasMesa.length} {pessoasMesa.length === 1 ? 'cliente' : 'clientes'}
                       </span>
@@ -1478,22 +1764,21 @@ export default function Mesas() {
 
                     <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                       {pessoasMesa.map((p) => {
-                        const itensPessoa = itensConsumidos.filter(
-                          (it) => getDonoDoItem(it, mesaParaFechar) === p
-                        );
-                        const subtotalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+                        const totPessoa = getTotaisComanda(mesaParaFechar, p);
+                        const itensPessoa = totPessoa.itens;
+                        const subtotalPessoa = totPessoa.subtotal;
 
                         return (
                           <div
                             key={p}
-                            className={`p-3 rounded-2xl border transition-all ${
-                              subtotalPessoa === 0
+                            className={`p-3.5 rounded-2xl border transition-all ${
+                              totPessoa.total === 0 && subtotalPessoa === 0
                                 ? 'bg-slate-950/40 border-slate-800/60 opacity-60'
-                                : 'bg-slate-950 border-slate-800'
+                                : 'bg-slate-950 border-slate-800 hover:border-slate-700'
                             }`}
                           >
                             <div className="flex items-start justify-between gap-3">
-                              <div className="space-y-1 min-w-0">
+                              <div className="space-y-1 min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                   <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center justify-center text-[11px] font-bold">
                                     {p.charAt(0).toUpperCase()}
@@ -1510,20 +1795,61 @@ export default function Mesas() {
                                     </span>
                                   )}
                                 </div>
+
+                                {/* Resumo de Valores da Comanda da Pessoa */}
+                                {subtotalPessoa > 0 && (
+                                  <div className="pl-8 pt-1 space-y-0.5 text-[10px]">
+                                    <div className="text-slate-400">
+                                      Consumo: <span className="font-mono text-slate-200">R$ {subtotalPessoa.toFixed(2)}</span>
+                                      {' • '}
+                                      10%: <span className="font-mono text-emerald-400 font-bold">{totPessoa.taxaAtiva ? `R$ ${totPessoa.taxaServico.toFixed(2)}` : 'Isento'}</span>
+                                      {totPessoa.desconto > 0 && (
+                                        <>
+                                          {' • '}
+                                          Desc: <span className="font-mono text-rose-400 font-bold">-R$ {totPessoa.desconto.toFixed(2)}</span>
+                                        </>
+                                      )}
+                                    </div>
+
+                                    {/* Ações de Gerente para esta Comanda */}
+                                    <div className="flex items-center gap-1.5 pt-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSolicitarToggle10(mesaParaFechar, p)}
+                                        className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 flex items-center gap-0.5 cursor-pointer"
+                                        title="Retirar ou restaurar 10% desta comanda (Requer Gerente)"
+                                      >
+                                        <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
+                                        <span>{totPessoa.taxaAtiva ? 'Retirar 10%' : 'Restaurar 10%'}</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAbrirDescontoGerente(mesaParaFechar, p)}
+                                        className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-purple-300 flex items-center gap-0.5 cursor-pointer"
+                                        title="Dar desconto nesta comanda (Requer Gerente)"
+                                      >
+                                        <Tag className="w-2.5 h-2.5 text-purple-400" />
+                                        <span>{totPessoa.desconto > 0 ? 'Editar Desc.' : '+ Desconto'}</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
 
                               <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                                <span className="font-mono font-black text-emerald-400 text-sm">
-                                  R$ {subtotalPessoa.toFixed(2)}
+                                <span className="text-[9px] text-slate-400 uppercase font-bold block">Total a Pagar</span>
+                                <span className="font-mono font-black text-emerald-400 text-base">
+                                  R$ {totPessoa.total.toFixed(2)}
                                 </span>
-                                {subtotalPessoa > 0 && (
+                                {totPessoa.total > 0 && (
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setModalPagamentoComanda({
                                         mesa: mesaParaFechar,
                                         nomePessoa: p,
-                                        valor: subtotalPessoa,
+                                        valor: totPessoa.total,
                                         itens: itensPessoa,
                                       });
                                     }}
@@ -1556,9 +1882,9 @@ export default function Mesas() {
                     </div>
 
                     <div className="pt-2 border-t border-purple-500/20 flex items-center justify-between">
-                      <span className="text-purple-300 font-bold">Valor por pessoa (Divisão Igualitária):</span>
+                      <span className="text-purple-300 font-bold">Valor por pessoa (Divisão Igualitária com 10%):</span>
                       <span className="text-base font-black text-white font-mono bg-purple-900/50 px-3 py-1 rounded-xl">
-                        R$ {(totalGeral / Math.max(1, pessoasDivisao)).toFixed(2)}
+                        R$ {(totaisMesa.total / Math.max(1, pessoasDivisao)).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -1578,15 +1904,15 @@ export default function Mesas() {
                       setModalPagamentoComanda({
                         mesa: mesaParaFechar,
                         nomePessoa: 'todos',
-                        valor: totalGeral,
-                        itens: itensConsumidos,
+                        valor: totaisMesa.total,
+                        itens: totaisMesa.itens,
                       });
                     }}
-                    disabled={totalGeral <= 0}
+                    disabled={totaisMesa.total <= 0 && totaisMesa.itens.length === 0}
                     className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5"
                   >
                     <Check className="w-4 h-4" />
-                    <span>Quitar Toda a Mesa & Liberar</span>
+                    <span>Quitar Toda a Mesa & Liberar (R$ {totaisMesa.total.toFixed(2)})</span>
                   </button>
                 </div>
               </div>
@@ -2771,15 +3097,12 @@ export default function Mesas() {
                         <Users className="w-3.5 h-3.5" />
                         <span>👥 Todas as Comandas</span>
                         <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-md bg-slate-950/40 text-emerald-400 font-black">
-                          R$ {(mesaParaLancar.totalConsumo || 0).toFixed(0)}
+                          R$ {getTotaisComanda(mesaParaLancar, 'todos').total.toFixed(0)}
                         </span>
                       </button>
 
                       {getPessoasDaMesa(mesaParaLancar).map((p) => {
-                        const itensPessoa = (mesaParaLancar.comandaItens || []).filter(
-                          (it) => getDonoDoItem(it, mesaParaLancar) === p
-                        );
-                        const subtotalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+                        const totP = getTotaisComanda(mesaParaLancar, p);
                         const isAtiva = pessoaAtivaComanda === p;
 
                         return (
@@ -2802,7 +3125,7 @@ export default function Mesas() {
                                   : 'bg-slate-950 text-emerald-400'
                               }`}
                             >
-                              R$ {subtotalPessoa.toFixed(0)}
+                              R$ {totP.total.toFixed(0)}
                             </span>
                           </button>
                         );
@@ -2843,10 +3166,9 @@ export default function Mesas() {
                           {/* Cards Individuais de Cada Pessoa com botão direto de pagamento */}
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {getPessoasDaMesa(mesaParaLancar).map((p, idx) => {
-                              const itensPessoa = mesaParaLancar.comandaItens!.filter(
-                                (it) => getDonoDoItem(it, mesaParaLancar) === p
-                              );
-                              const subtotalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+                              const totP = getTotaisComanda(mesaParaLancar, p);
+                              const itensPessoa = totP.itens;
+                              const subtotalPessoa = totP.subtotal;
 
                               return (
                                 <div
@@ -2868,9 +3190,9 @@ export default function Mesas() {
                                       </div>
 
                                       <div className="text-right shrink-0">
-                                        <span className="text-[9px] text-slate-400 block font-semibold">Subtotal:</span>
+                                        <span className="text-[9px] text-slate-400 uppercase font-bold block">Total a Pagar:</span>
                                         <span className="font-mono font-black text-emerald-400 text-sm">
-                                          R$ {subtotalPessoa.toFixed(2)}
+                                          R$ {totP.total.toFixed(2)}
                                         </span>
                                       </div>
                                     </div>
@@ -2890,11 +3212,59 @@ export default function Mesas() {
                                               <span className="text-orange-400 font-bold mr-1">{it.quantidade}x</span>
                                               <span className="text-white font-medium">{it.nome}</span>
                                             </div>
-                                            <span className="font-mono font-bold text-slate-200 shrink-0">
-                                              R$ {it.subtotal.toFixed(2)}
-                                            </span>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                              <span className="font-mono font-bold text-slate-200">
+                                                R$ {it.subtotal.toFixed(2)}
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleSolicitarCancelarItem(mesaParaLancar, it)}
+                                                className="p-1 rounded text-slate-500 hover:text-rose-400 cursor-pointer"
+                                                title="Cancelar item (Requer Gerente)"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
+                                            </div>
                                           </div>
                                         ))}
+                                      </div>
+                                    )}
+
+                                    {/* Discriminação de 10% e Desconto para esta Pessoa */}
+                                    {subtotalPessoa > 0 && (
+                                      <div className="pt-2 border-t border-slate-900 space-y-1 text-[10px]">
+                                        <div className="flex justify-between text-slate-400">
+                                          <span>Consumo: R$ {subtotalPessoa.toFixed(2)}</span>
+                                          <span className="text-emerald-400 font-semibold">
+                                            10%: {totP.taxaAtiva ? `+R$ ${totP.taxaServico.toFixed(2)}` : 'Isento'}
+                                          </span>
+                                        </div>
+                                        {totP.desconto > 0 && (
+                                          <div className="flex justify-between text-rose-400 font-semibold">
+                                            <span>Desconto Gerente:</span>
+                                            <span>-R$ {totP.desconto.toFixed(2)}</span>
+                                          </div>
+                                        )}
+                                        <div className="flex items-center gap-1.5 pt-0.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSolicitarToggle10(mesaParaLancar, p)}
+                                            className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 flex items-center gap-0.5 cursor-pointer"
+                                            title="Retirar ou restaurar os 10% (Gerente)"
+                                          >
+                                            <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
+                                            <span>{totP.taxaAtiva ? 'Retirar 10%' : 'Restaurar 10%'}</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleAbrirDescontoGerente(mesaParaLancar, p)}
+                                            className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-purple-300 flex items-center gap-0.5 cursor-pointer"
+                                            title="Conceder desconto do gerente nesta comanda"
+                                          >
+                                            <Tag className="w-2.5 h-2.5 text-purple-400" />
+                                            <span>{totP.desconto > 0 ? 'Editar Desc.' : '+ Desconto'}</span>
+                                          </button>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -2907,14 +3277,14 @@ export default function Mesas() {
                                           setModalPagamentoComanda({
                                             mesa: mesaParaLancar,
                                             nomePessoa: p,
-                                            valor: subtotalPessoa,
+                                            valor: totP.total,
                                             itens: itensPessoa,
                                           });
                                         }}
                                         className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
                                       >
                                         <CreditCard className="w-3.5 h-3.5" />
-                                        <span>Pagar Comanda de {p}</span>
+                                        <span>Pagar Comanda (R$ {totP.total.toFixed(2)})</span>
                                       </button>
                                     )}
                                     <div className="flex gap-1.5">
@@ -2942,12 +3312,12 @@ export default function Mesas() {
                             })}
                           </div>
 
-                          {/* Tabela Unificada de Pedidos com Seletor de Troca de Dono */}
+                          {/* Tabela Unificada de Pedidos com Seletor de Troca de Dono e Cancelamento Gerente */}
                           <div className="space-y-2 pt-2">
                             <div className="flex items-center justify-between text-xs text-slate-400">
                               <span className="font-bold text-slate-300">Todos os pedidos detalhados no salão:</span>
                               <span className="text-[11px] text-slate-500">
-                                Você pode transferir itens entre pessoas se lançado por engano.
+                                Você pode transferir itens entre pessoas ou solicitar cancelamento ao Gerente.
                               </span>
                             </div>
 
@@ -2962,6 +3332,7 @@ export default function Mesas() {
                                     <th className="py-2.5 px-3">Unitário</th>
                                     <th className="py-2.5 px-3">Subtotal</th>
                                     <th className="py-2.5 px-3">KDS Cozinha</th>
+                                    <th className="py-2.5 px-3 text-right">Gerente</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/60">
@@ -3026,6 +3397,17 @@ export default function Mesas() {
                                               : 'Fila da Cozinha'}
                                           </span>
                                         </td>
+                                        <td className="py-2.5 px-3 text-right">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSolicitarCancelarItem(mesaParaLancar, item)}
+                                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer inline-flex items-center gap-1 text-[11px]"
+                                            title="Cancelar item da comanda (Requer Gerente)"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <span className="hidden sm:inline">Cancelar</span>
+                                          </button>
+                                        </td>
                                       </tr>
                                     );
                                   })}
@@ -3038,10 +3420,9 @@ export default function Mesas() {
                         /* VISTA 2: COMANDA FOCADA NA PESSOA SELECIONADA */
                         (() => {
                           const p = pessoaAtivaComanda;
-                          const itensPessoa = mesaParaLancar.comandaItens!.filter(
-                            (it) => getDonoDoItem(it, mesaParaLancar) === p
-                          );
-                          const subtotalPessoa = itensPessoa.reduce((sum, it) => sum + it.subtotal, 0);
+                          const totP = getTotaisComanda(mesaParaLancar, p);
+                          const itensPessoa = totP.itens;
+                          const subtotalPessoa = totP.subtotal;
                           const pessoasDisponiveis = getPessoasDaMesa(mesaParaLancar);
 
                           return (
@@ -3065,29 +3446,29 @@ export default function Mesas() {
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 self-end sm:self-auto">
+                                <div className="flex items-center gap-3 self-end sm:self-auto flex-wrap sm:flex-nowrap justify-end">
                                   <div className="text-right">
-                                    <span className="text-[10px] text-slate-400 block font-semibold">Subtotal a Pagar:</span>
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Total a Pagar (+10%):</span>
                                     <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
-                                      R$ {subtotalPessoa.toFixed(2)}
+                                      R$ {totP.total.toFixed(2)}
                                     </span>
                                   </div>
 
-                                  {subtotalPessoa > 0 && (
+                                  {totP.total > 0 && (
                                     <button
                                       type="button"
                                       onClick={() => {
                                         setModalPagamentoComanda({
                                           mesa: mesaParaLancar,
                                           nomePessoa: p,
-                                          valor: subtotalPessoa,
+                                          valor: totP.total,
                                           itens: itensPessoa,
                                         });
                                       }}
                                       className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
                                     >
                                       <CreditCard className="w-4 h-4" />
-                                      <span>Pagar Comanda (R$ {subtotalPessoa.toFixed(2)})</span>
+                                      <span>Pagar Comanda (R$ {totP.total.toFixed(2)})</span>
                                     </button>
                                   )}
 
@@ -3102,6 +3483,56 @@ export default function Mesas() {
                                     <Plus className="w-3.5 h-3.5" />
                                     <span>Lançar Itens</span>
                                   </button>
+                                </div>
+                              </div>
+
+                              {/* Barra de Detalhamento de Taxa de Serviço e Desconto do Gerente para esta Comanda */}
+                              <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-slate-400">Consumo: <strong className="text-white">R$ {subtotalPessoa.toFixed(2)}</strong></span>
+                                  <span className="text-slate-500">•</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-slate-400">10% Serviço:</span>
+                                    <strong className={totP.taxaAtiva ? 'text-emerald-400' : 'text-amber-400'}>
+                                      {totP.taxaAtiva ? `+ R$ ${totP.taxaServico.toFixed(2)} (Incluso)` : 'Isento'}
+                                    </strong>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSolicitarToggle10(mesaParaLancar, p)}
+                                      className="text-[10px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center gap-0.5 cursor-pointer ml-1"
+                                      title="Apenas o Gerente pode retirar/restaurar 10%"
+                                    >
+                                      <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
+                                      <span>{totP.taxaAtiva ? 'Retirar 10%' : 'Restaurar 10%'}</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {totP.desconto > 0 ? (
+                                    <>
+                                      <span className="text-rose-400 font-bold">
+                                        Desconto: - R$ {totP.desconto.toFixed(2)}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAbrirDescontoGerente(mesaParaLancar, p)}
+                                        className="text-[10px] px-2 py-0.5 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-purple-300 font-bold flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <Tag className="w-2.5 h-2.5 text-purple-400" />
+                                        <span>Alterar Desconto</span>
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAbrirDescontoGerente(mesaParaLancar, p)}
+                                      className="text-[10px] px-2 py-0.5 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-purple-300 font-bold flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Tag className="w-2.5 h-2.5 text-purple-400" />
+                                      <span>+ Desconto (Gerente)</span>
+                                    </button>
+                                  )}
                                 </div>
                               </div>
 
@@ -3136,6 +3567,7 @@ export default function Mesas() {
                                         {pessoasDisponiveis.length > 1 && (
                                           <th className="py-2.5 px-3 text-right">Mover Item</th>
                                         )}
+                                        <th className="py-2.5 px-3 text-right">Gerente</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-800/60">
@@ -3192,6 +3624,17 @@ export default function Mesas() {
                                               </select>
                                             </td>
                                           )}
+                                          <td className="py-2.5 px-3 text-right">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleSolicitarCancelarItem(mesaParaLancar, item)}
+                                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer inline-flex items-center gap-1 text-[11px]"
+                                              title="Cancelar este item da comanda (Requer Gerente)"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                              <span className="hidden sm:inline">Cancelar</span>
+                                            </button>
+                                          </td>
                                         </tr>
                                       ))}
                                     </tbody>
@@ -3204,44 +3647,78 @@ export default function Mesas() {
                       )}
 
                       {/* Totais e Fechamento */}
-                      <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-end sm:items-center justify-between gap-4">
-                        <div className="space-y-1 text-xs text-slate-400">
-                          <p>
-                            Total de pratos/bebidas servidos:{' '}
-                            <strong className="text-white">
-                              {mesaParaLancar.comandaItens.reduce((acc, it) => acc + it.quantidade, 0)} unidades
-                            </strong>
-                          </p>
-                          <p>
-                            10% Serviço Sugerido (opcional):{' '}
-                            <strong className="text-slate-300">
-                              R$ {((mesaParaLancar.totalConsumo || 0) * 0.1).toFixed(2)}
-                            </strong>
-                          </p>
-                        </div>
+                      {(() => {
+                        const totMesa = getTotaisComanda(mesaParaLancar, 'todos');
+                        return (
+                          <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-end sm:items-center justify-between gap-4">
+                            <div className="space-y-1 text-xs text-slate-400">
+                              <p>
+                                Total de pratos/bebidas servidos:{' '}
+                                <strong className="text-white">
+                                  {totMesa.itens.reduce((acc, it) => acc + it.quantidade, 0)} unidades
+                                </strong>
+                              </p>
+                              <p>
+                                Subtotal Consumo: <strong className="text-slate-300">R$ {totMesa.subtotal.toFixed(2)}</strong>
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  10% Serviço (Garçom):{' '}
+                                  <strong className={totMesa.taxaAtiva ? 'text-emerald-400' : 'text-amber-400'}>
+                                    {totMesa.taxaAtiva ? `+ R$ ${totMesa.taxaServico.toFixed(2)} (Incluso por Padrão)` : 'Isento pelo Gerente'}
+                                  </strong>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSolicitarToggle10(mesaParaLancar, 'todos')}
+                                  className="text-[10px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 flex items-center gap-1 cursor-pointer"
+                                  title="Apenas o Gerente pode retirar/restaurar 10%"
+                                >
+                                  <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
+                                  <span>{totMesa.taxaAtiva ? 'Retirar 10%' : 'Restaurar 10%'}</span>
+                                </button>
+                              </div>
+                              {totMesa.desconto > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-rose-400 font-bold">
+                                    Desconto Gerente: - R$ {totMesa.desconto.toFixed(2)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAbrirDescontoGerente(mesaParaLancar, 'todos')}
+                                    className="text-[10px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-purple-300 flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Tag className="w-2.5 h-2.5 text-purple-400" />
+                                    <span>Alterar Desconto</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
 
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <span className="text-[10px] text-slate-400 block font-semibold">Total a Pagar:</span>
-                            <span className="text-2xl font-black font-mono text-emerald-400">
-                              R$ {(mesaParaLancar.totalConsumo || 0).toFixed(2)}
-                            </span>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <span className="text-[10px] text-slate-400 block font-semibold">Total Geral a Pagar:</span>
+                                <span className="text-2xl font-black font-mono text-emerald-400">
+                                  R$ {totMesa.total.toFixed(2)}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const mesaAlvo = mesaParaLancar;
+                                  setMesaParaLancar(null);
+                                  setMesaParaFechar(mesaAlvo);
+                                  setPessoasDivisao(mesaAlvo.quantidadePessoas || 2);
+                                }}
+                                className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Split className="w-4 h-4" />
+                                <span>Fechar Conta / Checkout</span>
+                              </button>
+                            </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const mesaAlvo = mesaParaLancar;
-                              setMesaParaLancar(null);
-                              setMesaParaFechar(mesaAlvo);
-                              setPessoasDivisao(mesaAlvo.quantidadePessoas || 2);
-                            }}
-                            className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <Split className="w-4 h-4" />
-                            <span>Fechar Conta / Checkout</span>
-                          </button>
-                        </div>
-                      </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -3467,114 +3944,440 @@ export default function Mesas() {
       {/* ============================================================== */}
       {/* MODAL: PAGAMENTO DE COMANDA INDIVIDUAL OU TOTAL DA MESA       */}
       {/* ============================================================== */}
-      {modalPagamentoComanda && (
+      {modalPagamentoComanda && (() => {
+        const totPagamento = getTotaisComanda(modalPagamentoComanda.mesa, modalPagamentoComanda.nomePessoa);
+
+        return (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 select-none">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white">
+                      {modalPagamentoComanda.nomePessoa === 'todos'
+                        ? `Quitar Toda a Mesa #${modalPagamentoComanda.mesa.numero}`
+                        : `Pagar Comanda — ${modalPagamentoComanda.nomePessoa}`}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Mesa #{modalPagamentoComanda.mesa.numero} • {modalPagamentoComanda.mesa.setor}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setModalPagamentoComanda(null)}
+                  className="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-slate-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Valor do Pagamento e Discriminação Financeira */}
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5">
+                <div className="text-center">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                    Total a Receber (+10% Incluso)
+                  </span>
+                  <div className="text-3xl font-black text-emerald-400 font-mono">
+                    R$ {totPagamento.total.toFixed(2)}
+                  </div>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    {totPagamento.itens.length} {totPagamento.itens.length === 1 ? 'item a liquidar' : 'itens a liquidar'}
+                  </span>
+                </div>
+
+                {/* Detalhamento: Subtotal, 10% Serviço, Desconto */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-xs">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Subtotal de consumo:</span>
+                    <span className="font-mono text-slate-200 font-bold">R$ {totPagamento.subtotal.toFixed(2)}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-400">10% Serviço (Garçom):</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                        totPagamento.taxaAtiva
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      }`}>
+                        {totPagamento.taxaAtiva ? 'Incluso por Padrão' : 'Isento pelo Gerente'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-emerald-400 font-bold">
+                        {totPagamento.taxaAtiva ? `+ R$ ${totPagamento.taxaServico.toFixed(2)}` : 'R$ 0,00'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleSolicitarToggle10(modalPagamentoComanda.mesa, modalPagamentoComanda.nomePessoa)}
+                        className="text-[10px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center gap-1 cursor-pointer"
+                        title="Retirar ou restaurar 10% (Requer Gerente)"
+                      >
+                        <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
+                        <span>{totPagamento.taxaAtiva ? 'Retirar' : 'Restaurar'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {totPagamento.desconto > 0 ? (
+                    <div className="flex items-center justify-between text-rose-400">
+                      <div className="flex items-center gap-1.5">
+                        <span>Desconto Gerente:</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold">- R$ {totPagamento.desconto.toFixed(2)}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleAbrirDescontoGerente(modalPagamentoComanda.mesa, modalPagamentoComanda.nomePessoa)}
+                          className="text-[10px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-purple-300 font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Tag className="w-2.5 h-2.5 text-purple-400" />
+                          <span>Editar</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleAbrirDescontoGerente(modalPagamentoComanda.mesa, modalPagamentoComanda.nomePessoa)}
+                        className="text-[10px] px-2 py-0.5 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-purple-300 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Tag className="w-2.5 h-2.5 text-purple-400" />
+                        <span>+ Aplicar Desconto (Gerente)</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Lista resumida de itens sendo pagos */}
+              <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800/80 max-h-36 overflow-y-auto space-y-1">
+                {totPagamento.itens.map((it, idx) => (
+                  <div key={it.id || idx} className="flex justify-between items-center text-[11px]">
+                    <span className="text-slate-300 truncate pr-2">
+                      <span className="text-orange-400 font-bold mr-1">{it.quantidade}x</span>
+                      {it.nome}
+                    </span>
+                    <span className="font-mono font-bold text-emerald-400 shrink-0">
+                      R$ {it.subtotal.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Seleção da Forma de Pagamento */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-300 block">
+                  Forma de Pagamento do Cliente:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'pix', label: 'PIX', icon: '⚡' },
+                    { id: 'cartao_credito', label: 'Cartão Crédito', icon: '💳' },
+                    { id: 'cartao_debito', label: 'Cartão Débito', icon: '💳' },
+                    { id: 'dinheiro', label: 'Dinheiro', icon: '💵' },
+                  ].map((fp) => (
+                    <button
+                      key={fp.id}
+                      type="button"
+                      onClick={() => setFormaPagamentoComanda(fp.id as FormaPagamento)}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                        formaPagamentoComanda === fp.id
+                          ? 'bg-emerald-500/20 border-emerald-500 text-white ring-2 ring-emerald-500/30'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span>{fp.icon}</span>
+                      <span>{fp.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ações */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalPagamentoComanda(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold text-xs cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleConfirmarPagamentoComanda(
+                      modalPagamentoComanda.mesa,
+                      modalPagamentoComanda.nomePessoa,
+                      formaPagamentoComanda
+                    )
+                  }
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                >
+                  <Check className="w-4 h-4 text-slate-950" />
+                  <span>Confirmar Recebimento (R$ {totPagamento.total.toFixed(2)})</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ============================================================== */}
+      {/* MODAL 1: AUTORIZAÇÃO POR PIN DE GERENTE / ADMIN                */}
+      {/* ============================================================== */}
+      <AdminAuthModal
+        isOpen={modalAuth.isOpen}
+        onClose={() => setModalAuth({ ...modalAuth, isOpen: false })}
+        onSuccess={modalAuth.onSuccess}
+        actionTitle={modalAuth.actionTitle}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 2: APLICAR DESCONTO DO GERENTE                           */}
+      {/* ============================================================== */}
+      {modalDescontoGerente && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 select-none">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex justify-between items-center pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <CreditCard className="w-5 h-5" />
+                <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  <Tag className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-white">
-                    {modalPagamentoComanda.nomePessoa === 'todos'
-                      ? `Quitar Toda a Mesa #${modalPagamentoComanda.mesa.numero}`
-                      : `Pagar Comanda — ${modalPagamentoComanda.nomePessoa}`}
-                  </h3>
+                  <h3 className="text-base font-extrabold text-white">Desconto Autorizado — Gerente</h3>
                   <p className="text-[11px] text-slate-400">
-                    Mesa #{modalPagamentoComanda.mesa.numero} • {modalPagamentoComanda.mesa.setor}
+                    {modalDescontoGerente.nomePessoa === 'todos'
+                      ? `Toda a Mesa #${modalDescontoGerente.mesa.numero}`
+                      : `Comanda de ${modalDescontoGerente.nomePessoa}`}
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setModalPagamentoComanda(null)}
+                onClick={() => setModalDescontoGerente(null)}
                 className="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Valor do Pagamento */}
-            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-1">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                Valor da Comanda
-              </span>
-              <div className="text-3xl font-black text-emerald-400 font-mono">
-                R$ {modalPagamentoComanda.valor.toFixed(2)}
+            <form onSubmit={handleConfirmarDescontoGerente} className="space-y-4 text-xs">
+              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex justify-between items-center">
+                <span className="text-slate-400 font-bold">Subtotal + 10% da Comanda:</span>
+                <span className="font-mono font-black text-white text-sm">
+                  R$ {modalDescontoGerente.subtotalComanda.toFixed(2)}
+                </span>
               </div>
-              <span className="text-[11px] text-slate-500 block">
-                {modalPagamentoComanda.itens.length} {modalPagamentoComanda.itens.length === 1 ? 'item a liquidar' : 'itens a liquidar'}
-              </span>
-            </div>
 
-            {/* Lista resumida de itens sendo pagos */}
-            <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800/80 max-h-36 overflow-y-auto space-y-1">
-              {modalPagamentoComanda.itens.map((it, idx) => (
-                <div key={it.id || idx} className="flex justify-between items-center text-[11px]">
-                  <span className="text-slate-300 truncate pr-2">
-                    <span className="text-orange-400 font-bold mr-1">{it.quantidade}x</span>
-                    {it.nome}
-                  </span>
-                  <span className="font-mono font-bold text-emerald-400 shrink-0">
-                    R$ {it.subtotal.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Seleção da Forma de Pagamento */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 block">
-                Forma de Pagamento do Cliente:
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'pix', label: 'PIX', icon: '⚡' },
-                  { id: 'cartao_credito', label: 'Cartão Crédito', icon: '💳' },
-                  { id: 'cartao_debito', label: 'Cartão Débito', icon: '💳' },
-                  { id: 'dinheiro', label: 'Dinheiro', icon: '💵' },
-                ].map((fp) => (
+              {/* Tipo de Desconto: R$ ou % */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-300 block">Formato do Desconto:</label>
+                <div className="grid grid-cols-2 gap-2">
                   <button
-                    key={fp.id}
                     type="button"
-                    onClick={() => setFormaPagamentoComanda(fp.id as FormaPagamento)}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                      formaPagamentoComanda === fp.id
-                        ? 'bg-emerald-500/20 border-emerald-500 text-white ring-2 ring-emerald-500/30'
+                    onClick={() => setFormDesconto({ ...formDesconto, tipo: 'reais' })}
+                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer border transition-all ${
+                      formDesconto.tipo === 'reais'
+                        ? 'bg-purple-600 border-purple-500 text-white shadow-md'
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                     }`}
                   >
-                    <span>{fp.icon}</span>
-                    <span>{fp.label}</span>
+                    <span>R$ Valor Fixo</span>
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setFormDesconto({ ...formDesconto, tipo: 'porcentagem' })}
+                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer border transition-all ${
+                      formDesconto.tipo === 'porcentagem'
+                        ? 'bg-purple-600 border-purple-500 text-white shadow-md'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Percent className="w-3.5 h-3.5" />
+                    <span>Porcentagem (%)</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Valor do Desconto */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-300 block">
+                  {formDesconto.tipo === 'reais' ? 'Valor do Desconto em Reais (R$):' : 'Porcentagem do Desconto (%):'}
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={formDesconto.tipo === 'reais' ? modalDescontoGerente.subtotalComanda : 100}
+                  value={formDesconto.valor || ''}
+                  onChange={(e) => setFormDesconto({ ...formDesconto, valor: parseFloat(e.target.value) || 0 })}
+                  placeholder={formDesconto.tipo === 'reais' ? 'Ex: 15.00' : 'Ex: 10'}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-bold focus:outline-none focus:border-purple-500"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {/* Motivo do Desconto */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-300 block">Motivo do Desconto:</label>
+                <select
+                  value={formDesconto.motivo}
+                  onChange={(e) => setFormDesconto({ ...formDesconto, motivo: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-semibold focus:outline-none focus:border-purple-500 cursor-pointer"
+                >
+                  <option value="Cortesia do Gerente">Cortesia do Gerente</option>
+                  <option value="Fidelidade / Amigo da Casa">Fidelidade / Amigo da Casa</option>
+                  <option value="Compensação por Atraso">Compensação por Atraso / Atendimento</option>
+                  <option value="Promoção / Parceria">Promoção / Parceria Comercial</option>
+                  <option value="Outro motivo aprovado">Outro motivo aprovado</option>
+                </select>
+              </div>
+
+              {/* Resumo do Valor Final */}
+              <div className="p-3 bg-purple-950/30 border border-purple-500/30 rounded-2xl flex justify-between items-center">
+                <span className="text-purple-300 font-bold">Total Após Desconto:</span>
+                <span className="font-mono font-black text-emerald-400 text-base">
+                  R${' '}
+                  {Math.max(
+                    0,
+                    modalDescontoGerente.subtotalComanda -
+                      (formDesconto.tipo === 'reais'
+                        ? Number(formDesconto.valor) || 0
+                        : ((modalDescontoGerente.subtotalComanda * (Number(formDesconto.valor) || 0)) / 100))
+                  ).toFixed(2)}
+                </span>
+              </div>
+
+              {/* Botões */}
+              <div className="flex gap-2 pt-2">
+                {modalDescontoGerente.valorAtual > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      aplicarDescontoComandaMesa(modalDescontoGerente.mesa.numero, modalDescontoGerente.nomePessoa, 0, idLoja);
+                      dispararToast('Desconto removido com sucesso!');
+                      setModalDescontoGerente(null);
+                      sincronizarMesasAbertas(modalDescontoGerente.mesa.numero);
+                    }}
+                    className="py-2.5 px-3 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold cursor-pointer"
+                  >
+                    Remover Desconto
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setModalDescontoGerente(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer active:scale-95 transition-all"
+                >
+                  Confirmar Desconto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 3: CANCELAMENTO DE ITEM DA COMANDA (GERENTE)             */}
+      {/* ============================================================== */}
+      {modalCancelarItem && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 select-none">
+          <div className="bg-slate-900 border border-rose-500/40 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Cancelar Item da Comanda</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Mesa #{modalCancelarItem.mesa.numero} • Ação Exclusiva do Gerente
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalCancelarItem(null)}
+                className="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Ações */}
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setModalPagamentoComanda(null)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold text-xs cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleConfirmarPagamentoComanda(
-                    modalPagamentoComanda.mesa,
-                    modalPagamentoComanda.nomePessoa,
-                    formaPagamentoComanda
-                  )
-                }
-                className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
-              >
-                <Check className="w-4 h-4 text-slate-950" />
-                <span>Confirmar Recebimento</span>
-              </button>
-            </div>
+            <form onSubmit={handleConfirmarCancelarItem} className="space-y-4 text-xs">
+              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="font-extrabold text-white text-sm block">
+                      {modalCancelarItem.item.nome}
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Pertence a: <strong>{getDonoDoItem(modalCancelarItem.item, modalCancelarItem.mesa)}</strong> • Lançado às {modalCancelarItem.item.horario}
+                    </span>
+                  </div>
+                  <span className="font-mono font-black text-rose-400 text-sm">
+                    R$ {modalCancelarItem.item.subtotal.toFixed(2)}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-900">
+                  <span>Quantidade a estornar:</span>
+                  <span className="font-bold text-orange-400">{modalCancelarItem.item.quantidade}x</span>
+                </div>
+              </div>
+
+              {/* Motivo do Cancelamento */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-300 block">
+                  Selecione o Motivo Obrigatório do Cancelamento:
+                </label>
+                <select
+                  value={motivoCancelamentoItem}
+                  onChange={(e) => setMotivoCancelamentoItem(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-semibold focus:outline-none focus:border-rose-500 cursor-pointer"
+                  required
+                >
+                  <option value="Cliente desistiu">Cliente desistiu</option>
+                  <option value="Erro de digitação / Lançamento indevido">Erro de digitação / Lançamento indevido</option>
+                  <option value="Demora excessiva na cozinha">Demora excessiva na cozinha</option>
+                  <option value="Prato servido com avaria / reclamação">Prato servido com avaria / reclamação</option>
+                  <option value="Falta de ingrediente no estoque">Falta de ingrediente no estoque</option>
+                  <option value="Outro motivo aprovado pela gerência">Outro motivo aprovado pela gerência</option>
+                </select>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <span>
+                  O item será <strong>removido da comanda</strong>, o saldo da mesa e os 10% recalculados, e o cancelamento ficará registrado no histórico da gerência com o motivo selecionado.
+                </span>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalCancelarItem(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold shadow-lg shadow-rose-600/30 cursor-pointer active:scale-95 transition-all"
+                >
+                  Confirmar Cancelamento
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
