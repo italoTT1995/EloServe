@@ -49,7 +49,7 @@ import {
 } from '../utils/qrCodeHelper';
 
 export default function Mesas() {
-  const { getMesasPorTenant, atualizarStatusMesa, adicionarMesa, removerMesa, lancarItensComandaMesa, trocarMesa } = useAppStore();
+  const { getMesasPorTenant, atualizarStatusMesa, adicionarMesa, removerMesa, editarMesa, lancarItensComandaMesa, trocarMesa } = useAppStore();
   const { funcionarios } = useFuncionarioStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
   const { fichasTecnicas } = useEstoqueStore();
@@ -163,6 +163,29 @@ export default function Mesas() {
     } else {
       dispararToast(`⚠️ ${res.mensagem}`);
     }
+  }
+
+  // Estados para Edição Rápida do Nome do Responsável da Comanda
+  const [mesaParaEditarNome, setMesaParaEditarNome] = useState<Mesa | null>(null);
+  const [novoNomeResponsavel, setNovoNomeResponsavel] = useState<string>('');
+
+  function abrirModalEditarResponsavel(mesa: Mesa) {
+    setMesaParaEditarNome(mesa);
+    setNovoNomeResponsavel(mesa.responsavelNome || `Mesa #${mesa.numero}`);
+  }
+
+  function handleSalvarNomeResponsavel(e: React.FormEvent) {
+    e.preventDefault();
+    if (!mesaParaEditarNome) return;
+    const nomeAtualizado = novoNomeResponsavel.trim() || `Mesa #${mesaParaEditarNome.numero}`;
+    editarMesa(mesaParaEditarNome.numero, { responsavelNome: nomeAtualizado }, idLoja);
+
+    if (mesaParaLancar && mesaParaLancar.numero === mesaParaEditarNome.numero) {
+      setMesaParaLancar({ ...mesaParaLancar, responsavelNome: nomeAtualizado });
+    }
+
+    dispararToast(`Responsável da Mesa #${mesaParaEditarNome.numero} atualizado para "${nomeAtualizado}"!`);
+    setMesaParaEditarNome(null);
   }
 
   // Estados de Lançamento de Pedidos e Comanda da Mesa
@@ -282,14 +305,21 @@ export default function Mesas() {
     e.preventDefault();
     if (!mesaParaAbrir) return;
 
-    atualizarStatusMesa(mesaParaAbrir.numero, 'ocupada', idLoja);
-    mesaParaAbrir.quantidadePessoas = Number(formAbertura.quantidadePessoas);
-    mesaParaAbrir.responsavelNome = formAbertura.responsavelNome || 'Cliente Salão';
-    mesaParaAbrir.garcomResponsavel = formAbertura.garcomResponsavel;
-    mesaParaAbrir.tempoOcupadaMin = 1;
-    mesaParaAbrir.totalConsumo = 0;
+    const nomeFinal = formAbertura.responsavelNome.trim() || `Mesa #${mesaParaAbrir.numero}`;
+    const qtdPessoas = Number(formAbertura.quantidadePessoas) || 2;
+    const garcom = formAbertura.garcomResponsavel || garconsDisponiveis[0]?.nome || 'Lucas Oliveira';
 
-    dispararToast(`Mesa #${mesaParaAbrir.numero} aberta com sucesso para ${formAbertura.responsavelNome || 'Cliente'} (${formAbertura.quantidadePessoas} pessoas)!`);
+    editarMesa(mesaParaAbrir.numero, {
+      status: 'ocupada',
+      quantidadePessoas: qtdPessoas,
+      responsavelNome: nomeFinal,
+      garcomResponsavel: garcom,
+      tempoOcupadaMin: 1,
+      totalConsumo: 0,
+      comandaItens: [],
+    }, idLoja);
+
+    dispararToast(`Mesa #${mesaParaAbrir.numero} aberta com sucesso! Responsável: ${nomeFinal} (${qtdPessoas} pessoas)`);
     setMesaParaAbrir(null);
   }
 
@@ -670,6 +700,18 @@ export default function Mesas() {
                             type="button"
                             onClick={() => {
                               setMenuAcoesMesaId(null);
+                              abrirModalEditarResponsavel(mesa);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 cursor-pointer"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                            <span>Editar Nome / Responsável</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuAcoesMesaId(null);
                               setMesaParaLancar(mesa);
                               setAbaModalComanda('itens_consumidos');
                             }}
@@ -760,9 +802,24 @@ export default function Mesas() {
                     <div className="space-y-2">
                       {/* Responsável e Garçom */}
                       <div className="p-2.5 bg-slate-950/80 rounded-xl border border-slate-800/80 space-y-1 text-xs">
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center">
                           <span className="text-slate-400">Responsável:</span>
-                          <strong className="text-white">{mesa.responsavelNome || 'Pedro Santos'}</strong>
+                          <div className="flex items-center gap-1.5">
+                            <strong className="text-white truncate max-w-[130px]">
+                              {mesa.responsavelNome || `Mesa #${mesa.numero}`}
+                            </strong>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                abrirModalEditarResponsavel(mesa);
+                              }}
+                              title="Alterar identificação / responsável desta comanda"
+                              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-orange-400 transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400">Garçom da Mesa:</span>
@@ -969,17 +1026,38 @@ export default function Mesas() {
               </div>
 
               <div>
-                <label className="text-slate-300 font-semibold block mb-1">
-                  Nome do Responsável pela Comanda *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-semibold block">
+                    Nome do Responsável / Identificação (Opcional)
+                  </label>
+                  <span className="text-[10px] text-slate-500">Pode deixar em branco</span>
+                </div>
                 <input
                   type="text"
-                  required
                   value={formAbertura.responsavelNome}
                   onChange={(e) => setFormAbertura({ ...formAbertura, responsavelNome: e.target.value })}
-                  placeholder="Ex: Pedro Santos"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
+                  placeholder={`Ex: Mesa #${mesaParaAbrir.numero} ou Nome do Cliente`}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold placeholder-slate-600 focus:outline-none focus:border-orange-500"
                 />
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span className="text-[10px] text-slate-500 mr-0.5">Preenchimento rápido:</span>
+                  {[
+                    `Mesa #${mesaParaAbrir.numero}`,
+                    'Cliente Balcão',
+                    'Casal',
+                    'Família',
+                    'Anônimo',
+                  ].map((sugestao) => (
+                    <button
+                      key={sugestao}
+                      type="button"
+                      onClick={() => setFormAbertura({ ...formAbertura, responsavelNome: sugestao })}
+                      className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 hover:border-orange-500 transition-colors cursor-pointer"
+                    >
+                      {sugestao}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -1858,8 +1936,17 @@ export default function Mesas() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                    <span>
-                      Cliente: <strong className="text-white">{mesaParaLancar.responsavelNome || 'Cliente Salão'}</strong>
+                    <span className="flex items-center gap-1.5">
+                      <span>Cliente:</span>
+                      <strong className="text-white">{mesaParaLancar.responsavelNome || `Mesa #${mesaParaLancar.numero}`}</strong>
+                      <button
+                        type="button"
+                        onClick={() => abrirModalEditarResponsavel(mesaParaLancar)}
+                        title="Alterar nome do cliente / responsável desta comanda"
+                        className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-orange-400 transition-colors cursor-pointer"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
                     </span>
                     <span>
                       Garçom: <strong className="text-purple-300">{mesaParaLancar.garcomResponsavel || 'Lucas Oliveira'}</strong>
@@ -2303,6 +2390,80 @@ export default function Mesas() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: EDITAR NOME DO RESPONSÁVEL / CLIENTE DA MESA           */}
+      {/* ============================================================== */}
+      {mesaParaEditarNome && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                <Pencil className="w-4 h-4 text-orange-400" />
+                <span>Identificação da Mesa #{mesaParaEditarNome.numero}</span>
+              </h3>
+              <button
+                onClick={() => setMesaParaEditarNome(null)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarNomeResponsavel} className="space-y-3.5 text-xs">
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">
+                  Nome do Cliente / Responsável pela Comanda:
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={novoNomeResponsavel}
+                  onChange={(e) => setNovoNomeResponsavel(e.target.value)}
+                  placeholder={`Ex: Mesa #${mesaParaEditarNome.numero} ou Nome do Cliente`}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold text-sm focus:outline-none focus:border-orange-500"
+                />
+                {/* Sugestões rápidas */}
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span className="text-[10px] text-slate-500 mr-0.5">Sugestões:</span>
+                  {[
+                    `Mesa #${mesaParaEditarNome.numero}`,
+                    'Cliente Balcão',
+                    'Casal',
+                    'Família',
+                    'Anônimo',
+                  ].map((sugestao) => (
+                    <button
+                      key={sugestao}
+                      type="button"
+                      onClick={() => setNovoNomeResponsavel(sugestao)}
+                      className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 hover:border-orange-500 transition-colors cursor-pointer"
+                    >
+                      {sugestao}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setMesaParaEditarNome(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-lg shadow-orange-500/20 cursor-pointer active:scale-95 transition-all"
+                >
+                  Salvar Nome
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
