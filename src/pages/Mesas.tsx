@@ -118,11 +118,12 @@ export default function Mesas() {
     atualizarDadosTenant(targetId, {
       couvertArtisticoAtivo: formCouvert.ativo,
       valorCouvertPorPessoa: formCouvert.valorPorPessoa,
+      valorCouvertPorComanda: formCouvert.valorPorPessoa,
       diasAoVivo: formCouvert.diasAoVivo,
     });
     dispararToast(
       formCouvert.ativo
-        ? `🎵 Couvert Artístico configurado (R$ ${formCouvert.valorPorPessoa.toFixed(2)}/pessoa)!`
+        ? `🎵 Couvert Artístico configurado (R$ ${formCouvert.valorPorPessoa.toFixed(2)}/comanda aberta)!`
         : 'Couvert Artístico desativado no salão.'
     );
     setModalCouvertAberto(false);
@@ -313,24 +314,33 @@ export default function Mesas() {
     const taxaServico = taxaAtiva ? Number((subtotal * 0.10).toFixed(2)) : 0;
 
     // Regra: Couvert Artístico
-    // Configurado no estabelecimento e/ou na mesa
-    const valorCouvertBase = mesa.valorCouvertPorPessoa ?? tenantAtual?.valorCouvertPorPessoa ?? 12.0;
+    // ATENÇÃO: Cobrança realizada POR COMANDA ABERTA e NÃO por pessoa física na mesa!
+    const valorCouvertBase = mesa.valorCouvertPorComanda ?? mesa.valorCouvertPorPessoa ?? tenantAtual?.valorCouvertPorComanda ?? tenantAtual?.valorCouvertPorPessoa ?? 12.0;
     const couvertAtivo = mesa.couvertArtisticoAtivo !== undefined
       ? mesa.couvertArtisticoAtivo
       : (tenantAtual?.couvertArtisticoAtivo ?? false);
 
     let couvertTotal = 0;
-    let qtdPessoasComCouvert = 0;
+    let qtdComandasComCouvert = 0;
 
     if (couvertAtivo) {
       if (isTodos) {
-        const totalPessoasMesa = (mesa.pessoas && mesa.pessoas.length > 0) ? mesa.pessoas.length : (mesa.quantidadePessoas || 1);
-        const isentos = mesa.isencaoCouvertPorPessoa || [];
-        qtdPessoasComCouvert = Math.max(0, totalPessoasMesa - isentos.length);
-        couvertTotal = Number((qtdPessoasComCouvert * valorCouvertBase).toFixed(2));
+        // Se a mesa foi dividida em comandas individuais por pessoa (mesa.pessoas > 1):
+        if (mesa.pessoas && mesa.pessoas.length > 1) {
+          const isentos = mesa.isencaoCouvertPorPessoa || [];
+          const comandasCobrar = mesa.pessoas.filter((p) => !isentos.includes(p));
+          qtdComandasComCouvert = comandasCobrar.length;
+          couvertTotal = Number((qtdComandasComCouvert * valorCouvertBase).toFixed(2));
+        } else {
+          // Comanda única da mesa: cobra exatamente 1x couvert pela comanda aberta (NÃO multiplica por quantidade de pessoas na mesa!)
+          const isentoMesa = (mesa.isencaoCouvertPorPessoa || []).includes('todos');
+          qtdComandasComCouvert = isentoMesa ? 0 : 1;
+          couvertTotal = isentoMesa ? 0 : valorCouvertBase;
+        }
       } else {
+        // Sub-comanda individual aberta para uma pessoa específica
         const isento = (mesa.isencaoCouvertPorPessoa || []).includes(nomePessoa);
-        qtdPessoasComCouvert = isento ? 0 : 1;
+        qtdComandasComCouvert = isento ? 0 : 1;
         couvertTotal = isento ? 0 : valorCouvertBase;
       }
     }
@@ -349,7 +359,8 @@ export default function Mesas() {
       couvertTotal,
       couvertAtivo,
       valorCouvertBase,
-      qtdPessoasComCouvert,
+      qtdPessoasComCouvert: qtdComandasComCouvert,
+      qtdComandasComCouvert,
       desconto,
       total,
       itens,
@@ -1198,7 +1209,7 @@ export default function Mesas() {
             className="px-3.5 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-lg shadow-purple-600/25 transition-all active:scale-95"
           >
             <Music className="w-4 h-4 text-purple-200 animate-pulse" />
-            <span>Couvert: {tenantAtual?.couvertArtisticoAtivo ? `R$ ${(tenantAtual?.valorCouvertPorPessoa ?? 12).toFixed(2)}/pes.` : 'Inativo'}</span>
+            <span>Couvert: {tenantAtual?.couvertArtisticoAtivo ? `R$ ${(tenantAtual?.valorCouvertPorComanda ?? tenantAtual?.valorCouvertPorPessoa ?? 12).toFixed(2)}/comanda` : 'Inativo'}</span>
             <span className="px-1.5 py-0.2 rounded-full bg-white text-purple-700 font-black text-[10px]">
               {tenantAtual?.couvertArtisticoAtivo ? 'Ativo' : 'Ativar'}
             </span>
@@ -1726,7 +1737,7 @@ export default function Mesas() {
                               </span>
                               {totMesaCard.couvertTotal > 0 ? (
                                 <span className="font-medium font-mono text-purple-300">
-                                  {totMesaCard.qtdPessoasComCouvert}x R$ {totMesaCard.valorCouvertBase.toFixed(2)} (+R$ {totMesaCard.couvertTotal.toFixed(2)})
+                                  {totMesaCard.qtdPessoasComCouvert} comanda(s) x R$ {totMesaCard.valorCouvertBase.toFixed(2)} (+R$ {totMesaCard.couvertTotal.toFixed(2)})
                                 </span>
                               ) : (
                                 <span className="text-slate-500 italic text-[9px]">
@@ -2033,7 +2044,7 @@ export default function Mesas() {
                             : 'bg-slate-800 text-slate-400'
                         }`}>
                           {totaisMesa.couvertAtivo && totaisMesa.couvertTotal > 0
-                            ? `${totaisMesa.qtdPessoasComCouvert}x R$ ${totaisMesa.valorCouvertBase.toFixed(2)}`
+                            ? `${totaisMesa.qtdPessoasComCouvert} comanda(s) x R$ ${totaisMesa.valorCouvertBase.toFixed(2)}`
                             : 'Isento / Inativo'}
                         </span>
                       </div>
@@ -2202,7 +2213,7 @@ export default function Mesas() {
                                         type="button"
                                         onClick={() => handleSolicitarToggleCouvert(mesaParaFechar, p)}
                                         className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-purple-300 flex items-center gap-0.5 cursor-pointer"
-                                        title="Isentar ou cobrar couvert artístico desta pessoa"
+                                        title="Isentar ou cobrar couvert artístico desta comanda"
                                       >
                                         <Music className="w-2.5 h-2.5 text-purple-400" />
                                         <span>{totPessoa.couvertTotal > 0 ? 'Isentar Couvert' : 'Cobrar Couvert'}</span>
@@ -3650,7 +3661,7 @@ export default function Mesas() {
                                             type="button"
                                             onClick={() => handleSolicitarToggleCouvert(mesaParaLancar, p)}
                                             className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-purple-300 flex items-center gap-0.5 cursor-pointer"
-                                            title="Isentar ou cobrar couvert artístico desta pessoa"
+                                            title="Isentar ou cobrar couvert artístico desta comanda"
                                           >
                                             <Music className="w-2.5 h-2.5 text-purple-400" />
                                             <span>{totP.couvertTotal > 0 ? 'Isentar Couvert' : 'Cobrar Couvert'}</span>
@@ -4448,7 +4459,7 @@ export default function Mesas() {
                           : 'bg-slate-800 text-slate-400'
                       }`}>
                         {totPagamento.couvertAtivo && totPagamento.couvertTotal > 0
-                          ? `${totPagamento.qtdPessoasComCouvert}x R$ ${totPagamento.valorCouvertBase.toFixed(2)}`
+                          ? `${totPagamento.qtdPessoasComCouvert} comanda(s) x R$ ${totPagamento.valorCouvertBase.toFixed(2)}`
                           : 'Isento / Inativo'}
                       </span>
                     </div>
@@ -4866,8 +4877,8 @@ export default function Mesas() {
                 </span>
                 <p className="text-[11px] text-slate-400">
                   {formCouvert.ativo
-                    ? 'Ativo: adiciona o couvert automaticamente nas contas de mesas ocupadas.'
-                    : 'Inativo: nenhuma mesa será cobrada por couvert artístico.'}
+                    ? 'Ativo: adiciona o couvert automaticamente por comanda aberta nas mesas ocupadas.'
+                    : 'Inativo: nenhuma comanda será cobrada por couvert artístico.'}
                 </p>
               </div>
 
@@ -4889,7 +4900,7 @@ export default function Mesas() {
             {/* Configuração do Valor do Couvert */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-300 block">
-                Valor Cobrado por Pessoa (R$)
+                Valor Cobrado por Comanda Aberta (R$)
               </label>
 
               <div className="flex items-center gap-2">
@@ -4973,12 +4984,12 @@ export default function Mesas() {
             {/* Indicador ao Vivo do Salão */}
             {(() => {
               const mesasOcupadas = mesas.filter((m) => m.status !== 'livre' && m.status !== 'reservada');
-              const totalPessoasOcupadas = mesasOcupadas.reduce(
-                (acc, m) => acc + ((m.pessoas && m.pessoas.length > 0) ? m.pessoas.length : (m.quantidadePessoas || 1)),
+              const totalComandasAbertas = mesasOcupadas.reduce(
+                (acc, m) => acc + ((m.pessoas && m.pessoas.length > 1) ? m.pessoas.length : 1),
                 0
               );
               const totalArrecadadoEstimado = formCouvert.ativo
-                ? totalPessoasOcupadas * formCouvert.valorPorPessoa
+                ? totalComandasAbertas * formCouvert.valorPorPessoa
                 : 0;
 
               return (
@@ -4988,8 +4999,8 @@ export default function Mesas() {
                     <span className="font-bold text-white">{mesasOcupadas.length} mesa(s)</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
-                    <span>Clientes no salão:</span>
-                    <span className="font-bold text-white">{totalPessoasOcupadas} pessoa(s)</span>
+                    <span>Comandas abertas no salão:</span>
+                    <span className="font-bold text-white">{totalComandasAbertas} comanda(s)</span>
                   </div>
                   <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-800">
                     <span className="font-bold text-purple-300">Estimativa Couvert Salão:</span>

@@ -209,6 +209,7 @@ export const TENANT_GLOBAL: TenantRestaurante = {
   criadoEm: '2026-01-01',
   couvertArtisticoAtivo: true,
   valorCouvertPorPessoa: 12.00,
+  valorCouvertPorComanda: 12.00,
   diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
 };
 
@@ -234,6 +235,7 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
     drePermissaoModificadoEm: '15/10/2026 14:00',
     couvertArtisticoAtivo: true,
     valorCouvertPorPessoa: 12.00,
+    valorCouvertPorComanda: 12.00,
     diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
   },
   {
@@ -255,6 +257,7 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
     dreHabilitado: false,
     couvertArtisticoAtivo: false,
     valorCouvertPorPessoa: 10.00,
+    valorCouvertPorComanda: 10.00,
     diasAoVivo: ['sexta', 'sabado'],
   },
   {
@@ -277,6 +280,7 @@ const TENANTS_INICIAIS: TenantRestaurante[] = [
     dreHabilitado: false,
     couvertArtisticoAtivo: true,
     valorCouvertPorPessoa: 12.00,
+    valorCouvertPorComanda: 12.00,
     diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
   },
   {

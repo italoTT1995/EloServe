@@ -142,6 +142,7 @@ export interface Mesa {
   historicoCancelamentos?: CancelamentoItemMesa[];
   couvertArtisticoAtivo?: boolean;
   valorCouvertPorPessoa?: number;
+  valorCouvertPorComanda?: number;
   quantidadeCouvert?: number;
   isencaoCouvertPorPessoa?: string[];
   reservaId?: string;
@@ -244,6 +245,7 @@ export interface TenantRestaurante {
   drePermissaoModificadoEm?: string;
   couvertArtisticoAtivo?: boolean;
   valorCouvertPorPessoa?: number;
+  valorCouvertPorComanda?: number;
   diasAoVivo?: string[];
 }
 

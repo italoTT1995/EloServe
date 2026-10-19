@@ -70,11 +70,12 @@ export default function PainelDono() {
     atualizarDadosTenant(currentTenantId, {
       couvertArtisticoAtivo: couvertAtivo,
       valorCouvertPorPessoa: Number(valorCouvert) || 0,
+      valorCouvertPorComanda: Number(valorCouvert) || 0,
       diasAoVivo: diasAoVivo,
     });
     dispararToast(
       couvertAtivo
-        ? `🎶 Couvert Artístico atualizado: R$ ${(Number(valorCouvert) || 0).toFixed(2)} por pessoa nos dias selecionados!`
+        ? `🎶 Couvert Artístico atualizado: R$ ${(Number(valorCouvert) || 0).toFixed(2)} por comanda aberta nos dias selecionados!`
         : `Couvert Artístico desativado no estabelecimento.`
     );
   }
@@ -575,7 +576,7 @@ export default function PainelDono() {
                 </span>
               </h3>
               <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-                Configure o valor cobrado por pessoa e os dias de apresentação ao vivo para aplicação automática nas comandas.
+                Configure o valor cobrado por comanda aberta e os dias de apresentação ao vivo para aplicação automática nas comandas.
               </p>
             </div>
           </div>
@@ -602,10 +603,10 @@ export default function PainelDono() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-          {/* Valor por pessoa */}
+          {/* Valor por comanda */}
           <div className="md:col-span-4 space-y-1.5">
             <label className={`text-xs font-bold block ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
-              Valor do Couvert por Pessoa (R$):
+              Valor do Couvert por Comanda Aberta (R$):
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-500 text-xs">
