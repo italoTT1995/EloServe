@@ -1195,19 +1195,11 @@ export default function Mesas() {
               setModalCouvertAberto(true);
             }}
             title="Gerenciar e configurar Couvert Artístico do Salão (Música ao Vivo)"
-            className={`px-3.5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 cursor-pointer shadow-lg transition-all active:scale-95 ${
-              tenantAtual?.couvertArtisticoAtivo
-                ? 'bg-purple-950/80 border border-purple-500/50 hover:bg-purple-900/60 text-purple-300 shadow-purple-950/40'
-                : 'bg-slate-900 border border-slate-700 hover:border-purple-500/50 text-slate-300'
-            }`}
+            className="px-3.5 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-lg shadow-purple-600/25 transition-all active:scale-95"
           >
-            <Music className={`w-4 h-4 ${tenantAtual?.couvertArtisticoAtivo ? 'text-purple-400 animate-pulse' : 'text-slate-400'}`} />
+            <Music className="w-4 h-4 text-purple-200 animate-pulse" />
             <span>Couvert: {tenantAtual?.couvertArtisticoAtivo ? `R$ ${(tenantAtual?.valorCouvertPorPessoa ?? 12).toFixed(2)}/pes.` : 'Inativo'}</span>
-            <span className={`px-1.5 py-0.2 rounded-full font-black text-[10px] ${
-              tenantAtual?.couvertArtisticoAtivo
-                ? 'bg-purple-500 text-slate-950'
-                : 'bg-slate-800 text-slate-400'
-            }`}>
+            <span className="px-1.5 py-0.2 rounded-full bg-white text-purple-700 font-black text-[10px]">
               {tenantAtual?.couvertArtisticoAtivo ? 'Ativo' : 'Ativar'}
             </span>
           </button>
