@@ -14,6 +14,7 @@ export interface Usuario {
   tenantId: string;
   avatar?: string;
   pin: string;
+  senha?: string;
   ativo: boolean;
 }
 

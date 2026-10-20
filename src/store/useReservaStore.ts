@@ -78,7 +78,7 @@ interface ReservaState {
 export const useReservaStore = create<ReservaState>()(
   persist(
     (set, get) => ({
-      reservasPorTenant: RESERVAS_INICIAIS,
+      reservasPorTenant: {},
 
       getReservas: (tenantId) => {
         const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
@@ -266,7 +266,7 @@ export const useReservaStore = create<ReservaState>()(
       },
     }),
     {
-      name: 'eloserve_reservas_store_v1',
+      name: 'eloserve_reservas_store_v2',
     }
   )
 );

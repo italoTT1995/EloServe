@@ -150,7 +150,7 @@ interface DeliveryState {
 export const useDeliveryStore = create<DeliveryState>()(
   persist(
     (set, get) => ({
-      pedidos: PEDIDOS_DELIVERY_INICIAIS,
+      pedidos: [],
       clientes: CLIENTES_INICIAIS,
       faixasTaxa: FAIXAS_TAXA_PADRAO,
       raioMaximoKm: 8.0,
@@ -280,7 +280,7 @@ export const useDeliveryStore = create<DeliveryState>()(
       },
     }),
     {
-      name: 'eloserve_delivery_store_v1',
+      name: 'eloserve_delivery_store_v2',
     }
   )
 );

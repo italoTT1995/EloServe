@@ -3,48 +3,63 @@ import { Usuario, CargoUsuario } from '../types';
 
 export const USUARIOS_PADRAO: Usuario[] = [
   {
-    id: 'usr-01',
-    nome: 'Italo Lemos',
-    email: 'italo@eloserve.com.br',
+    id: 'usr-master',
+    nome: 'Ítalo Silva (Admin Master & Fundador)',
+    email: 'master@eloserve.com.br',
     cargo: 'super_admin',
     tenantId: 'global',
-    pin: '1234',
+    pin: '8899',
+    senha: 'EloMaster@2026',
     ativo: true,
   },
   {
     id: 'usr-02',
-    nome: 'Carlos Eduardo (Gerente)',
+    nome: 'Carlos Eduardo (Gerente da Loja)',
     email: 'gerente@eloserve.com.br',
     cargo: 'admin_restaurante',
     tenantId: 'tenant-01',
     pin: '1234',
+    senha: 'gerente@2026',
     ativo: true,
   },
   {
     id: 'usr-03',
-    nome: 'Juliana Mendes (Caixa)',
+    nome: 'Juliana Mendes (Operadora de Caixa)',
     email: 'caixa@eloserve.com.br',
     cargo: 'caixa',
     tenantId: 'tenant-01',
     pin: '2233',
+    senha: 'caixa@2026',
     ativo: true,
   },
   {
     id: 'usr-04',
-    nome: 'Lucas Oliveira (Garçom)',
+    nome: 'Lucas Oliveira (Garçom / Atendimento)',
     email: 'garcom@eloserve.com.br',
     cargo: 'garcom',
     tenantId: 'tenant-01',
     pin: '3344',
+    senha: 'garcom@2026',
     ativo: true,
   },
   {
     id: 'usr-05',
-    nome: 'Chef Rodrigo (Cozinha)',
+    nome: 'Chef Rodrigo (Cozinha & Bar / KDS)',
     email: 'cozinha@eloserve.com.br',
     cargo: 'cozinha',
     tenantId: 'tenant-01',
     pin: '5566',
+    senha: 'cozinha@2026',
+    ativo: true,
+  },
+  {
+    id: 'usr-06',
+    nome: 'Thiago Silva (Entregador / Delivery)',
+    email: 'entregador@eloserve.com.br',
+    cargo: 'entregador',
+    tenantId: 'tenant-01',
+    pin: '7788',
+    senha: 'entregador@2026',
     ativo: true,
   },
 ];
@@ -60,7 +75,7 @@ interface AuthState {
   getDescricaoCargo: (cargo?: CargoUsuario) => { titulo: string; nivel: string; cor: string; icone: string };
 }
 
-const STORAGE_KEY = 'eloserve_auth_user';
+const STORAGE_KEY = 'eloserve_auth_user_v2';
 
 function obterUsuarioSalvo(): Usuario | null {
   try {
@@ -71,8 +86,8 @@ function obterUsuarioSalvo(): Usuario | null {
   } catch {
     // Falha silenciosa
   }
-  // Padrão inicial: Super Admin (Italo Lemos)
-  return USUARIOS_PADRAO[0];
+  // No lançamento oficial, exige login ativo
+  return null;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -82,9 +97,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: (email, senhaOuPin) => {
     const { usuarios } = get();
-    const usuario = usuarios.find(
-      (u) => u.email.toLowerCase() === email.trim().toLowerCase()
-    );
+    const emailLimpo = (email || '').trim().toLowerCase();
+    const senhaLimpa = (senhaOuPin || '').trim();
+
+    // Permite login do Admin Master com master@eloserve.com.br ou italo@eloserve.com.br
+    const usuario = usuarios.find((u) => {
+      const uEmail = u.email.toLowerCase();
+      if (u.cargo === 'super_admin' && (emailLimpo === 'italo@eloserve.com.br' || emailLimpo === 'master@eloserve.com.br')) {
+        return true;
+      }
+      return uEmail === emailLimpo;
+    });
 
     if (!usuario) {
       return { sucesso: false, mensagem: 'E-mail não cadastrado.' };
@@ -94,8 +117,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return { sucesso: false, mensagem: 'Usuário desativado pelo administrador.' };
     }
 
-    // Aceita o PIN do usuário ou a senha padrão '123456'
-    if (senhaOuPin !== usuario.pin && senhaOuPin !== '123456' && senhaOuPin !== '1234') {
+    // Aceita a senha cadastrada, o PIN de 4 dígitos ou fallback padrão 123456
+    const senhaCorreta =
+      (usuario.senha && senhaLimpa === usuario.senha) ||
+      senhaLimpa === usuario.pin ||
+      senhaLimpa === '1234' ||
+      senhaLimpa === '123456';
+
+    if (!senhaCorreta) {
       return { sucesso: false, mensagem: 'Senha ou PIN incorreto.' };
     }
 
@@ -168,6 +197,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           nivel: 'Nível 5 (Preparação e Despacho de Pedidos)',
           cor: 'text-rose-400 bg-rose-950/60 border-rose-500/30',
           icone: '🍳',
+        };
+      case 'entregador':
+        return {
+          titulo: 'Entregador / Delivery',
+          nivel: 'Nível 5 (Expedição e Rastreio de Entregas)',
+          cor: 'text-cyan-400 bg-cyan-950/60 border-cyan-500/30',
+          icone: '🛵',
         };
       default:
         return {

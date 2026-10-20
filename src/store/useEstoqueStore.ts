@@ -544,11 +544,11 @@ export const useEstoqueStore = create<EstoqueState>()(
   persist(
     (set, get) => ({
       itens: ITENS_ESTOQUE_INICIAIS,
-      compras: HISTORICO_COMPRAS_INICIAIS,
+      compras: [],
       fichasTecnicas: FICHAS_TECNICAS_INICIAIS,
       fornecedores: FORNECEDORES_INICIAIS,
-      movimentacoes: HISTORICO_MOVIMENTACOES_INICIAIS,
-      pedidosProcessados: ['VD-1082'],
+      movimentacoes: [],
+      pedidosProcessados: [],
 
       // ==============================================================
       // BAIXA AUTOMÁTICA EM VENDAS COM FICHA TÉCNICA (SEÇÃO 2 E 4)
@@ -1052,7 +1052,7 @@ export const useEstoqueStore = create<EstoqueState>()(
       },
     }),
     {
-      name: 'eloserve_estoque_store_v2',
+      name: 'eloserve_estoque_store_v3',
     }
   )
 );
