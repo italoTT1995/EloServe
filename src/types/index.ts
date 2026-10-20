@@ -148,7 +148,7 @@ export interface Mesa {
   reservaId?: string;
 }
 
-export type StatusProducaoKDS = 'novo' | 'em_preparo' | 'pronto';
+export type StatusProducaoKDS = 'novo' | 'em_preparo' | 'pronto' | 'entregue';
 export type EstacaoKDS = 'todas' | 'cozinha' | 'bar';
 
 export interface ItemPedidoKDS {

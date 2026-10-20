@@ -46,6 +46,10 @@ interface AppState {
   ) => { sucesso: boolean; pedidoKDSId: string; totalAdicionado: number };
   adicionarPedidoKDS: (pedido: PedidoKDS) => void;
   avancarStatusKDS: (pedidoId: string) => void;
+  iniciarProducaoKDS: (pedidoId: string) => void;
+  marcarFeitoKDS: (pedidoId: string) => void;
+  marcarEntregueKDS: (pedidoId: string, garcomNome?: string) => void;
+  marcarItemEntregueMesa: (numeroMesa: number, itemId: string, tenantId?: string) => void;
   toggleItemConcluidoKDS: (pedidoId: string, itemIdx: number) => void;
   ticarTodosItensKDS: (pedidoId: string) => void;
   arquivarPedidoKDS: (pedidoId: string) => void;
@@ -1224,21 +1228,69 @@ export const useAppStore = create<AppState>()(
         })),
 
       avancarStatusKDS: (pedidoId) => {
-        let pedidoAtualizado: PedidoKDS | undefined;
+        const state = get();
+        const pedido = state.pedidosKDS.find((p) => p.id === pedidoId);
+        if (!pedido) return;
+        if (pedido.status === 'novo') {
+          state.iniciarProducaoKDS(pedidoId);
+        } else if (pedido.status === 'em_preparo') {
+          state.marcarFeitoKDS(pedidoId);
+        } else {
+          state.marcarEntregueKDS(pedidoId);
+        }
+      },
+
+      iniciarProducaoKDS: (pedidoId) => {
+        let pedidoAtual: PedidoKDS | undefined;
         set((state) => ({
           pedidosKDS: state.pedidosKDS.map((p) => {
             if (p.id !== pedidoId) return p;
-            const prox = p.status === 'novo' ? 'em_preparo' : p.status === 'em_preparo' ? 'pronto' : 'pronto';
-            pedidoAtualizado = { ...p, status: prox };
-            return pedidoAtualizado;
+            pedidoAtual = { ...p, status: 'em_preparo' };
+            return pedidoAtual;
           }),
         }));
 
-        if (pedidoAtualizado && pedidoAtualizado.status === 'pronto' && pedidoAtualizado.tipo === 'delivery') {
+        // Sincroniza status na mesa se for pedido de mesa
+        if (pedidoAtual && pedidoAtual.tipo === 'mesa' && pedidoAtual.mesaNumero) {
+          const mesaNum = pedidoAtual.mesaNumero;
+          const map = get().mesasPorTenant || MESAS_POR_TENANT;
+          const novoMap = { ...map };
+          Object.keys(novoMap).forEach((tId) => {
+            novoMap[tId] = (novoMap[tId] || []).map((m) => {
+              if (m.numero !== mesaNum) return m;
+              return {
+                ...m,
+                comandaItens: (m.comandaItens || []).map((it) => {
+                  const noPedido = pedidoAtual?.itens.some((pIt) => pIt.nome.includes(it.nome) || it.nome.includes(pIt.nome));
+                  return noPedido && it.statusKDS === 'novo' ? { ...it, statusKDS: 'em_preparo' } : it;
+                }),
+              };
+            });
+          });
+          set({ mesasPorTenant: novoMap });
+        }
+      },
+
+      marcarFeitoKDS: (pedidoId) => {
+        let pedidoAtual: PedidoKDS | undefined;
+        set((state) => ({
+          pedidosKDS: state.pedidosKDS.map((p) => {
+            if (p.id !== pedidoId) return p;
+            pedidoAtual = {
+              ...p,
+              status: 'pronto',
+              itens: p.itens.map((it) => ({ ...it, concluido: true })),
+            };
+            return pedidoAtual;
+          }),
+        }));
+
+        // Se for delivery, avança status
+        if (pedidoAtual && pedidoAtual.status === 'pronto' && pedidoAtual.tipo === 'delivery') {
           try {
             import('./useDeliveryStore').then(({ useDeliveryStore }) => {
               const { pedidos, avancarStatusDelivery } = useDeliveryStore.getState();
-              const deliv = pedidos.find((d) => d.numero === pedidoAtualizado?.numero);
+              const deliv = pedidos.find((d) => d.numero === pedidoAtual?.numero);
               if (deliv && deliv.status === 'preparando') {
                 avancarStatusDelivery(deliv.id);
               }
@@ -1247,6 +1299,85 @@ export const useAppStore = create<AppState>()(
             console.warn(e);
           }
         }
+
+        // Sincroniza status na mesa se for pedido de mesa
+        if (pedidoAtual && pedidoAtual.tipo === 'mesa' && pedidoAtual.mesaNumero) {
+          const mesaNum = pedidoAtual.mesaNumero;
+          const map = get().mesasPorTenant || MESAS_POR_TENANT;
+          const novoMap = { ...map };
+          Object.keys(novoMap).forEach((tId) => {
+            novoMap[tId] = (novoMap[tId] || []).map((m) => {
+              if (m.numero !== mesaNum) return m;
+              return {
+                ...m,
+                comandaItens: (m.comandaItens || []).map((it) => {
+                  const noPedido = pedidoAtual?.itens.some((pIt) => pIt.nome.includes(it.nome) || it.nome.includes(pIt.nome));
+                  return noPedido ? { ...it, statusKDS: 'pronto' } : it;
+                }),
+              };
+            });
+          });
+          set({ mesasPorTenant: novoMap });
+        }
+      },
+
+      marcarEntregueKDS: (pedidoId, garcomNome) => {
+        const state = get();
+        const pedido = state.pedidosKDS.find((p) => p.id === pedidoId);
+        if (!pedido) return;
+
+        const agoraTexto = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const pedidoEntregue: PedidoKDS = {
+          ...pedido,
+          status: 'entregue',
+        };
+
+        set({
+          pedidosKDS: state.pedidosKDS.filter((p) => p.id !== pedidoId),
+          historicoKDS: [pedidoEntregue, ...(state.historicoKDS || [])].slice(0, 20),
+        });
+
+        // Sincroniza status na mesa
+        if (pedido.tipo === 'mesa' && pedido.mesaNumero) {
+          const mesaNum = pedido.mesaNumero;
+          const map = state.mesasPorTenant || MESAS_POR_TENANT;
+          const novoMap = { ...map };
+          Object.keys(novoMap).forEach((tId) => {
+            novoMap[tId] = (novoMap[tId] || []).map((m) => {
+              if (m.numero !== mesaNum) return m;
+              return {
+                ...m,
+                comandaItens: (m.comandaItens || []).map((it) => {
+                  const noPedido = pedido.itens.some((pIt) => pIt.nome.includes(it.nome) || it.nome.includes(pIt.nome));
+                  return noPedido ? { ...it, statusKDS: 'entregue' } : it;
+                }),
+              };
+            });
+          });
+          set({ mesasPorTenant: novoMap });
+        }
+      },
+
+      marcarItemEntregueMesa: (numeroMesa, itemId, tenantId) => {
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const state = get();
+        const map = state.mesasPorTenant || MESAS_POR_TENANT;
+        const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
+
+        const novaLista = listaAtual.map((m) => {
+          if (m.numero !== numeroMesa) return m;
+          return {
+            ...m,
+            comandaItens: (m.comandaItens || []).map((it) =>
+              it.id === itemId ? { ...it, statusKDS: 'entregue' as const } : it
+            ),
+          };
+        });
+
+        set({
+          mesasPorTenant: { ...map, [idAlvo]: novaLista },
+          mesas: novaLista,
+        });
       },
 
       toggleItemConcluidoKDS: (pedidoId, itemIdx) => {

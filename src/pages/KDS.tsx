@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ChefHat,
+  Wine,
   Clock,
   CheckCircle2,
   Circle,
@@ -13,23 +14,26 @@ import {
   Crown,
   ArrowUpRight,
   Utensils,
-  Wine,
   RotateCcw,
   CheckCheck,
+  BellRing,
+  Sparkles,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useSaaSStore, PLANOS_DISPONIVEIS } from '../store/useSaaSStore';
 import { audio } from '../lib/audio';
-import { PedidoKDS, EstacaoKDS, ItemPedidoKDS } from '../types';
+import { PedidoKDS, ItemPedidoKDS } from '../types';
+import { DoubleClickButton } from '../components/common/DoubleClickButton';
 
 export default function KDS() {
   const {
     pedidosKDS,
     historicoKDS,
-    avancarStatusKDS,
+    iniciarProducaoKDS,
+    marcarFeitoKDS,
+    marcarEntregueKDS,
     toggleItemConcluidoKDS,
     ticarTodosItensKDS,
-    arquivarPedidoKDS,
     recuperarUltimoPedidoKDS,
   } = useAppStore();
 
@@ -38,38 +42,39 @@ export default function KDS() {
   const planoAtual = PLANOS_DISPONIVEIS.find((p) => p.id === tenantAtual?.planoId) || PLANOS_DISPONIVEIS[0];
   const kdsDisponivel = planoAtual.limites.kdsIncluso !== false;
 
-  // Filtro por Estação de Preparo (Cozinha vs Bar)
-  const [estacaoFiltro, setEstacaoFiltro] = useState<EstacaoKDS>('todas');
+  // Duas Abas Principais: Cozinha e Bar (com opção de Todas)
+  const [abaAtiva, setAbaAtiva] = useState<'cozinha' | 'bar' | 'todas'>('cozinha');
 
-  // Helper para verificar se um item pertence à estação ativa
-  function itemPertenceEstacao(item: ItemPedidoKDS, estacao: EstacaoKDS): boolean {
-    if (estacao === 'todas') return true;
+  // Helper para verificar se um item pertence à aba selecionada
+  function itemPertenceAba(item: ItemPedidoKDS, aba: 'cozinha' | 'bar' | 'todas'): boolean {
+    if (aba === 'todas') return true;
     const ehBar = item.setorPreparo === 'bar';
-    if (estacao === 'bar') return ehBar;
-    return !ehBar; // 'cozinha'
+    return aba === 'bar' ? ehBar : !ehBar;
   }
 
-  // Helper para verificar se o pedido possui itens da estação selecionada
-  function pedidoPertenceEstacao(pedido: PedidoKDS, estacao: EstacaoKDS): boolean {
-    if (estacao === 'todas') return true;
-    return pedido.itens.some((it) => itemPertenceEstacao(it, estacao));
+  // Helper para verificar se o pedido possui itens da aba selecionada
+  function pedidoPertenceAba(pedido: PedidoKDS, aba: 'cozinha' | 'bar' | 'todas'): boolean {
+    if (aba === 'todas') return true;
+    return pedido.itens.some((it) => itemPertenceAba(it, aba));
   }
 
-  // Filtragem dos pedidos por estação
-  const pedidosFiltrados = pedidosKDS.filter((p) => pedidoPertenceEstacao(p, estacaoFiltro));
+  // Filtragem dos pedidos ativos
+  const pedidosFiltrados = pedidosKDS.filter((p) => pedidoPertenceAba(p, abaAtiva));
 
   const novos = pedidosFiltrados.filter((p) => p.status === 'novo');
   const emPreparo = pedidosFiltrados.filter((p) => p.status === 'em_preparo');
   const prontos = pedidosFiltrados.filter((p) => p.status === 'pronto');
 
-  // Contadores para as abas de estação
-  const qtdTodas = pedidosKDS.filter((p) => p.status !== 'pronto').length;
-  const qtdCozinha = pedidosKDS
+  // Contadores para as abas
+  const pendentesCozinha = pedidosKDS
     .filter((p) => p.status !== 'pronto')
     .filter((p) => p.itens.some((it) => it.setorPreparo !== 'bar')).length;
-  const qtdBar = pedidosKDS
+
+  const pendentesBar = pedidosKDS
     .filter((p) => p.status !== 'pronto')
     .filter((p) => p.itens.some((it) => it.setorPreparo === 'bar')).length;
+
+  const prontosParaEntrega = pedidosKDS.filter((p) => p.status === 'pronto').length;
 
   if (!kdsDisponivel) {
     return (
@@ -81,29 +86,24 @@ export default function KDS() {
           <span className="text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 inline-block mb-3">
             Plano Starter Detectado
           </span>
-          <h2 className="text-xl font-black text-white mb-2">Painel KDS da Cozinha</h2>
+          <h2 className="text-xl font-black text-white mb-2">Painel de Produção KDS</h2>
           <p className="text-xs text-slate-400 leading-relaxed mb-6">
             O restaurante <strong className="text-slate-200">{tenantAtual?.nomeFantasia}</strong> está no plano{' '}
-            <strong className="text-amber-400">Starter</strong> (ideal para operação essencial com cardápio QR Code e
-            PDV). O Painel de Cozinha KDS sem papel em tempo real está disponível a partir do{' '}
-            <strong className="text-emerald-400">Plano Pro</strong>.
+            <strong className="text-amber-400">Starter</strong>. O Painel KDS com abas de Cozinha e Bar e confirmação
+            em 2 cliques está disponível a partir do <strong className="text-emerald-400">Plano Pro</strong>.
           </p>
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-left mb-6 space-y-2.5">
             <div className="text-xs text-slate-300 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Ordem de preparo automática sem comandas de papel</span>
+              <span>Duas abas dedicadas: 🍳 Cozinha e 🍹 Bar</span>
             </div>
             <div className="text-xs text-slate-300 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Alertas sonoros para novos pedidos do salão e delivery</span>
+              <span>Avanço seguro em 2 cliques (Produção ➔ Feito ➔ Entregue)</span>
             </div>
             <div className="text-xs text-slate-300 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Filtro por Estações (Cozinha Quente vs Bar/Copa)</span>
-            </div>
-            <div className="text-xs text-slate-300 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Checklist de preparo prato por prato com barra de progresso</span>
+              <span>Aviso automático de prato pronto para entrega pelo Garçom</span>
             </div>
           </div>
           <button
@@ -122,71 +122,118 @@ export default function KDS() {
   }
 
   return (
-    <div className="h-full flex flex-col space-y-4 select-none">
-      {/* Top Banner com Filtro de Estações */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-            <Flame className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-              <span>Painel de Produção (KDS)</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 font-semibold border border-emerald-500/20">
-                Tempo Real
-              </span>
-            </h2>
-            <p className="text-xs text-slate-400">
-              Gerencie a fila de preparo, tique itens individualmente e filtre por estação.
-            </p>
-          </div>
-        </div>
-
-        {/* Barra de Filtros de Estação (Cozinha vs Bar) & Ações */}
-        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-          {/* Pills de Estação */}
-          <div className="flex items-center p-1 bg-slate-950 border border-slate-800 rounded-2xl">
-            <button
-              type="button"
-              onClick={() => setEstacaoFiltro('todas')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                estacaoFiltro === 'todas'
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+    <div className="h-full flex flex-col space-y-3.5 select-none">
+      {/* Top Banner com as Duas Abas: Cozinha & Bar */}
+      <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        {/* Identificação e Duas Abas Centrais */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full lg:w-auto">
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 transition-all ${
+                abaAtiva === 'bar'
+                  ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                  : 'bg-orange-500/10 border-orange-500/30 text-orange-400'
               }`}
             >
-              <Utensils className="w-3.5 h-3.5 text-slate-400" />
-              <span>Todas ({qtdTodas})</span>
-            </button>
+              {abaAtiva === 'bar' ? <Wine className="w-6 h-6" /> : <ChefHat className="w-6 h-6" />}
+            </div>
+            <div>
+              <h2 className="text-base font-black text-white flex items-center gap-2">
+                <span>Painel KDS ({abaAtiva === 'bar' ? 'Bar & Copa' : abaAtiva === 'cozinha' ? 'Cozinha Quente' : 'Visão Geral'})</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 font-semibold border border-emerald-500/20">
+                  Tempo Real
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Dê <strong>2 cliques</strong> para avançar: Produção ➔ Feito ➔ Garçom Entregou.
+              </p>
+            </div>
+          </div>
 
+          {/* DUAS ABAS EM DESTAQUE (COZINHA E BAR) */}
+          <div className="flex items-center p-1 bg-slate-950 border border-slate-800 rounded-2xl shrink-0">
+            {/* Aba 1: Cozinha */}
             <button
               type="button"
-              onClick={() => setEstacaoFiltro('cozinha')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                estacaoFiltro === 'cozinha'
-                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
+              onClick={() => {
+                setAbaAtiva('cozinha');
+                audio.tocarBipItem();
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                abaAtiva === 'cozinha'
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
                   : 'text-slate-400 hover:text-orange-300'
               }`}
             >
-              <ChefHat className="w-3.5 h-3.5 text-amber-400" />
-              <span>🍳 Cozinha ({qtdCozinha})</span>
+              <ChefHat className="w-4 h-4" />
+              <span>🍳 COZINHA</span>
+              {pendentesCozinha > 0 && (
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    abaAtiva === 'cozinha'
+                      ? 'bg-white text-orange-600'
+                      : 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
+                  }`}
+                >
+                  {pendentesCozinha}
+                </span>
+              )}
             </button>
 
+            {/* Aba 2: Bar */}
             <button
               type="button"
-              onClick={() => setEstacaoFiltro('bar')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                estacaoFiltro === 'bar'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/25'
+              onClick={() => {
+                setAbaAtiva('bar');
+                audio.tocarBipItem();
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                abaAtiva === 'bar'
+                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
                   : 'text-slate-400 hover:text-purple-300'
               }`}
             >
-              <Wine className="w-3.5 h-3.5 text-purple-400" />
-              <span>🍹 Bar / Copa ({qtdBar})</span>
+              <Wine className="w-4 h-4" />
+              <span>🍹 BAR / COPA</span>
+              {pendentesBar > 0 && (
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    abaAtiva === 'bar'
+                      ? 'bg-white text-purple-700'
+                      : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                  }`}
+                >
+                  {pendentesBar}
+                </span>
+              )}
+            </button>
+
+            {/* Opção Secundária: Todas as Estações */}
+            <button
+              type="button"
+              onClick={() => setAbaAtiva('todas')}
+              title="Visualizar todas as estações integradas"
+              className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                abaAtiva === 'todas'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <span>Todas</span>
             </button>
           </div>
+        </div>
 
-          {/* Botão Desfazer / Recall de Pedido Arquivado */}
+        {/* Lado Direito: Prontos / Recall / Som */}
+        <div className="flex items-center gap-2.5 w-full lg:w-auto justify-end">
+          {prontosParaEntrega > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold animate-pulse">
+              <BellRing className="w-3.5 h-3.5" />
+              <span>{prontosParaEntrega} feito(s) p/ entrega!</span>
+            </div>
+          )}
+
+          {/* Desfazer / Recall */}
           {historicoKDS && historicoKDS.length > 0 && (
             <button
               type="button"
@@ -196,11 +243,11 @@ export default function KDS() {
                   audio.tocarBipItem();
                 }
               }}
-              title="Recuperar o último pedido entregue para a tela de KDS"
+              title="Desfazer e recuperar o último pedido marcado como entregue"
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-amber-400 border border-slate-700 transition-all cursor-pointer active:scale-95"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Desfazer #{historicoKDS[0].numero}</span>
+              <span>Desfazer #{historicoKDS[0].numero}</span>
             </button>
           )}
 
@@ -208,13 +255,29 @@ export default function KDS() {
           <button
             type="button"
             onClick={() => audio.tocarAlertaNotificacao()}
-            title="Testar alarme sonoro de novos pedidos"
+            title="Testar alarme sonoro de novo pedido"
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors cursor-pointer"
           >
             <Volume2 className="w-4 h-4 text-emerald-400" />
             <span className="hidden sm:inline">Som</span>
           </button>
         </div>
+      </div>
+
+      {/* Faixa Explicativa da Regra dos 2 Cliques */}
+      <div className="px-4 py-2 rounded-2xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span>
+            <strong>Fluxo Seguro de 2 Cliques:</strong> Cozinheiro/Barman dá 2 cliques para{' '}
+            <strong className="text-blue-400">Em Produção</strong>, 2 cliques para{' '}
+            <strong className="text-emerald-400">Marcar Feito</strong>, e o Garçom dá 2 cliques para{' '}
+            <strong className="text-purple-300">Avisar que já foi Entregue</strong>.
+          </span>
+        </div>
+        <span className="hidden md:inline font-mono text-[11px] text-slate-500">
+          Aba ativa: <strong className="text-slate-200 uppercase">{abaAtiva}</strong>
+        </span>
       </div>
 
       {/* Colunas do Kanban KDS */}
@@ -224,27 +287,27 @@ export default function KDS() {
           <div className="p-3.5 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">A Fazer ({novos.length})</h3>
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                1. A Fazer ({novos.length})
+              </h3>
             </div>
-            {estacaoFiltro !== 'todas' && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 uppercase">
-                {estacaoFiltro}
-              </span>
-            )}
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-400">
+              Aguardando
+            </span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {novos.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-600 text-xs p-6 text-center">
-                <Utensils className="w-8 h-8 opacity-30 mb-2" />
-                <span>Nenhum pedido aguardando nesta estação</span>
+                <Utensils className="w-8 h-8 opacity-25 mb-2" />
+                <span>Nenhum pedido novo nesta estação</span>
               </div>
             ) : (
               novos.map((pedido) => (
                 <KdsCard
                   key={pedido.id}
                   pedido={pedido}
-                  estacaoFiltro={estacaoFiltro}
+                  abaAtiva={abaAtiva}
                   onToggleItem={(idx) => {
                     toggleItemConcluidoKDS(pedido.id, idx);
                     audio.tocarCheckItem();
@@ -253,46 +316,43 @@ export default function KDS() {
                     ticarTodosItensKDS(pedido.id);
                     audio.tocarCheckItem();
                   }}
-                  onAction={() => {
-                    avancarStatusKDS(pedido.id);
+                  onConfirmarAvanco={() => {
+                    iniciarProducaoKDS(pedido.id);
                     audio.tocarBipItem();
                   }}
-                  actionLabel="Iniciar Preparo"
-                  actionIcon={Play}
+                  etapa="a_fazer"
                 />
               ))
             )}
           </div>
         </div>
 
-        {/* Coluna 2: Em Preparo */}
+        {/* Coluna 2: Em Produção (No Fogo / Chapa / Coqueteleira) */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl flex flex-col overflow-hidden">
           <div className="p-3.5 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-400"></span>
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                No Fogo / Chapa ({emPreparo.length})
+                2. Em Produção ({emPreparo.length})
               </h3>
             </div>
-            {estacaoFiltro !== 'todas' && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 uppercase">
-                {estacaoFiltro}
-              </span>
-            )}
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              {abaAtiva === 'bar' ? 'Na Coqueteleira' : 'No Fogo/Chapa'}
+            </span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {emPreparo.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-600 text-xs p-6 text-center">
-                <Flame className="w-8 h-8 opacity-30 mb-2" />
-                <span>Nenhum prato em preparo agora</span>
+                <Flame className="w-8 h-8 opacity-25 mb-2" />
+                <span>Nenhum item sendo preparado agora</span>
               </div>
             ) : (
               emPreparo.map((pedido) => (
                 <KdsCard
                   key={pedido.id}
                   pedido={pedido}
-                  estacaoFiltro={estacaoFiltro}
+                  abaAtiva={abaAtiva}
                   onToggleItem={(idx) => {
                     toggleItemConcluidoKDS(pedido.id, idx);
                     audio.tocarCheckItem();
@@ -301,46 +361,43 @@ export default function KDS() {
                     ticarTodosItensKDS(pedido.id);
                     audio.tocarCheckItem();
                   }}
-                  onAction={() => {
-                    avancarStatusKDS(pedido.id);
+                  onConfirmarAvanco={() => {
+                    marcarFeitoKDS(pedido.id);
                     audio.tocarSucessoVenda();
                   }}
-                  actionLabel="Marcar Pronto"
-                  actionIcon={Check}
+                  etapa="em_producao"
                 />
               ))
             )}
           </div>
         </div>
 
-        {/* Coluna 3: Pronto */}
+        {/* Coluna 3: Feito / Pronto na Bancada (Garçom Entregou) */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl flex flex-col overflow-hidden">
           <div className="p-3.5 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                Pronto p/ Entrega ({prontos.length})
+                3. Feito / Na Bancada ({prontos.length})
               </h3>
             </div>
-            {estacaoFiltro !== 'todas' && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 uppercase">
-                {estacaoFiltro}
-              </span>
-            )}
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Aguardando Garçom
+            </span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {prontos.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-600 text-xs p-6 text-center">
-                <CheckCircle2 className="w-8 h-8 opacity-30 mb-2" />
-                <span>Nenhum prato aguardando retirada</span>
+                <CheckCircle2 className="w-8 h-8 opacity-25 mb-2" />
+                <span>Nenhum prato na bancada aguardando entrega</span>
               </div>
             ) : (
               prontos.map((pedido) => (
                 <KdsCard
                   key={pedido.id}
                   pedido={pedido}
-                  estacaoFiltro={estacaoFiltro}
+                  abaAtiva={abaAtiva}
                   onToggleItem={(idx) => {
                     toggleItemConcluidoKDS(pedido.id, idx);
                     audio.tocarCheckItem();
@@ -349,12 +406,11 @@ export default function KDS() {
                     ticarTodosItensKDS(pedido.id);
                     audio.tocarCheckItem();
                   }}
-                  onAction={() => {
-                    arquivarPedidoKDS(pedido.id);
+                  onConfirmarAvanco={() => {
+                    marcarEntregueKDS(pedido.id);
                     audio.tocarBipItem();
                   }}
-                  actionLabel="Entregar e Finalizar"
-                  actionIcon={CheckCircle2}
+                  etapa="feito"
                   isDone
                 />
               ))
@@ -368,47 +424,73 @@ export default function KDS() {
 
 function KdsCard({
   pedido,
-  estacaoFiltro,
+  abaAtiva,
   onToggleItem,
   onTicarTodos,
-  onAction,
-  actionLabel,
-  actionIcon: Icon,
+  onConfirmarAvanco,
+  etapa,
   isDone = false,
 }: {
   pedido: PedidoKDS;
-  estacaoFiltro: EstacaoKDS;
+  abaAtiva: 'cozinha' | 'bar' | 'todas';
   onToggleItem: (itemIdx: number) => void;
   onTicarTodos: () => void;
-  onAction: () => void;
-  actionLabel: string;
-  actionIcon: any;
+  onConfirmarAvanco: () => void;
+  etapa: 'a_fazer' | 'em_producao' | 'feito';
   isDone?: boolean;
 }) {
-  // SLA Visual por tempo
   const minutos = pedido.minutosEspera || 0;
   const isCritico = minutos >= 20;
   const isAtencao = minutos >= 10 && minutos < 20;
 
-  // Itens relevantes conforme filtro
-  const itensVisiveis = pedido.itens.map((item, originalIdx) => ({ item, originalIdx }));
+  // Filtragem dos itens exibidos no card de acordo com a aba selecionada
+  const itensComIndices = pedido.itens.map((item, originalIdx) => ({ item, originalIdx }));
+  const itensPertencentes = itensComIndices.filter(({ item }) => {
+    if (abaAtiva === 'todas') return true;
+    const ehBar = item.setorPreparo === 'bar';
+    return abaAtiva === 'bar' ? ehBar : !ehBar;
+  });
 
-  // Contagem de progresso
-  const totalItens = pedido.itens.length;
-  const concluidosCount = pedido.itens.filter((it) => it.concluido).length;
+  const outrosItensQtd = totalItensDaOutraEstacao(pedido, abaAtiva);
+
+  function totalItensDaOutraEstacao(p: PedidoKDS, aba: 'cozinha' | 'bar' | 'todas'): number {
+    if (aba === 'todas') return 0;
+    const buscaBar = aba === 'cozinha'; // na cozinha, os outros são bar
+    return p.itens.filter((it) => (buscaBar ? it.setorPreparo === 'bar' : it.setorPreparo !== 'bar')).length;
+  }
+
+  // Progresso dos itens
+  const totalItens = itensPertencentes.length > 0 ? itensPertencentes.length : pedido.itens.length;
+  const concluidosCount = (itensPertencentes.length > 0 ? itensPertencentes : itensComIndices).filter(
+    ({ item }) => item.concluido
+  ).length;
   const porcentagem = totalItens > 0 ? Math.round((concluidosCount / totalItens) * 100) : 0;
   const todosConcluidos = totalItens > 0 && concluidosCount === totalItens;
 
-  // Detecção de Estação do Pedido
-  const temCozinha = pedido.itens.some((it) => it.setorPreparo !== 'bar');
-  const temBar = pedido.itens.some((it) => it.setorPreparo === 'bar');
-  const estacaoPedido = temCozinha && temBar ? 'misto' : temBar ? 'bar' : 'cozinha';
+  // Rótulos e Ícones para a Regra dos 2 Cliques
+  let btnLabelDefault = '⚡ 2 Cliques: Iniciar Produção';
+  let btnLabelConfirm = 'Dê +1 clique p/ Iniciar Produção';
+  let btnIcon = <Play className="w-3.5 h-3.5" />;
+  let btnClass = 'w-full py-2.5 rounded-xl font-black text-xs bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20';
+
+  if (etapa === 'em_producao') {
+    btnLabelDefault = '⚡ 2 Cliques: Marcar como Feito';
+    btnLabelConfirm = 'Dê +1 clique p/ Marcar Feito';
+    btnIcon = <Check className="w-3.5 h-3.5" />;
+    btnClass = 'w-full py-2.5 rounded-xl font-black text-xs bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/25';
+  } else if (etapa === 'feito') {
+    btnLabelDefault = '⚡ 2 Cliques: Garçom Entregou';
+    btnLabelConfirm = 'Dê +1 clique p/ Confirmar Entrega';
+    btnIcon = <CheckCircle2 className="w-3.5 h-3.5" />;
+    btnClass = 'w-full py-2.5 rounded-xl font-black text-xs bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/25';
+  }
 
   return (
     <div
-      className={`rounded-2xl border p-4 space-y-3 transition-all ${
+      onDoubleClick={onConfirmarAvanco}
+      className={`rounded-2xl border p-4 space-y-3 transition-all select-none ${
         isDone
-          ? 'bg-slate-950/40 border-slate-800 opacity-80'
+          ? 'bg-slate-950/80 border-emerald-500/30 ring-1 ring-emerald-500/20'
           : isCritico
           ? 'bg-rose-950/20 border-rose-500/40 ring-1 ring-rose-500/30'
           : isAtencao
@@ -426,13 +508,13 @@ function KdsCard({
             {pedido.tipo === 'mesa' ? `Mesa #${pedido.mesaNumero}` : pedido.tipo}
           </span>
           {pedido.nomeCliente && pedido.tipo !== 'mesa' && (
-            <span className="text-[11px] text-slate-400 font-semibold truncate max-w-[110px]">
+            <span className="text-[11px] text-slate-400 font-semibold truncate max-w-[100px]">
               {pedido.nomeCliente}
             </span>
           )}
         </div>
 
-        {/* SLA / Tempo de Espera com Cores */}
+        {/* SLA / Tempo com Cores */}
         <div
           className={`flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
             isCritico
@@ -441,37 +523,19 @@ function KdsCard({
               ? 'bg-amber-500/20 text-amber-400'
               : 'bg-slate-800 text-emerald-400'
           }`}
-          title={
-            isCritico
-              ? 'Urgente: mais de 20 minutos de espera'
-              : isAtencao
-              ? 'Atenção: entre 10 e 20 minutos de espera'
-              : 'Dentro do prazo'
-          }
         >
           <Clock className="w-3 h-3" />
           <span>{minutos} min</span>
         </div>
       </div>
 
-      {/* Indicador de Estação e Barra de Progresso */}
+      {/* Indicador de Progresso e Aviso de Outra Estação */}
       <div className="space-y-1.5 pt-0.5">
         <div className="flex items-center justify-between text-[10px]">
           <div className="flex items-center gap-1.5">
-            {estacaoPedido === 'misto' ? (
-              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 font-bold border border-blue-500/20 flex items-center gap-1">
-                <Utensils className="w-2.5 h-2.5" />
-                <span>Misto (Cozinha + Bar)</span>
-              </span>
-            ) : estacaoPedido === 'bar' ? (
-              <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 font-bold border border-purple-500/20 flex items-center gap-1">
-                <Wine className="w-2.5 h-2.5" />
-                <span>Estação Bar / Copa</span>
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-300 font-bold border border-orange-500/20 flex items-center gap-1">
-                <ChefHat className="w-2.5 h-2.5" />
-                <span>Estação Cozinha</span>
+            {outrosItensQtd > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 text-[9px] font-bold">
+                +{outrosItensQtd} item(ns) no {abaAtiva === 'cozinha' ? '🍹 Bar' : '🍳 Cozinha'}
               </span>
             )}
           </div>
@@ -481,11 +545,11 @@ function KdsCard({
               {concluidosCount}/{totalItens} prontos
             </span>
 
-            {/* Botão de Ticar Todos */}
+            {/* Ticar Todos */}
             <button
               type="button"
               onClick={onTicarTodos}
-              title={todosConcluidos ? 'Desmarcar todos os itens' : 'Marcar todos os itens como concluídos'}
+              title={todosConcluidos ? 'Desmarcar todos' : 'Ticar todos os itens'}
               className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 cursor-pointer flex items-center gap-1 transition-colors"
             >
               <CheckCheck className="w-2.5 h-2.5 text-emerald-400" />
@@ -505,106 +569,91 @@ function KdsCard({
         </div>
       </div>
 
-      {/* Lista de Itens com Checklist Individual */}
+      {/* Lista de Itens do Pedido */}
       <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
-        {itensVisiveis.map(({ item, originalIdx }) => {
-          const ehDoSetorBar = item.setorPreparo === 'bar';
-          const pertenceAoFiltro =
-            estacaoFiltro === 'todas' ||
-            (estacaoFiltro === 'bar' && ehDoSetorBar) ||
-            (estacaoFiltro === 'cozinha' && !ehDoSetorBar);
+        {(itensPertencentes.length > 0 ? itensPertencentes : itensComIndices).map(
+          ({ item, originalIdx }) => {
+            const ehDoSetorBar = item.setorPreparo === 'bar';
 
-          return (
-            <div
-              key={originalIdx}
-              onClick={() => onToggleItem(originalIdx)}
-              className={`p-2 rounded-xl border transition-all cursor-pointer select-none ${
-                item.concluido
-                  ? 'bg-emerald-950/20 border-emerald-500/30 opacity-70'
-                  : 'bg-slate-900/80 hover:bg-slate-900 border-slate-800/90'
-              } ${!pertenceAoFiltro ? 'opacity-40 grayscale-[50%]' : ''}`}
-              title="Clique para marcar este prato como pronto / pendente"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                  {/* Checkbox Visual Interativo */}
-                  <div className="pt-0.5 shrink-0">
-                    {item.concluido ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 fill-emerald-500/20" />
-                    ) : (
-                      <Circle className="w-4 h-4 text-slate-500 hover:text-slate-300" />
-                    )}
-                  </div>
-
-                  {/* Nome e Quantidade do Item */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-1.5">
-                      <span
-                        className={`font-mono font-black text-xs ${
-                          item.concluido ? 'text-slate-400' : 'text-emerald-400'
-                        }`}
-                      >
-                        {item.quantidade}x
-                      </span>
-                      <span
-                        className={`text-xs font-bold leading-tight ${
-                          item.concluido
-                            ? 'line-through text-slate-400'
-                            : 'text-slate-100'
-                        }`}
-                      >
-                        {item.nome}
-                      </span>
+            return (
+              <div
+                key={originalIdx}
+                onClick={() => onToggleItem(originalIdx)}
+                className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                  item.concluido
+                    ? 'bg-emerald-950/20 border-emerald-500/30 opacity-70'
+                    : 'bg-slate-900/80 hover:bg-slate-900 border-slate-800/90'
+                }`}
+                title="Clique para marcar prato pronto / pendente"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    <div className="pt-0.5 shrink-0">
+                      {item.concluido ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 fill-emerald-500/20" />
+                      ) : (
+                        <Circle className="w-4 h-4 text-slate-500 hover:text-slate-300" />
+                      )}
                     </div>
 
-                    {/* Observações de 1 Toque com Destaque Forte */}
-                    {item.observacoes && (
-                      <div className="mt-1 flex items-start gap-1 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-bold px-2 py-0.5 rounded-lg">
-                        <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
-                        <span className="leading-tight">{item.observacoes}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-1.5">
+                        <span
+                          className={`font-mono font-black text-xs ${
+                            item.concluido ? 'text-slate-400' : 'text-emerald-400'
+                          }`}
+                        >
+                          {item.quantidade}x
+                        </span>
+                        <span
+                          className={`text-xs font-bold leading-tight ${
+                            item.concluido ? 'line-through text-slate-400' : 'text-slate-100'
+                          }`}
+                        >
+                          {item.nome}
+                        </span>
                       </div>
+
+                      {/* Observações com Destaque */}
+                      {item.observacoes && (
+                        <div className="mt-1 flex items-start gap-1 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-bold px-2 py-0.5 rounded-lg">
+                          <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                          <span className="leading-tight">{item.observacoes}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                        ehDoSetorBar
+                          ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20'
+                          : 'bg-orange-500/10 text-orange-300 border border-orange-500/20'
+                      }`}
+                    >
+                      {ehDoSetorBar ? '🍹 Bar' : '🍳 Cozinha'}
+                    </span>
+                    {item.concluido && (
+                      <span className="text-[9px] font-black text-emerald-400 uppercase">✓ Feito</span>
                     )}
                   </div>
                 </div>
-
-                {/* Badge de Estação e Status */}
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span
-                    className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-                      ehDoSetorBar
-                        ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20'
-                        : 'bg-orange-500/10 text-orange-300 border border-orange-500/20'
-                    }`}
-                  >
-                    {ehDoSetorBar ? '🍹 Bar' : '🍳 Cozinha'}
-                  </span>
-
-                  {item.concluido && (
-                    <span className="text-[9px] font-black text-emerald-400 uppercase">
-                      ✓ Pronto
-                    </span>
-                  )}
-                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          }
+        )}
       </div>
 
-      {/* Botão de Avanço do Pedido */}
-      <button
-        onClick={onAction}
-        className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
-          isDone
-            ? 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-            : todosConcluidos
-            ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 animate-pulse'
-            : 'bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20'
-        }`}
-      >
-        <Icon className="w-3.5 h-3.5" />
-        <span>{actionLabel}</span>
-      </button>
+      {/* BOTÃO DA REGRA DOS 2 CLIQUES */}
+      <DoubleClickButton
+        onConfirm={onConfirmarAvanco}
+        labelDefault={btnLabelDefault}
+        labelConfirm={btnLabelConfirm}
+        iconDefault={btnIcon}
+        className={btnClass}
+        title="Dê 2 cliques para avançar esta comanda com segurança"
+      />
     </div>
   );
 }

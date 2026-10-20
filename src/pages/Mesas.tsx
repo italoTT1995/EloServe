@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Bell,
+  BellRing,
   X,
   Split,
   Layers,
@@ -54,6 +55,8 @@ import { useProductStore } from '../store/useProductStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
 import { Mesa, Produto, FormaPagamento, VendaRealizada, ItemComandaMesa, ReservaMesa } from '../types';
 import { MesaQRCodeThumbnail } from '../components/mesas/MesaQRCodeThumbnail';
+import { DoubleClickButton } from '../components/common/DoubleClickButton';
+import { audio } from '../lib/audio';
 import {
   getModificadoresParaProduto,
   alternarTagObservacao,
@@ -80,6 +83,7 @@ export default function Mesas() {
     trocarMesa,
     registrarVenda,
     cancelarItemComandaMesa,
+    marcarItemEntregueMesa,
     toggleTaxaServicoMesa,
     toggleCouvertMesa,
     aplicarDescontoComandaMesa,
@@ -3647,11 +3651,36 @@ export default function Mesas() {
                                             <div className="min-w-0 pr-1 truncate">
                                               <span className="text-orange-400 font-bold mr-1">{it.quantidade}x</span>
                                               <span className="text-white font-medium">{it.nome}</span>
+                                              {it.statusKDS === 'pronto' && (
+                                                <span className="ml-1 text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold animate-pulse">
+                                                  🔔 Feito
+                                                </span>
+                                              )}
+                                              {it.statusKDS === 'entregue' && (
+                                                <span className="ml-1 text-[9px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-bold">
+                                                  ✓ Entregue
+                                                </span>
+                                              )}
                                             </div>
                                             <div className="flex items-center gap-1.5 shrink-0">
                                               <span className="font-mono font-bold text-slate-200">
                                                 R$ {it.subtotal.toFixed(2)}
                                               </span>
+                                              {it.statusKDS === 'pronto' && (
+                                                <DoubleClickButton
+                                                  onConfirm={() => {
+                                                    marcarItemEntregueMesa(mesaParaLancar.numero, it.id, idLoja);
+                                                    audio.tocarBipItem();
+                                                    dispararToast(`Item "${it.nome}" confirmado como entregue!`);
+                                                    const atual = useAppStore.getState().getMesasPorTenant(idLoja).find((m) => m.numero === mesaParaLancar.numero);
+                                                    if (atual) setMesaParaLancar({ ...atual });
+                                                  }}
+                                                  labelDefault="Entregue"
+                                                  labelConfirm="Confirma?"
+                                                  className="px-1.5 py-0.5 rounded bg-purple-600 hover:bg-purple-500 text-white font-bold text-[9px]"
+                                                  title="Dê 2 cliques para avisar que já foi entregue ao cliente"
+                                                />
+                                              )}
                                               <button
                                                 type="button"
                                                 onClick={() => handleSolicitarCancelarItem(mesaParaLancar, it)}
@@ -3832,21 +3861,40 @@ export default function Mesas() {
                                           R$ {item.subtotal.toFixed(2)}
                                         </td>
                                         <td className="py-2.5 px-3">
-                                          <span
-                                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-block ${
-                                              item.statusKDS === 'pronto'
-                                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                                : item.statusKDS === 'em_preparo'
-                                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
-                                                : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                                            }`}
-                                          >
-                                            {item.statusKDS === 'pronto'
-                                              ? 'Pronto / Servido'
-                                              : item.statusKDS === 'em_preparo'
-                                              ? 'Em Preparo'
-                                              : 'Fila da Cozinha'}
-                                          </span>
+                                          {item.statusKDS === 'entregue' ? (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                              <CheckCircle2 className="w-3 h-3" />
+                                              <span>Entregue na Mesa</span>
+                                            </span>
+                                          ) : item.statusKDS === 'pronto' ? (
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-flex items-center gap-1 bg-amber-500/10 text-amber-300 border border-amber-500/30 animate-pulse">
+                                                <BellRing className="w-3 h-3 text-amber-400" />
+                                                <span>Feito no Pass</span>
+                                              </span>
+                                              <DoubleClickButton
+                                                onConfirm={() => {
+                                                  marcarItemEntregueMesa(mesaParaLancar.numero, item.id, idLoja);
+                                                  audio.tocarBipItem();
+                                                  dispararToast(`Item "${item.nome}" confirmado como entregue na Mesa #${mesaParaLancar.numero}!`);
+                                                  const atual = useAppStore.getState().getMesasPorTenant(idLoja).find((m) => m.numero === mesaParaLancar.numero);
+                                                  if (atual) setMesaParaLancar({ ...atual });
+                                                }}
+                                                labelDefault="⚡ 2 Cliques: Entregue"
+                                                labelConfirm="Dê +1 clique"
+                                                className="px-2 py-0.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-[10px] shadow-sm"
+                                                title="Dê 2 cliques para avisar que este prato já foi entregue ao cliente"
+                                              />
+                                            </div>
+                                          ) : item.statusKDS === 'em_preparo' ? (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-block bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                              🔥 Em Produção
+                                            </span>
+                                          ) : (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase inline-block bg-slate-800 text-slate-400 border border-slate-700">
+                                              ⏳ Na Fila
+                                            </span>
+                                          )}
                                         </td>
                                         <td className="py-2.5 px-3 text-right">
                                           <button
