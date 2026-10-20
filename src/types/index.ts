@@ -149,6 +149,17 @@ export interface Mesa {
 }
 
 export type StatusProducaoKDS = 'novo' | 'em_preparo' | 'pronto';
+export type EstacaoKDS = 'todas' | 'cozinha' | 'bar';
+
+export interface ItemPedidoKDS {
+  id?: string;
+  produtoId?: string;
+  nome: string;
+  quantidade: number;
+  observacoes?: string;
+  setorPreparo?: 'cozinha' | 'bar' | 'nenhum';
+  concluido?: boolean;
+}
 
 export interface PedidoKDS {
   id: string;
@@ -157,13 +168,18 @@ export interface PedidoKDS {
   mesaNumero?: number;
   nomeCliente?: string;
   status: StatusProducaoKDS;
-  itens: {
-    nome: string;
-    quantidade: number;
-    observacoes?: string;
-  }[];
+  itens: ItemPedidoKDS[];
   minutosEspera: number;
   criadoEm: string;
+  estacaoDestino?: 'cozinha' | 'bar' | 'misto';
+}
+
+export interface ModificadorRapido {
+  id: string;
+  rotulo: string;
+  texto: string;
+  icone?: string;
+  categoriaAlvo: 'carnes' | 'cozinha' | 'bar' | 'geral';
 }
 
 export type FormaPagamento = 'dinheiro' | 'pix' | 'credito' | 'debito' | 'voucher';

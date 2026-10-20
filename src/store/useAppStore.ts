@@ -46,6 +46,11 @@ interface AppState {
   ) => { sucesso: boolean; pedidoKDSId: string; totalAdicionado: number };
   adicionarPedidoKDS: (pedido: PedidoKDS) => void;
   avancarStatusKDS: (pedidoId: string) => void;
+  toggleItemConcluidoKDS: (pedidoId: string, itemIdx: number) => void;
+  ticarTodosItensKDS: (pedidoId: string) => void;
+  arquivarPedidoKDS: (pedidoId: string) => void;
+  recuperarUltimoPedidoKDS: () => PedidoKDS | null;
+  historicoKDS: PedidoKDS[];
   alternarPerfil: (perfil: 'admin' | 'caixa' | 'garcom') => void;
   validarPinAdmin: (pin: string) => boolean;
   cancelarItemComandaMesa: (
@@ -153,6 +158,7 @@ export const useAppStore = create<AppState>()(
         return mesasIniciais;
       },
 
+      historicoKDS: [],
       pedidosKDS: [
         {
           id: 'k1',
@@ -163,8 +169,9 @@ export const useAppStore = create<AppState>()(
           minutosEspera: 3,
           criadoEm: '11:15',
           itens: [
-            { nome: 'EloBurger Smash Bacon', quantidade: 2, observacoes: '1x sem picles' },
-            { nome: 'Batata Rústica com Alecrim', quantidade: 1 },
+            { nome: 'EloBurger Smash Bacon', quantidade: 2, observacoes: '1x sem picles, ao ponto', setorPreparo: 'cozinha', concluido: false },
+            { nome: 'Batata Rústica com Alecrim', quantidade: 1, observacoes: 'Molho à parte', setorPreparo: 'cozinha', concluido: false },
+            { nome: 'Chopp Brahma 500ml', quantidade: 2, observacoes: 'Estupidamente gelado', setorPreparo: 'bar', concluido: false },
           ],
         },
         {
@@ -176,8 +183,8 @@ export const useAppStore = create<AppState>()(
           minutosEspera: 12,
           criadoEm: '11:06',
           itens: [
-            { nome: 'Pizza Margherita Grande', quantidade: 1, observacoes: 'Massa fina bem tostada' },
-            { nome: 'Coca-Cola Zero 350ml', quantidade: 2 },
+            { nome: 'Pizza Margherita Grande', quantidade: 1, observacoes: 'Massa fina bem tostada', setorPreparo: 'cozinha', concluido: true },
+            { nome: 'Coca-Cola Zero 350ml', quantidade: 2, observacoes: 'Gelo e limão', setorPreparo: 'bar', concluido: false },
           ],
         },
         {
@@ -189,7 +196,8 @@ export const useAppStore = create<AppState>()(
           minutosEspera: 22,
           criadoEm: '10:56',
           itens: [
-            { nome: 'Combo Família 4 Burgers + Fritas', quantidade: 1 },
+            { nome: 'Combo Família 4 Burgers + Fritas', quantidade: 1, setorPreparo: 'cozinha', concluido: true },
+            { nome: 'Refrigerante 2L Guaraná', quantidade: 1, setorPreparo: 'bar', concluido: true },
           ],
         },
       ],
@@ -1159,13 +1167,20 @@ export const useAppStore = create<AppState>()(
           mesaNumero: numeroMesa,
           nomeCliente: mesa.responsavelNome || `Mesa #${numeroMesa}`,
           status: 'novo',
-          itens: itensCompletos.map((it) => ({
-            nome: it.clienteNome && it.clienteNome !== mesa.responsavelNome
-              ? `${it.nome} (${it.clienteNome})`
-              : it.nome,
-            quantidade: it.quantidade,
-            observacoes: it.observacoes || undefined,
-          })),
+          itens: itensCompletos.map((it) => {
+            const ehBar = /chopp|cerveja|vinho|refrigerante|suco|drink|caipirinha|saquê|água|refri|lata|garrafa/i.test(it.nome);
+            return {
+              id: it.id,
+              produtoId: it.produtoId,
+              nome: it.clienteNome && it.clienteNome !== mesa.responsavelNome
+                ? `${it.nome} (${it.clienteNome})`
+                : it.nome,
+              quantidade: it.quantidade,
+              observacoes: it.observacoes || undefined,
+              setorPreparo: ehBar ? 'bar' : 'cozinha',
+              concluido: false,
+            };
+          }),
           minutosEspera: 0,
           criadoEm: agoraHora,
         };
@@ -1232,6 +1247,54 @@ export const useAppStore = create<AppState>()(
             console.warn(e);
           }
         }
+      },
+
+      toggleItemConcluidoKDS: (pedidoId, itemIdx) => {
+        set((state) => ({
+          pedidosKDS: state.pedidosKDS.map((p) => {
+            if (p.id !== pedidoId) return p;
+            const novosItens = p.itens.map((it, idx) =>
+              idx === itemIdx ? { ...it, concluido: !it.concluido } : it
+            );
+            return { ...p, itens: novosItens };
+          }),
+        }));
+      },
+
+      ticarTodosItensKDS: (pedidoId) => {
+        set((state) => ({
+          pedidosKDS: state.pedidosKDS.map((p) => {
+            if (p.id !== pedidoId) return p;
+            const todosJaConcluidos = p.itens.every((it) => it.concluido);
+            const novosItens = p.itens.map((it) => ({
+              ...it,
+              concluido: !todosJaConcluidos,
+            }));
+            return { ...p, itens: novosItens };
+          }),
+        }));
+      },
+
+      arquivarPedidoKDS: (pedidoId) => {
+        const state = get();
+        const pedido = state.pedidosKDS.find((p) => p.id === pedidoId);
+        if (!pedido) return;
+        set({
+          pedidosKDS: state.pedidosKDS.filter((p) => p.id !== pedidoId),
+          historicoKDS: [pedido, ...(state.historicoKDS || [])].slice(0, 15),
+        });
+      },
+
+      recuperarUltimoPedidoKDS: () => {
+        const state = get();
+        const historico = state.historicoKDS || [];
+        if (historico.length === 0) return null;
+        const [recuperado, ...resto] = historico;
+        set({
+          pedidosKDS: [recuperado, ...state.pedidosKDS],
+          historicoKDS: resto,
+        });
+        return recuperado;
       },
 
       alternarPerfil: (perfil) =>

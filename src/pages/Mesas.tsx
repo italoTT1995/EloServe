@@ -55,6 +55,11 @@ import { useEstoqueStore } from '../store/useEstoqueStore';
 import { Mesa, Produto, FormaPagamento, VendaRealizada, ItemComandaMesa, ReservaMesa } from '../types';
 import { MesaQRCodeThumbnail } from '../components/mesas/MesaQRCodeThumbnail';
 import {
+  getModificadoresParaProduto,
+  alternarTagObservacao,
+  tagEstaAtivaNaObservacao,
+} from '../data/modificadoresRapidos';
+import {
   gerarQrCodeMesaDataUrl,
   getUrlMesaCliente,
   baixarQrCodeMesaPng,
@@ -3410,6 +3415,41 @@ export default function Mesas() {
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
+
+                              {/* Modificadores Rápidos de 1 Toque (Exclusivo Garçom & Cozinha) */}
+                              {(() => {
+                                const mods = getModificadoresParaProduto(it.produto.nome, it.produto.setorPreparo);
+                                return (
+                                  <div className="pt-1.5 border-t border-slate-800/60 flex flex-wrap items-center gap-1">
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-0.5 mr-0.5">
+                                      <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                      <span>1 Toque:</span>
+                                    </span>
+                                    {mods.map((mod) => {
+                                      const ativo = tagEstaAtivaNaObservacao(it.observacoes, mod.texto);
+                                      return (
+                                        <button
+                                          key={mod.id}
+                                          type="button"
+                                          onClick={() => {
+                                            const novaObs = alternarTagObservacao(it.observacoes, mod.texto);
+                                            handleAlterarObsItemCarrinhoMesa(it.produto.id, novaObs, it.clienteNome);
+                                          }}
+                                          title={`Adicionar ou remover "${mod.texto}" da observação deste prato`}
+                                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
+                                            ativo
+                                              ? 'bg-amber-500 border-amber-400 text-slate-950 font-black shadow-sm'
+                                              : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                                          }`}
+                                        >
+                                          {mod.icone && <span className="text-[10px]">{mod.icone}</span>}
+                                          <span>{mod.rotulo}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           ))}
                         </div>
