@@ -37,6 +37,9 @@ export default function Caixa() {
     cancelarVenda,
     limparVendasTurno,
     operadorAtivo,
+    registrarSangria,
+    registrarSuprimento,
+    movimentosCaixa,
   } = useAppStore();
   const { itens, processarAberturaDiaConsumoPrevisto, ajustarSobraDiaAnterior } = useEstoqueStore();
   const { usuarioLogado, temPermissao } = useAuthStore();
@@ -47,7 +50,6 @@ export default function Caixa() {
   // Modais
   const [modalAbertura, setModalAbertura] = useState(false);
   const [modalFechamento, setModalFechamento] = useState(false);
-  const [modalSangria, setModalSangria] = useState(false);
   const [comprovanteAbertura, setComprovanteAbertura] = useState<{ troco: number; horario: string; operador: string } | null>(null);
   const [comprovanteFechamento, setComprovanteFechamento] = useState<QuestionarioFechamentoCaixa | null>(null);
 
@@ -64,9 +66,14 @@ export default function Caixa() {
   const [zerarTotalCaixa, setZerarTotalCaixa] = useState(false);
   const [sucessoLimpeza, setSucessoLimpeza] = useState<string | null>(null);
 
-  // Estados de Sangria
+  // Estados de Sangria e Suprimento
+  const [modalSangria, setModalSangria] = useState(false);
   const [valorSangria, setValorSangria] = useState('');
   const [motivoSangria, setMotivoSangria] = useState('');
+
+  const [modalSuprimento, setModalSuprimento] = useState(false);
+  const [valorSuprimento, setValorSuprimento] = useState('');
+  const [motivoSuprimento, setMotivoSuprimento] = useState('');
 
   // Estados da Abertura: Contagem de Moedas e Cédulas (Seção 6.2)
   const [contagemAbertura, setContagemAbertura] = useState<ContagemDinheiroFisico>({
@@ -110,7 +117,18 @@ export default function Caixa() {
   });
 
   // Cálculos de Vendas e Fechamento
-  const valorEsperadoDinheiro = caixaAtual.saldoInicial + (caixaAtual.totalVendas * 0.35) - caixaAtual.totalSangrias;
+  const totalVendasDinheiro = (vendas || [])
+    .filter((v) => v.status === 'concluida' && v.formaPagamento === 'dinheiro')
+    .reduce((acc, v) => acc + (v.total || 0), 0);
+
+  const valorEsperadoDinheiro = Number(
+    (
+      (caixaAtual.saldoInicial || 0) +
+      (totalVendasDinheiro > 0 ? totalVendasDinheiro : (caixaAtual.totalVendas || 0) * 0.35) +
+      (caixaAtual.totalSuprimentos || 0) -
+      (caixaAtual.totalSangrias || 0)
+    ).toFixed(2)
+  );
   const diferencaFechamento = Number((dinheiroContadoFechamento - valorEsperadoDinheiro).toFixed(2));
 
   function handleConfirmarAbertura(e: React.FormEvent) {
@@ -229,6 +247,13 @@ export default function Caixa() {
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {isAberto ? (
             <>
+              <button
+                onClick={() => setModalSuprimento(true)}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <span>Reforço (Suprimento)</span>
+              </button>
               <button
                 onClick={() => setModalSangria(true)}
                 className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
@@ -1017,14 +1042,86 @@ export default function Caixa() {
               </button>
               <button
                 onClick={() => {
-                  alert(`Sangria de R$ ${valorSangria} registrada com sucesso!`);
-                  setModalSangria(false);
-                  setValorSangria('');
-                  setMotivoSangria('');
+                  const num = parseFloat(valorSangria.replace(',', '.'));
+                  if (!isNaN(num) && num > 0) {
+                    registrarSangria(num, motivoSangria || 'Sangria de Caixa', operadorAtivo);
+                    setSucessoEstorno(`Sangria de R$ ${num.toFixed(2)} registrada no caixa com sucesso!`);
+                    setTimeout(() => setSucessoEstorno(null), 4000);
+                    setModalSangria(false);
+                    setValorSangria('');
+                    setMotivoSangria('');
+                  } else {
+                    alert('Informe um valor válido maior que zero para a sangria.');
+                  }
                 }}
                 className="flex-1 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold"
               >
                 Confirmar Sangria
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Suprimento (Reforço de Caixa) */}
+      {modalSuprimento && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <span>Registrar Reforço / Suprimento (Entrada de Troco)</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              Informe o valor em dinheiro adicionado à gaveta para troco e sua justificativa.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-400">Valor em R$:</label>
+                <input
+                  type="number"
+                  value={valorSuprimento}
+                  onChange={(e) => setValorSuprimento(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400">Motivo / Origem do Troco:</label>
+                <input
+                  type="text"
+                  value={motivoSuprimento}
+                  onChange={(e) => setMotivoSuprimento(e.target.value)}
+                  placeholder="Ex: Troca de notas no cofre para abertura da noite"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white mt-1"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setModalSuprimento(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-800 text-xs font-bold text-slate-400 hover:text-white"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const num = parseFloat(valorSuprimento.replace(',', '.'));
+                  if (!isNaN(num) && num > 0) {
+                    registrarSuprimento(num, motivoSuprimento || 'Reforço de Caixa', operadorAtivo);
+                    setSucessoEstorno(`Reforço de R$ ${num.toFixed(2)} registrado com sucesso no caixa!`);
+                    setTimeout(() => setSucessoEstorno(null), 4000);
+                    setModalSuprimento(false);
+                    setValorSuprimento('');
+                    setMotivoSuprimento('');
+                  } else {
+                    alert('Informe um valor válido maior que zero para o suprimento.');
+                  }
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs"
+              >
+                Confirmar Suprimento
               </button>
             </div>
           </div>

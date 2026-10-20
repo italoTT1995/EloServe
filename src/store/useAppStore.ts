@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { SessaoCaixa, Mesa, PedidoKDS, VendaRealizada, ItemComandaMesa, DespesaOperacionalRestaurante } from '../types';
+import { SessaoCaixa, Mesa, PedidoKDS, VendaRealizada, ItemComandaMesa, DespesaOperacionalRestaurante, MovimentoCaixa } from '../types';
 import { useEstoqueStore } from './useEstoqueStore';
 import { MESAS_POR_TENANT } from './initialMesas';
 
@@ -21,6 +21,9 @@ interface AppState {
   removerDespesaRestaurante: (id: string) => void;
   abrirCaixa: (saldoInicial: number) => void;
   fecharCaixa: () => void;
+  registrarSangria: (valor: number, motivo: string, operador?: string) => { sucesso: boolean; mensagem?: string };
+  registrarSuprimento: (valor: number, motivo: string, operador?: string) => { sucesso: boolean; mensagem?: string };
+  movimentosCaixa: MovimentoCaixa[];
   registrarVendaCaixa: (valor: number) => void;
   registrarVenda: (venda: VendaRealizada) => void;
   cancelarVenda: (vendaId: string, motivo: string, operador: string) => { sucesso: boolean; mensagem?: string };
@@ -98,6 +101,7 @@ export const useAppStore = create<AppState>()(
         abertoEm: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         operador: 'Italo Lemos',
       },
+      movimentosCaixa: [],
 
       mesasPorTenant: MESAS_POR_TENANT,
       mesas: MESAS_POR_TENANT['tenant-01'],
@@ -577,6 +581,48 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           caixaAtual: { ...state.caixaAtual, status: 'fechado' },
         })),
+
+      registrarSangria: (valor, motivo, operador) => {
+        if (valor <= 0) return { sucesso: false, mensagem: 'Valor inválido para sangria.' };
+        const agora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const novoMov: MovimentoCaixa = {
+          id: `sangria-${Date.now()}`,
+          tipo: 'sangria',
+          formaPagamento: 'dinheiro',
+          valor,
+          motivo: motivo || 'Retirada de caixa (Sangria)',
+          horario: agora,
+        };
+        set((state) => ({
+          movimentosCaixa: [novoMov, ...(state.movimentosCaixa || [])],
+          caixaAtual: {
+            ...state.caixaAtual,
+            totalSangrias: Number(((state.caixaAtual.totalSangrias || 0) + valor).toFixed(2)),
+          },
+        }));
+        return { sucesso: true };
+      },
+
+      registrarSuprimento: (valor, motivo, operador) => {
+        if (valor <= 0) return { sucesso: false, mensagem: 'Valor inválido para suprimento.' };
+        const agora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const novoMov: MovimentoCaixa = {
+          id: `suprimento-${Date.now()}`,
+          tipo: 'suprimento',
+          formaPagamento: 'dinheiro',
+          valor,
+          motivo: motivo || 'Reforço de troco (Suprimento)',
+          horario: agora,
+        };
+        set((state) => ({
+          movimentosCaixa: [novoMov, ...(state.movimentosCaixa || [])],
+          caixaAtual: {
+            ...state.caixaAtual,
+            totalSuprimentos: Number(((state.caixaAtual.totalSuprimentos || 0) + valor).toFixed(2)),
+          },
+        }));
+        return { sucesso: true };
+      },
 
       registrarVendaCaixa: (valor) =>
         set((state) => ({

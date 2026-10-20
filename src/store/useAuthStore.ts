@@ -64,8 +64,10 @@ const STORAGE_KEY = 'eloserve_auth_user';
 
 function obterUsuarioSalvo(): Usuario | null {
   try {
-    const salvo = localStorage.getItem(STORAGE_KEY);
-    if (salvo) return JSON.parse(salvo);
+    if (typeof localStorage !== 'undefined') {
+      const salvo = localStorage.getItem(STORAGE_KEY);
+      if (salvo) return JSON.parse(salvo);
+    }
   } catch {
     // Falha silenciosa
   }
@@ -97,7 +99,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return { sucesso: false, mensagem: 'Senha ou PIN incorreto.' };
     }
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(usuario));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(usuario));
+    }
     set({ usuarioLogado: usuario, isAuthenticated: true });
     return { sucesso: true, usuario };
   },
@@ -105,13 +109,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loginRapidoPorCargo: (cargo) => {
     const { usuarios } = get();
     const usuario = usuarios.find((u) => u.cargo === cargo) || usuarios[0];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(usuario));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(usuario));
+    }
     set({ usuarioLogado: usuario, isAuthenticated: true });
     return usuario;
   },
 
   logout: () => {
-    localStorage.removeItem(STORAGE_KEY);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+    }
     set({ usuarioLogado: null, isAuthenticated: false });
   },
 

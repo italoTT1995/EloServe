@@ -38,8 +38,9 @@ export default function PainelDono() {
   const tenantAtual = getTenantAtivo();
   const currentTenantId = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
   const { usuarioLogado } = useAuthStore();
-  const { caixaAtual, getMesasPorTenant, pedidosKDS } = useAppStore();
+  const { caixaAtual, getMesasPorTenant, pedidosKDS, getVendasPorTenant } = useAppStore();
   const mesas = getMesasPorTenant(currentTenantId);
+  const todasVendas = getVendasPorTenant ? getVendasPorTenant(currentTenantId) : [];
   const { tema, alternarTema } = useThemeStore();
   const isWhite = tema === 'light';
   const { getProdutosPorTenant, alternarDisponibilidade, atualizarPreco } = useProductStore();
@@ -65,6 +66,34 @@ export default function PainelDono() {
   const [couvertAtivo, setCouvertAtivo] = useState(tenantAtual?.couvertArtisticoAtivo ?? false);
   const [valorCouvert, setValorCouvert] = useState<number>(tenantAtual?.valorCouvertPorPessoa ?? 12.0);
   const [diasAoVivo, setDiasAoVivo] = useState<string[]>(tenantAtual?.diasAoVivo ?? ['quinta', 'sexta', 'sabado', 'domingo']);
+
+  // Cálculos dinâmicos em tempo real do restaurante
+  const vendasHoje = useMemo(() => {
+    const hojeStr = new Date().toLocaleDateString('pt-BR');
+    return (todasVendas || []).filter((v) => v.dataHora.includes(hojeStr) && v.status === 'concluida');
+  }, [todasVendas]);
+
+  const totalVendasHoje = useMemo(() => {
+    const soma = vendasHoje.reduce((acc, v) => acc + (v.total || 0), 0);
+    if (soma > 0) return soma;
+    if (caixaAtual.status === 'aberto' && caixaAtual.totalVendas > 0) return caixaAtual.totalVendas;
+    return (todasVendas || []).reduce((acc, v) => acc + (v.total || 0), 0);
+  }, [vendasHoje, caixaAtual, todasVendas]);
+
+  const totalPedidosHoje = useMemo(() => {
+    if (vendasHoje.length > 0) return vendasHoje.length;
+    if (totalVendasHoje > 0 && todasVendas.length > 0) return todasVendas.length;
+    return 0;
+  }, [vendasHoje, totalVendasHoje, todasVendas]);
+
+  const ticketMedioHoje = useMemo(() => {
+    return totalPedidosHoje > 0 ? totalVendasHoje / totalPedidosHoje : 0;
+  }, [totalVendasHoje, totalPedidosHoje]);
+
+  const totalClientesHoje = useMemo(() => {
+    const mesasOcupadas = mesas.filter((m) => m.status === 'ocupada').length;
+    return Math.max(mesasOcupadas, totalPedidosHoje);
+  }, [mesas, totalPedidosHoje]);
 
   function handleSalvarCouvert() {
     atualizarDadosTenant(currentTenantId, {
@@ -273,11 +302,13 @@ export default function PainelDono() {
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-black text-white font-mono tracking-tight">R$ 1.046,11</span>
+            <span className="text-2xl font-black text-white font-mono tracking-tight">
+              R$ {totalVendasHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
           </div>
-          <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-rose-400">
-            <TrendingDown className="w-3.5 h-3.5" />
-            <span>-34% vs ontem</span>
+          <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Faturamento do dia</span>
           </div>
         </div>
 
@@ -290,11 +321,11 @@ export default function PainelDono() {
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-black text-white font-mono tracking-tight">20</span>
+            <span className="text-2xl font-black text-white font-mono tracking-tight">{totalPedidosHoje}</span>
           </div>
-          <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-rose-400">
-            <TrendingDown className="w-3.5 h-3.5" />
-            <span>-44% vs ontem</span>
+          <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Pedidos processados</span>
           </div>
         </div>
 
@@ -307,28 +338,30 @@ export default function PainelDono() {
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-black text-white font-mono tracking-tight">R$ 52,31</span>
+            <span className="text-2xl font-black text-white font-mono tracking-tight">
+              R$ {ticketMedioHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
           </div>
           <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>+19% vs ontem</span>
+            <span>Média por comanda</span>
           </div>
         </div>
 
         {/* Card 4: CLIENTES */}
         <div className="bg-[#141416] border border-slate-800/80 rounded-2xl p-5 shadow-lg relative overflow-hidden group hover:border-slate-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">CLIENTES</span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">CLIENTES ATENDIDOS</span>
             <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-black text-white font-mono tracking-tight">17</span>
+            <span className="text-2xl font-black text-white font-mono tracking-tight">{totalClientesHoje}</span>
           </div>
-          <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-rose-400">
-            <TrendingDown className="w-3.5 h-3.5" />
-            <span>-15% vs ontem</span>
+          <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Mesas e clientes no dia</span>
           </div>
         </div>
       </div>

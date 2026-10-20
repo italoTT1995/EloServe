@@ -113,29 +113,31 @@ export default function Relatorios() {
 
     if (!dia || !mes || !ano) return true;
 
-    // Data de referência do sistema: Outubro de 2026 (ou data atual)
-    const hojeDia = 16;
-    const hojeMes = 10;
-    const hojeAno = 2026;
+    // Data dinâmica do sistema
+    const agora = new Date();
+    const hojeDia = agora.getDate();
+    const hojeMes = agora.getMonth() + 1;
+    const hojeAno = agora.getFullYear();
 
     if (filtro === 'hoje') {
       return dia === hojeDia && mes === hojeMes && ano === hojeAno;
     }
 
     if (filtro === '7dias') {
-      // Últimos 7 dias (10/10/2026 a 16/10/2026)
-      if (ano === 2026 && mes === 10 && dia >= 10 && dia <= 16) {
-        return true;
-      }
-      return false;
+      const dataItem = new Date(ano, mes - 1, dia);
+      const diffMs = agora.getTime() - dataItem.getTime();
+      const diffDias = diffMs / (1000 * 60 * 60 * 24);
+      return diffDias >= -1 && diffDias <= 7;
     }
 
     if (filtro === 'mes_atual') {
-      return mes === 10 && ano === 2026;
+      return mes === hojeMes && ano === hojeAno;
     }
 
     if (filtro === 'mes_anterior') {
-      return mes === 9 && ano === 2026;
+      const mesAnt = hojeMes === 1 ? 12 : hojeMes - 1;
+      const anoAnt = hojeMes === 1 ? hojeAno - 1 : hojeAno;
+      return mes === mesAnt && ano === anoAnt;
     }
 
     return true;

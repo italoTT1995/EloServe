@@ -178,6 +178,7 @@ interface SaaSState {
   registrarLogAuditoria: (acao: string, categoria: LogAuditoriaSaaS['categoria'], detalhes: string) => void;
   getAvisosAtivosParaTenant: (tenantId: string) => AvisoGlobalSaaS[];
   getTenantAtivo: () => TenantRestaurante;
+  getTenantPorId: (id: string) => TenantRestaurante | undefined;
   getMRR: () => number;
   getTotalAtivos: () => number;
   getTotalTrials: () => number;
@@ -428,7 +429,7 @@ export const useSaaSStore = create<SaaSState>()(
         // Sincroniza o novo restaurante com o backend de catálogo do WhatsApp
         try {
           const apiUrl =
-            import.meta.env.VITE_API_URL ||
+            (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
             (typeof window !== 'undefined' && window.location.port === '5174'
               ? 'http://localhost:3001'
               : typeof window !== 'undefined'
@@ -520,6 +521,11 @@ export const useSaaSStore = create<SaaSState>()(
           return TENANT_GLOBAL;
         }
         return tenants.find((t) => t.id === tenantAtivoId) || TENANT_GLOBAL;
+      },
+
+      getTenantPorId: (id: string) => {
+        if (!id || id === 'global') return TENANT_GLOBAL;
+        return get().tenants.find((t) => t.id === id);
       },
 
       getMRR: () => {

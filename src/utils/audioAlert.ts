@@ -4,6 +4,7 @@
  */
 
 export function tocarAlertaTransbordo() {
+  if (typeof window === 'undefined') return;
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
@@ -38,6 +39,7 @@ export function tocarAlertaTransbordo() {
 }
 
 export function tocarSomNovoPedido() {
+  if (typeof window === 'undefined') return;
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;

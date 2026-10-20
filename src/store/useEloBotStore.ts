@@ -174,7 +174,7 @@ const CONVERSAS_INICIAIS_TENANT_01: ConversaWhatsApp[] = [];
 
 let sseConnection: EventSource | null = null;
 const SERVER_URL =
-  import.meta.env.VITE_API_URL ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
   (typeof window !== 'undefined' && window.location.port === '5174'
     ? 'http://localhost:3001'
     : typeof window !== 'undefined'
