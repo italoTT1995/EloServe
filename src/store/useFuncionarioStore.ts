@@ -101,7 +101,7 @@ interface FuncionarioState {
 export const useFuncionarioStore = create<FuncionarioState>()(
   persist(
     (set, get) => ({
-      funcionarios: FUNCIONARIOS_INICIAIS,
+      funcionarios: [],
 
       adicionarFuncionario: (dados) => {
         const novo: FuncionarioCompleto = {
@@ -160,7 +160,7 @@ export const useFuncionarioStore = create<FuncionarioState>()(
       },
     }),
     {
-      name: 'eloserve_funcionarios_store_v1',
+      name: 'eloserve_funcionarios_store_v2',
     }
   )
 );

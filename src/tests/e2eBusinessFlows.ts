@@ -371,6 +371,26 @@ async function runBusinessFlowAudit() {
     const app = useAppStore.getState();
     const saas = useSaaSStore.getState();
 
+    // Provisiona dinamicamente colaboradores pelo Master
+    auth.adicionarUsuario({
+      nome: 'Lucas Oliveira (Garçom)',
+      email: 'garcom@eloserve.com.br',
+      cargo: 'garcom',
+      tenantId: 'tenant-01',
+      pin: '3344',
+      senha: 'garcom@2026',
+      ativo: true,
+    });
+    auth.adicionarUsuario({
+      nome: 'Chef Rodrigo (Cozinha)',
+      email: 'cozinha@eloserve.com.br',
+      cargo: 'cozinha',
+      tenantId: 'tenant-01',
+      pin: '5566',
+      senha: 'cozinha@2026',
+      ativo: true,
+    });
+
     // 6.1 Permissões de Garçom
     auth.login('garcom@eloserve.com.br', '3344');
     check('6.1 Garçom tem acesso a Mesas e PDV', auth.temPermissao(['garcom', 'caixa']));

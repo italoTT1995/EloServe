@@ -17,6 +17,7 @@ import {
   Check,
 } from 'lucide-react';
 import { useFuncionarioStore } from '../store/useFuncionarioStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { FuncionarioCompleto, CargoUsuario } from '../types';
 
 export default function Funcionarios() {
@@ -95,8 +96,23 @@ export default function Funcionarios() {
             }
           : undefined,
     });
+    // Sincroniza usuário e cria login no sistema de autenticação
+    try {
+      useAuthStore.getState().adicionarUsuario({
+        nome: `${form.nome} ${form.sobrenome}`,
+        email: form.email,
+        cargo: form.cargo,
+        tenantId: 'tenant-01',
+        pin: form.pin,
+        senha: `${form.cargo}@2026`,
+        ativo: true,
+      });
+    } catch (err) {
+      console.warn('Erro ao sincronizar login do colaborador:', err);
+    }
+
     setModalNovo(false);
-    dispararToast(`Colaborador "${form.nome} ${form.sobrenome}" cadastrado com sucesso!`);
+    dispararToast(`Colaborador "${form.nome} ${form.sobrenome}" cadastrado com sucesso! Login gerado.`);
   }
 
   function abrirWhatsApp(telefone: string, mensagem: string) {

@@ -10,15 +10,17 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Building2,
   KeyRound,
-  CheckCircle2,
+  Shield,
+  Layers,
 } from 'lucide-react';
 import { useAuthStore, USUARIOS_PADRAO } from '../store/useAuthStore';
-import { CargoUsuario, Usuario } from '../types';
+import { CargoUsuario } from '../types';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, loginRapidoPorCargo, getDescricaoCargo } = useAuthStore();
+  const { login, loginRapidoPorCargo } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -54,19 +56,19 @@ export default function Login() {
     }, 350);
   }
 
-  function handleLoginRapido(cargo: CargoUsuario) {
-    const usuario = loginRapidoPorCargo(cargo);
-    redirecionarPorCargo(usuario.cargo);
-  }
-
-  function handlePreencherCredenciais(u: Usuario) {
-    setEmail(u.email);
-    setSenha(u.senha || u.pin);
+  function handlePreencherMaster() {
+    const master = USUARIOS_PADRAO[0];
+    setEmail(master.email);
+    setSenha(master.senha || 'EloMaster@2026');
     setErro(null);
   }
 
-  const usuarioMaster = USUARIOS_PADRAO.find((u) => u.cargo === 'super_admin') || USUARIOS_PADRAO[0];
-  const usuariosEquipe = USUARIOS_PADRAO.filter((u) => u.cargo !== 'super_admin');
+  function handleEntrarMasterDireto() {
+    const usuario = loginRapidoPorCargo('super_admin');
+    redirecionarPorCargo(usuario.cargo);
+  }
+
+  const master = USUARIOS_PADRAO[0];
 
   return (
     <div className="min-h-screen w-screen bg-slate-950 flex flex-col justify-center items-center p-4 sm:p-6 font-['Plus_Jakarta_Sans',sans-serif] select-none relative overflow-x-hidden">
@@ -74,7 +76,7 @@ export default function Login() {
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 blur-[130px] pointer-events-none rounded-full" />
       <div className="absolute bottom-10 right-10 w-80 h-80 bg-purple-500/10 blur-[120px] pointer-events-none rounded-full" />
 
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-6 z-10">
+      <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-6 z-10">
         {/* Coluna Esquerda: Formulário de Login */}
         <div className="lg:col-span-6 bg-slate-900/90 border border-slate-800 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col justify-between">
           <div>
@@ -98,8 +100,8 @@ export default function Login() {
 
             <div className="mb-6">
               <h2 className="text-xl font-black text-white">Acesse o Sistema</h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Informe suas credenciais oficiais ou selecione um perfil ao lado para entrar.
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Entre com seu e-mail cadastrado e senha ou PIN de segurança para acessar o seu ambiente de trabalho.
               </p>
             </div>
 
@@ -115,7 +117,7 @@ export default function Login() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                  E-mail do Operador ou Administrador
+                  E-mail de Acesso
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -132,7 +134,7 @@ export default function Login() {
 
               <div>
                 <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                  Senha ou PIN de Acesso
+                  Senha ou PIN Rápido
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -141,7 +143,7 @@ export default function Login() {
                     required
                     value={senha}
                     onChange={(e) => setSenha(e.target.value)}
-                    placeholder="Digite sua senha ou PIN numérico"
+                    placeholder="Digite sua senha ou PIN de 4 dígitos"
                     className="w-full pl-10 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-colors font-medium"
                   />
                   <button
@@ -189,127 +191,112 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Coluna Direita: Credenciais & Acesso por Perfil */}
+        {/* Coluna Direita: Informações & Acesso do Admin Master */}
         <div className="lg:col-span-6 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
               <h3 className="text-sm font-extrabold text-white">
-                Perfis & Credenciais de Acesso
+                Controle Central & Autenticação
               </h3>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed mb-4">
-              Clique em <strong>Preencher</strong> para carregar os dados no formulário ou em <strong>Entrar →</strong> para login direto:
+              O EloServe opera com modelo de governança centralizada. O Admin Master gerencia os estabelecimentos, vincula os planos e cadastra os acessos de cada colaborador.
             </p>
 
             {/* Card Destaque: ADMIN MASTER (Ítalo Silva) */}
-            <div className="mb-3 p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/70 via-slate-950 to-purple-950/40 border border-purple-500/50 shadow-lg shadow-purple-500/10">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 shrink-0">
+            <div className="mb-4 p-4 rounded-2xl bg-gradient-to-br from-purple-950/80 via-slate-950 to-purple-950/40 border border-purple-500/50 shadow-xl shadow-purple-500/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
                     <Crown className="w-5 h-5" />
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-xs font-black text-purple-200 truncate">
-                        {usuarioMaster.nome}
-                      </p>
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-400/40 uppercase">
-                        Admin Master
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-300 font-mono mt-0.5">
-                      {usuarioMaster.email}
-                    </p>
-                    <p className="text-[10px] text-purple-300/80 font-mono">
-                      Senha: <span className="text-white font-bold">{usuarioMaster.senha}</span> • PIN: <span className="text-white font-bold">{usuarioMaster.pin}</span>
-                    </p>
+                  <div>
+                    <h4 className="text-xs font-black text-purple-200">
+                      {master.nome}
+                    </h4>
+                    <span className="text-[10px] font-bold text-purple-400">
+                      Super Admin Global • SaaS Master
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1 items-end shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handlePreencherCredenciais(usuarioMaster)}
-                    className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
-                  >
-                    Preencher
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoginRapido('super_admin')}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-purple-600 hover:bg-purple-500 text-white transition-all shadow-md shadow-purple-500/20 flex items-center gap-1"
-                  >
-                    Entrar →
-                  </button>
+                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/40 uppercase">
+                  Acesso Total
+                </span>
+              </div>
+
+              <div className="bg-slate-950/80 rounded-xl p-2.5 border border-purple-500/20 text-xs font-mono space-y-1">
+                <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                  <span>E-mail:</span>
+                  <span className="text-white font-bold">{master.email}</span>
                 </div>
+                <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                  <span>Senha:</span>
+                  <span className="text-white font-bold">{master.senha}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                  <span>PIN Rápido:</span>
+                  <span className="text-white font-bold">{master.pin}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handlePreencherMaster}
+                  className="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Preencher Login</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEntrarMasterDireto}
+                  className="flex-1 py-2 rounded-xl text-xs font-extrabold bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>Entrar Direto</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
-            {/* Lista dos demais perfis operacionais */}
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-              {usuariosEquipe.map((u) => {
-                const info = getDescricaoCargo(u.cargo);
-                return (
-                  <div
-                    key={u.id}
-                    className="w-full p-2.5 rounded-2xl bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800/80 hover:border-slate-700 transition-all flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-lg shrink-0">{info.icone}</span>
-                      <div className="truncate">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors truncate">
-                            {u.nome}
-                          </p>
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase border ${info.cor}`}
-                          >
-                            {u.cargo.replace('_', ' ')}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 font-mono truncate mt-0.5">
-                          {u.email} • PIN: <span className="text-slate-300 font-bold">{u.pin}</span> • Senha: <span className="text-slate-300 font-bold">{u.senha}</span>
-                        </p>
-                      </div>
-                    </div>
+            {/* Informações de Governança */}
+            <div className="space-y-2.5">
+              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-3">
+                <Building2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-white block font-semibold text-[11px]">Criação de Estabelecimentos & Planos:</strong>
+                  <span className="text-[10px] text-slate-400 leading-relaxed block mt-0.5">
+                    O Admin Master provisiona cada restaurante, define limites de mesas, ativa o módulo de reservas e associa planos (Starter, Pro, Enterprise).
+                  </span>
+                </div>
+              </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                      <button
-                        type="button"
-                        onClick={() => handlePreencherCredenciais(u)}
-                        className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition-colors"
-                      >
-                        Preencher
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleLoginRapido(u.cargo)}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/30 transition-colors"
-                      >
-                        Entrar →
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-3">
+                <Shield className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-white block font-semibold text-[11px]">Cadastro de Colaboradores & Cargos:</strong>
+                  <span className="text-[10px] text-slate-400 leading-relaxed block mt-0.5">
+                    Os acessos de Gerentes, Caixas, Garçons, Cozinheiros e Entregadores são cadastrados pelo Administrador dentro do sistema com PIN e permissões sob medida.
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-3">
+                <Layers className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-white block font-semibold text-[11px]">Multi-Tenancy 100% Blindado:</strong>
+                  <span className="text-[10px] text-slate-400 leading-relaxed block mt-0.5">
+                    Nenhum restaurante visualiza dados, estoque, comandas ou relatórios financeiros de outros estabelecimentos.
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 space-y-1">
-            <span className="text-white font-bold block flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
-              Hierarquia e Acesso Isolado:
-            </span>
-            <p>
-              • <strong>Admin Master (Ítalo Silva):</strong> Gestão SaaS global, controle de assinaturas, MRR e DRE Corporativo.
-            </p>
-            <p>
-              • <strong>Gerente:</strong> Cardápio, mesas, suprimentos, funcionários e DRE da sua filial.
-            </p>
-            <p>
-              • <strong>Caixa, Garçom, Cozinha e Delivery:</strong> Telas operacionais estritas ao seu posto de trabalho.
-            </p>
+          <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-[10px] text-slate-400 text-center">
+            🔐 EloServe Platform • Desenvolvido para Alta Performance Gastronômica
           </div>
         </div>
       </div>

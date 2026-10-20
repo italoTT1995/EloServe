@@ -45,6 +45,30 @@ async function runAllTests() {
     const auth = useAuthStore.getState();
     assert('AUTH', 'Store de Autenticação inicializada', !!auth);
     
+    // Login Admin Master Ítalo Silva
+    const resMaster = auth.login('master@eloserve.com.br', 'EloMaster@2026');
+    assert('AUTH', 'Login Admin Master Ítalo Silva', resMaster.sucesso && resMaster.usuario?.cargo === 'super_admin');
+
+    // Admin Master cadastra dinamicamente os colaboradores da loja
+    auth.adicionarUsuario({
+      nome: 'Carlos Eduardo (Gerente)',
+      email: 'gerente@eloserve.com.br',
+      cargo: 'admin_restaurante',
+      tenantId: 'tenant-01',
+      pin: '1234',
+      senha: 'gerente@2026',
+      ativo: true,
+    });
+    auth.adicionarUsuario({
+      nome: 'Lucas Oliveira (Garçom)',
+      email: 'garcom@eloserve.com.br',
+      cargo: 'garcom',
+      tenantId: 'tenant-01',
+      pin: '3344',
+      senha: 'garcom@2026',
+      ativo: true,
+    });
+
     // Login Admin / Gerente Restaurante
     const resLoginAdmin = auth.login('gerente@eloserve.com.br', '1234');
     const userAdmin = useAuthStore.getState().usuarioLogado;
