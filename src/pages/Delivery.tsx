@@ -44,7 +44,7 @@ export default function Delivery() {
 
   const { tenantAtivoId } = useSaaSStore();
   const { getProdutosPorTenant } = useProductStore();
-  const idLoja = tenantAtivoId === 'global' ? 'tenant-03' : tenantAtivoId;
+  const idLoja = !tenantAtivoId || tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
   const produtos = getProdutosPorTenant(idLoja);
 
   const { funcionarios } = useFuncionarioStore();

@@ -71,7 +71,7 @@ export default function PDV() {
   const { registrarVenda, vendas, cancelarVenda, operadorAtivo } = useAppStore();
   const { tenantAtivoId } = useSaaSStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
-  const idLoja = tenantAtivoId === 'global' ? 'tenant-03' : tenantAtivoId;
+  const idLoja = !tenantAtivoId || tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
   const produtos = getProdutosPorTenant(idLoja);
   const categorias = getCategoriasPorTenant(idLoja);
   const { processarBaixaVenda } = useEstoqueStore();

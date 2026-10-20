@@ -59,7 +59,8 @@ export default function Funcionarios() {
     setTimeout(() => setToastMsg(null), 3500);
   }
 
-  const aniversariantesMes = getAniversariantesDoMes(10); // Outubro
+  const mesAtual = new Date().getMonth() + 1;
+  const aniversariantesMes = getAniversariantesDoMes(mesAtual);
   const aniversariantesEmpresa = getAniversariantesDeEmpresa();
 
   const funcionariosFiltrados = funcionarios.filter((f) => {

@@ -198,7 +198,8 @@ export default function EloBot() {
       return todos.filter((c) => (c.totalPedidos || 0) < 10 || c.id === 'cli-02');
     }
     if (filtroPublicoCampanha === 'aniversariantes') {
-      return todos.filter((c) => c.dataNascimento?.includes('/10/') || c.id === 'cli-01' || c.id === 'cli-03');
+      const mesAtualStr = String(new Date().getMonth() + 1).padStart(2, '0');
+      return todos.filter((c) => c.dataNascimento?.includes(`/${mesAtualStr}/`) || c.id === 'cli-01' || c.id === 'cli-03');
     }
     if (filtroPublicoCampanha === 'vips') {
       return todos.filter((c) => (c.totalPedidos || 0) >= 5);
