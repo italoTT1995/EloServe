@@ -37,6 +37,125 @@ async function runBusinessFlowAudit() {
   console.log('🔬 INICIANDO AUDITORIA TÉCNICA E TESTES DOS FLUXOS DE NEGÓCIO');
   console.log('================================================================\n');
 
+  // Configura ambiente temporário para a auditoria dos fluxos de negócio
+  useSaaSStore.setState({
+    tenants: [
+      {
+        id: 'tenant-01',
+        nomeFantasia: 'Churrascaria Teste 1',
+        razaoSocial: 'Churrascaria Teste LTDA',
+        documento: '45.123.890/0001-12',
+        responsavelNome: 'Rodrigo Alvarenga',
+        telefoneWhatsApp: '+55 (31) 98112-9900',
+        email: 'gerencia@fogodeminas.com.br',
+        cidadeUf: 'Belo Horizonte / MG',
+        planoId: 'enterprise',
+        statusAssinatura: 'ativo',
+        valorMensalidade: 299.0,
+        dataInicio: '01/01/2026',
+        proximoVencimento: '15/11/2026',
+        instanciaWhatsAppConectada: true,
+        criadoEm: '2026-01-01',
+        dreHabilitado: true,
+        couvertArtisticoAtivo: true,
+        valorCouvertPorPessoa: 10.00,
+        valorCouvertPorComanda: 10.00,
+        diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
+      },
+      {
+        id: 'tenant-02',
+        nomeFantasia: 'Pizzaria Teste 2',
+        razaoSocial: 'Pizzaria Teste ME',
+        documento: '28.987.654/0001-33',
+        responsavelNome: 'Giovanni Rossi',
+        telefoneWhatsApp: '+55 (31) 98455-1122',
+        email: 'contato@bellanapoli.com.br',
+        cidadeUf: 'Belo Horizonte / MG',
+        planoId: 'pro',
+        statusAssinatura: 'ativo',
+        valorMensalidade: 199.0,
+        dataInicio: '10/02/2026',
+        proximoVencimento: '10/11/2026',
+        instanciaWhatsAppConectada: false,
+        criadoEm: '2026-02-10',
+        dreHabilitado: false,
+        couvertArtisticoAtivo: false,
+        valorCouvertPorPessoa: 10.00,
+        valorCouvertPorComanda: 10.00,
+        diasAoVivo: ['sexta', 'sabado'],
+      },
+    ],
+  });
+
+  useProductStore.setState({
+    produtosPorTenant: {
+      'tenant-01': [
+        {
+          id: 'p_fg_2',
+          categoriaId: 'c_fg_1',
+          nome: 'Ancho Prime com Risoto Trufado',
+          descricao: 'Corte alto de 400g grelhado no ponto da casa.',
+          precoVenda: 94.0,
+          precoCusto: 28.5,
+          setorPreparo: 'cozinha',
+          disponivel: true,
+        },
+      ],
+    },
+    categoriasPorTenant: {
+      'tenant-01': [
+        { id: 'c_fg_1', nome: 'Cortes Nobres' },
+      ],
+    },
+  });
+
+  useAppStore.setState({
+    mesasPorTenant: {
+      'tenant-01': [
+        { id: 'm1_t1', tenantId: 'tenant-01', numero: 1, capacidade: 4, setor: 'Salão', status: 'livre', totalConsumo: 0, tempoOcupadaMin: 0, comandaItens: [] },
+        { id: 'm2_t1', tenantId: 'tenant-01', numero: 2, capacidade: 4, setor: 'Salão', status: 'livre', totalConsumo: 0, tempoOcupadaMin: 0, comandaItens: [] },
+        { id: 'm3_t1', tenantId: 'tenant-01', numero: 3, capacidade: 4, setor: 'Salão', status: 'livre', totalConsumo: 0, tempoOcupadaMin: 0, comandaItens: [] },
+        { id: 'm10_t1', tenantId: 'tenant-01', numero: 10, capacidade: 4, setor: 'Salão', status: 'livre', totalConsumo: 0, tempoOcupadaMin: 0, comandaItens: [] },
+      ],
+      'tenant-02': [
+        { id: 'm1_t2', tenantId: 'tenant-02', numero: 1, capacidade: 4, setor: 'Salão', status: 'livre', totalConsumo: 0, tempoOcupadaMin: 0, comandaItens: [] },
+      ],
+    },
+  });
+
+  useEstoqueStore.setState({
+    itens: [
+      {
+        id: 'est-picanha',
+        nome: 'Picanha Bovina Angus Resfriada',
+        categoria: 'alimentos',
+        metodoControle: 'recorrente',
+        quantidadeAtual: 15.0,
+        unidadeMedida: 'kg',
+        consumoDiarioPrevisto: 3.0,
+        estoqueMinimo: 4.0,
+        estoqueIdeal: 20.0,
+        precoCusto: 58.0,
+        statusDisponibilidade: 'disponivel',
+        fornecedorHabitual: 'Frigorífico Central',
+      },
+      {
+        id: 'est-queijo',
+        nome: 'Queijo Mussarela Fatiado',
+        categoria: 'alimentos',
+        metodoControle: 'recorrente',
+        quantidadeAtual: 25.0,
+        unidadeMedida: 'kg',
+        consumoDiarioPrevisto: 2.0,
+        estoqueMinimo: 5.0,
+        estoqueIdeal: 30.0,
+        precoCusto: 38.0,
+        statusDisponibilidade: 'disponivel',
+        fornecedorHabitual: 'Laticínios da Serra',
+      },
+    ],
+  });
+
   // =================================================================
   // FLUXO 1: FLUXO DE VENDA COMPLETO NO SALÃO & COMANDAS
   // =================================================================

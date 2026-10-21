@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useFuncionarioStore } from '../store/useFuncionarioStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSaaSStore } from '../store/useSaaSStore';
 import { FuncionarioCompleto, CargoUsuario } from '../types';
 
 export default function Funcionarios() {
@@ -43,6 +44,7 @@ export default function Funcionarios() {
     dataNascimento: '',
     dataAdmissao: new Date().toLocaleDateString('pt-BR'),
     email: '',
+    senha: '',
     cargo: 'garcom' as CargoUsuario,
     salario: 1800,
     fgts: 144,
@@ -98,13 +100,22 @@ export default function Funcionarios() {
     });
     // Sincroniza usuário e cria login no sistema de autenticação
     try {
+      const { usuarioLogado } = useAuthStore.getState();
+      const { getTenantAtivo } = useSaaSStore.getState();
+      const tenantAtual = getTenantAtivo();
+      const tenantIdResolvido = usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global'
+        ? usuarioLogado.tenantId
+        : (tenantAtual?.id && tenantAtual.id !== 'global' ? tenantAtual.id : 'global');
+
+      const senhaFinal = form.senha.trim() ? form.senha.trim() : `${form.cargo}@2026`;
+
       useAuthStore.getState().adicionarUsuario({
         nome: `${form.nome} ${form.sobrenome}`,
         email: form.email,
         cargo: form.cargo,
-        tenantId: 'tenant-01',
+        tenantId: tenantIdResolvido,
         pin: form.pin,
-        senha: `${form.cargo}@2026`,
+        senha: senhaFinal,
         ativo: true,
       });
     } catch (err) {
@@ -528,12 +539,39 @@ export default function Funcionarios() {
                     onChange={(e) => setForm({ ...form, cargo: e.target.value as any })}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
                   >
-                    <option value="garcom">Garçom</option>
-                    <option value="caixa">Operador de Caixa</option>
-                    <option value="cozinha">Cozinha</option>
-                    <option value="entregador">Entregador (Delivery)</option>
-                    <option value="admin_restaurante">Gerente / Administrador</option>
+                    <option value="garcom">📱 Garçom / Salão</option>
+                    <option value="caixa">🛒 Operador de Caixa</option>
+                    <option value="cozinha">🍳 Cozinha / Barman (KDS)</option>
+                    <option value="entregador">🛵 Entregador (Delivery)</option>
+                    <option value="admin_restaurante">👔 Gerente / Administrador</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Credenciais de Login para o Colaborador */}
+              <div className="grid grid-cols-2 gap-3 p-3 bg-purple-950/20 border border-purple-500/20 rounded-2xl">
+                <div>
+                  <label className="text-purple-300 text-xs font-semibold block mb-1">Senha de Acesso *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.senha}
+                    onChange={(e) => setForm({ ...form, senha: e.target.value })}
+                    placeholder="Ex: Garcom@2026"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-purple-300 text-xs font-semibold block mb-1">PIN Numérico (4 Dígitos) *</label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    required
+                    value={form.pin}
+                    onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '') })}
+                    placeholder="1234"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold tracking-widest text-center text-xs"
+                  />
                 </div>
               </div>
 

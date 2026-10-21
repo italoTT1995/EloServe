@@ -266,7 +266,7 @@ export const useReservaStore = create<ReservaState>()(
       },
     }),
     {
-      name: 'eloserve_reservas_store_v2',
+      name: 'eloserve_reservas_store_v3',
     }
   )
 );

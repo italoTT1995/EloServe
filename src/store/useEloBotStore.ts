@@ -184,29 +184,8 @@ const SERVER_URL =
 export const useEloBotStore = create<EloBotState>()(
   persist(
     (set, get) => ({
-      configuracoes: {
-        'tenant-01': {
-          ...CONFIG_PADRAO,
-          nomeAgente: 'EloBot Fogo de Minas',
-          instrucoesCustomizadas: 'Especialista em carnes nobres, ponto da carne (mal passado, ao ponto, bem passado) e chopp artesanal gelado.',
-          chavePix: 'financeiro@fogodeminas.com.br',
-          palavrasCardapio: 'cardapio, cardápio, menu, carnes, pratos, opcoes, precos, churrasco, cortes',
-          palavrasAtendente: 'humano, atendente, garcom, garçom, ajuda, suporte, falar com atendente',
-          palavrasPix: 'pix, chave, chave pix, pagar, conta, pagamento',
-        },
-        'tenant-02': {
-          ...CONFIG_PADRAO,
-          nomeAgente: 'EloBot Bella Napoli',
-          instrucoesCustomizadas: 'Especialista em pizzas de fermentação lenta artesanal e vinhos italianos. Sugira borda recheada de catupiry.',
-          chavePix: 'contato@bellanapoli.com.br',
-          palavrasCardapio: 'cardapio, cardápio, menu, pizzas, sabores, massas, vinhos, precos',
-          palavrasAtendente: 'humano, atendente, ajuda, suporte, falar com atendente',
-          palavrasPix: 'pix, chave, chave pix, pagar, pagamento, conta',
-        },
-      },
-      conversasPorTenant: {
-        'tenant-01': CONVERSAS_INICIAIS_TENANT_01,
-      },
+      configuracoes: {},
+      conversasPorTenant: {},
       conversaAtivaId: null,
 
       getConfig: (tenantId: string) => {
@@ -1658,7 +1637,7 @@ export const useEloBotStore = create<EloBotState>()(
       },
     }),
     {
-      name: 'eloserve_elobot_store_v1',
+      name: 'eloserve_elobot_store_v2',
     }
   )
 );

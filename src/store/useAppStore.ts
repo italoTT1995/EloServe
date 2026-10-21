@@ -104,7 +104,7 @@ export const useAppStore = create<AppState>()(
       movimentosCaixa: [],
 
       mesasPorTenant: MESAS_POR_TENANT,
-      mesas: MESAS_POR_TENANT['tenant-01'],
+      mesas: [],
 
       getMesasPorTenant: (tenantId?: string) => {
         const state = get();
@@ -1126,7 +1126,7 @@ export const useAppStore = create<AppState>()(
       },
     }),
     {
-      name: 'eloserve_app_storage_v4',
+      name: 'eloserve_app_storage_v5',
     }
   )
 );

@@ -1743,6 +1743,24 @@ export default function SaaSMaster() {
 
       {/* CONTEÚDO DA ABA: AMBIENTE DE EDIÇÃO DAS LOJAS */}
       {abaAtiva === 'editor_loja' && (
+        !tenantEmEdicao ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center space-y-4">
+            <Store className="w-12 h-12 text-purple-400 mx-auto opacity-50" />
+            <h3 className="text-base font-bold text-white">Nenhum restaurante cliente cadastrado ainda</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              Para editar dados e cardápio de uma loja, cadastre o primeiro restaurante na aba "Restaurantes Assinantes".
+            </p>
+            <button
+              onClick={() => {
+                handleMudarAba('restaurantes');
+                setModalNovoTenant(true);
+              }}
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 cursor-pointer"
+            >
+              + Cadastrar Primeiro Restaurante
+            </button>
+          </div>
+        ) : (
         <div className="space-y-6">
           {/* Seletor Superior e Resumo da Loja */}
           <div className="bg-gradient-to-r from-slate-900 via-purple-950/40 to-slate-900 border border-purple-500/30 p-5 rounded-3xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -1783,7 +1801,7 @@ export default function SaaSMaster() {
 
               <div className="flex items-center gap-2 self-end sm:self-auto pt-4 sm:pt-4">
                 <button
-                  onClick={() => handleEntrarNaLoja(tenantEmEdicao.id)}
+                  onClick={() => tenantEmEdicao && handleEntrarNaLoja(tenantEmEdicao.id)}
                   title="Abrir o PDV deste restaurante em Modo Suporte"
                   className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-purple-600/30 cursor-pointer active:scale-95"
                 >
@@ -1792,7 +1810,7 @@ export default function SaaSMaster() {
                 </button>
 
                 <button
-                  onClick={() => setModalCobrancaWhatsApp(tenantEmEdicao)}
+                  onClick={() => tenantEmEdicao && setModalCobrancaWhatsApp(tenantEmEdicao)}
                   title="Cobrança PIX via WhatsApp"
                   className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer"
                 >
@@ -2277,6 +2295,7 @@ export default function SaaSMaster() {
             </div>
           )}
         </div>
+        )
       )}
 
       {/* CONTEÚDO DA NOVA ABA: DRE EXECUTIVO & GRÁFICOS DO SAAS */}

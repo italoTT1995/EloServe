@@ -100,7 +100,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                       EloServe SaaS (Visão Global)
                     </span>
                     <span className={`text-[9px] font-medium ${isWhite ? 'text-purple-700' : 'text-purple-400'}`}>
-                      {tenants.length} Restaurantes Assinantes
+                      {tenants.length === 0 ? '0 Restaurantes Assinantes' : `${tenants.length} Restaurantes Assinantes`}
                     </span>
                   </div>
                   <ChevronDown className={`w-3 h-3 opacity-70 shrink-0 ${isWhite ? 'text-purple-700' : 'text-purple-300'}`} />
@@ -203,52 +203,71 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 </div>
 
                 <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                  {tenants.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => {
-                        selecionarTenant(t.id);
-                        setMenuTenantAberto(false);
-                        navigate('/painel-dono');
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                        t.id === tenantAtivoId
-                          ? isWhite
-                            ? 'bg-amber-100 text-amber-950 font-bold border border-amber-300'
-                            : 'bg-amber-500 text-slate-950 font-bold'
-                          : isWhite
-                          ? 'text-slate-800 hover:bg-slate-100 hover:text-slate-900'
-                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      <div className="truncate pr-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold truncate">{t.nomeFantasia}</span>
-                          <span
-                            className={`text-[8px] px-1.5 py-0.2 rounded font-bold uppercase ${
-                              t.statusAssinatura === 'ativo'
-                                ? isWhite
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                  : 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
-                                : t.statusAssinatura === 'trial'
-                                ? isWhite
-                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                  : 'bg-amber-950 text-amber-300 border border-amber-500/30'
-                                : isWhite
-                                ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                                : 'bg-rose-950 text-rose-300 border border-rose-500/30'
-                            }`}
-                          >
-                            {t.statusAssinatura}
-                          </span>
+                  {tenants.length === 0 ? (
+                    <div className="py-5 px-3 text-center space-y-2">
+                      <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Nenhum restaurante cliente cadastrado ainda.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          selecionarTenant('global');
+                          setMenuTenantAberto(false);
+                          navigate('/saas');
+                        }}
+                        className={`text-[11px] font-bold ${isWhite ? 'text-purple-700 hover:text-purple-900' : 'text-purple-400 hover:text-purple-300'} underline cursor-pointer`}
+                      >
+                        + Cadastrar no SaaS Master
+                      </button>
+                    </div>
+                  ) : (
+                    tenants.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          selecionarTenant(t.id);
+                          setMenuTenantAberto(false);
+                          navigate('/painel-dono');
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                          t.id === tenantAtivoId
+                            ? isWhite
+                              ? 'bg-amber-100 text-amber-950 font-bold border border-amber-300'
+                              : 'bg-amber-500 text-slate-950 font-bold'
+                            : isWhite
+                            ? 'text-slate-800 hover:bg-slate-100 hover:text-slate-900'
+                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <div className="truncate pr-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold truncate">{t.nomeFantasia}</span>
+                            <span
+                              className={`text-[8px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                                t.statusAssinatura === 'ativo'
+                                  ? isWhite
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
+                                  : t.statusAssinatura === 'trial'
+                                  ? isWhite
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    : 'bg-amber-950 text-amber-300 border border-amber-500/30'
+                                  : isWhite
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                  : 'bg-rose-950 text-rose-300 border border-rose-500/30'
+                              }`}
+                            >
+                              {t.statusAssinatura}
+                            </span>
+                          </div>
+                          <p className={`text-[10px] font-mono ${isWhite ? 'text-slate-500' : 'opacity-75'}`}>
+                            {t.cidadeUf} • {t.planoId.toUpperCase()}
+                          </p>
                         </div>
-                        <p className={`text-[10px] font-mono ${isWhite ? 'text-slate-500' : 'opacity-75'}`}>
-                          {t.cidadeUf} • {t.planoId.toUpperCase()}
-                        </p>
-                      </div>
-                      {t.id === tenantAtivoId && <span className="text-[10px] font-bold">✓</span>}
-                    </button>
-                  ))}
+                        {t.id === tenantAtivoId && <span className="text-[10px] font-bold">✓</span>}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             )}

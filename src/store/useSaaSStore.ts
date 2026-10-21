@@ -214,115 +214,7 @@ export const TENANT_GLOBAL: TenantRestaurante = {
   diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
 };
 
-const TENANTS_INICIAIS: TenantRestaurante[] = [
-  {
-    id: 'tenant-01',
-    nomeFantasia: 'Churrascaria & Parrilla Fogo de Minas',
-    razaoSocial: 'Fogo de Minas Carnes Nobres LTDA',
-    documento: '45.123.890/0001-12',
-    responsavelNome: 'Rodrigo Alvarenga',
-    telefoneWhatsApp: '+55 (31) 98112-9900',
-    email: 'gerencia@fogodeminas.com.br',
-    cidadeUf: 'Belo Horizonte / MG',
-    planoId: 'enterprise',
-    statusAssinatura: 'ativo',
-    valorMensalidade: 299.0,
-    dataInicio: '01/01/2026',
-    proximoVencimento: '15/11/2026',
-    instanciaWhatsAppConectada: true,
-    criadoEm: '2026-01-01',
-    dreHabilitado: true,
-    drePermissaoModificadoPor: 'Italo Lemos (Super Admin)',
-    drePermissaoModificadoEm: '15/10/2026 14:00',
-    couvertArtisticoAtivo: true,
-    valorCouvertPorPessoa: 12.00,
-    valorCouvertPorComanda: 12.00,
-    diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
-  },
-  {
-    id: 'tenant-02',
-    nomeFantasia: 'Pizzaria & Trattoria Bella Napoli',
-    razaoSocial: 'Bella Napoli Forno a Lenha ME',
-    documento: '28.987.654/0001-33',
-    responsavelNome: 'Giovanni Rossi',
-    telefoneWhatsApp: '+55 (31) 98455-1122',
-    email: 'contato@bellanapoli.com.br',
-    cidadeUf: 'Belo Horizonte / MG',
-    planoId: 'pro',
-    statusAssinatura: 'ativo',
-    valorMensalidade: 199.0,
-    dataInicio: '10/02/2026',
-    proximoVencimento: '10/11/2026',
-    instanciaWhatsAppConectada: false,
-    criadoEm: '2026-02-10',
-    dreHabilitado: false,
-    couvertArtisticoAtivo: false,
-    valorCouvertPorPessoa: 10.00,
-    valorCouvertPorComanda: 10.00,
-    diasAoVivo: ['sexta', 'sabado'],
-  },
-  {
-    id: 'tenant-03',
-    nomeFantasia: 'Smash Burguer Mania',
-    razaoSocial: 'Burguer Mania Lanches EIRELI',
-    documento: '33.456.789/0001-88',
-    responsavelNome: 'Camila Fernandes',
-    telefoneWhatsApp: '+55 (31) 99123-4567',
-    email: 'financeiro@burguermania.com.br',
-    cidadeUf: 'Contagem / MG',
-    planoId: 'enterprise',
-    statusAssinatura: 'trial',
-    diasRestantesTrial: 5,
-    valorMensalidade: 299.0,
-    dataInicio: '04/10/2026',
-    proximoVencimento: '11/10/2026',
-    instanciaWhatsAppConectada: true,
-    criadoEm: '2026-10-04',
-    dreHabilitado: false,
-    couvertArtisticoAtivo: true,
-    valorCouvertPorPessoa: 12.00,
-    valorCouvertPorComanda: 12.00,
-    diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
-  },
-  {
-    id: 'tenant-04',
-    nomeFantasia: 'Boteco & Espetos do Silva',
-    razaoSocial: 'Silva Bar e Restaurante ME',
-    documento: '19.876.543/0001-99',
-    responsavelNome: 'Marcos Silva',
-    telefoneWhatsApp: '+55 (31) 98765-4321',
-    email: 'silva.espetos@gmail.com',
-    cidadeUf: 'Betim / MG',
-    planoId: 'starter',
-    statusAssinatura: 'atrasado',
-    valorMensalidade: 99.0,
-    dataInicio: '15/03/2026',
-    proximoVencimento: '05/10/2026',
-    instanciaWhatsAppConectada: false,
-    criadoEm: '2026-03-15',
-    dreHabilitado: false,
-  },
-  {
-    id: 'tenant-05',
-    nomeFantasia: 'Sushi Prime Oriental',
-    razaoSocial: 'Prime Culinaria Asiatica LTDA',
-    documento: '51.222.333/0001-44',
-    responsavelNome: 'Juliana Tanaka',
-    telefoneWhatsApp: '+55 (31) 99654-7890',
-    email: 'gerencia@sushiprime.com.br',
-    cidadeUf: 'Nova Lima / MG',
-    planoId: 'pro',
-    statusAssinatura: 'ativo',
-    valorMensalidade: 199.0,
-    dataInicio: '20/05/2026',
-    proximoVencimento: '20/10/2026',
-    instanciaWhatsAppConectada: false,
-    criadoEm: '2026-05-20',
-    dreHabilitado: true,
-    drePermissaoModificadoPor: 'Italo Lemos (Super Admin)',
-    drePermissaoModificadoEm: '14/10/2026 11:30',
-  },
-];
+const TENANTS_INICIAIS: TenantRestaurante[] = [];
 
 const CUSTOS_INFRA_PADRAO: CustosInfraSaaS = {
   cloudVps: 180.0,
@@ -332,61 +224,9 @@ const CUSTOS_INFRA_PADRAO: CustosInfraSaaS = {
   suporteMarketing: 350.0,
 };
 
-const AVISOS_INICIAIS: AvisoGlobalSaaS[] = [
-  {
-    id: 'aviso-01',
-    titulo: 'Novos Módulos: Estoque Inteligente & Delivery',
-    mensagem: 'Liberada a gestão com margem de segurança de 5 unidades, controle de sobras do dia anterior e rotas Google Maps.',
-    tipo: 'novidade',
-    destinoTenantId: 'todos',
-    ativo: true,
-    criadoEm: '13/10/2026 09:30',
-  },
-  {
-    id: 'aviso-02',
-    titulo: 'Otimização Preventiva na Madrugada',
-    mensagem: 'Hoje entre 03:00 e 03:15 os servidores passarão por otimização de rotina. Nenhuma perda de comanda ou dado ocorrerá.',
-    tipo: 'info',
-    destinoTenantId: 'todos',
-    ativo: true,
-    criadoEm: '12/10/2026 14:00',
-  },
-];
+const AVISOS_INICIAIS: AvisoGlobalSaaS[] = [];
 
-const LOGS_INICIAIS: LogAuditoriaSaaS[] = [
-  {
-    id: 'log-01',
-    dataHora: '13/10/2026 10:15',
-    usuarioNome: 'Super Admin (Dono do SaaS)',
-    acao: 'Atualização do DRE Executivo',
-    categoria: 'financeiro',
-    detalhes: 'Configurada a apuração de ROL, COGS Cloud, Lucro Bruto e Projeção de Valuation.',
-  },
-  {
-    id: 'log-02',
-    dataHora: '13/10/2026 09:30',
-    usuarioNome: 'Super Admin (Dono do SaaS)',
-    acao: 'Publicação de Aviso Global',
-    categoria: 'sistema',
-    detalhes: 'Disparado comunicado geral de liberação dos módulos de Estoque Inteligente.',
-  },
-  {
-    id: 'log-03',
-    dataHora: '12/10/2026 16:10',
-    usuarioNome: 'Super Admin (Dono do SaaS)',
-    acao: 'Alteração de Regras de Plano',
-    categoria: 'plano',
-    detalhes: 'Plano Pro atualizado para permitir mesas ilimitadas e até 5 caixas simultâneos.',
-  },
-  {
-    id: 'log-04',
-    dataHora: '11/10/2026 11:20',
-    usuarioNome: 'Super Admin (Dono do SaaS)',
-    acao: 'Cadastro de Restaurante',
-    categoria: 'restaurante',
-    detalhes: 'Cadastrado cliente Smash Burguer Mania no plano Enterprise (Trial 7 dias).',
-  },
-];
+const LOGS_INICIAIS: LogAuditoriaSaaS[] = [];
 
 export const useSaaSStore = create<SaaSState>()(
   persist(
@@ -395,7 +235,7 @@ export const useSaaSStore = create<SaaSState>()(
       tenants: TENANTS_INICIAIS,
       tenantAtivoId: 'global',
       abaAtivaMaster: 'restaurantes',
-      tenantEmEdicaoId: 'tenant-01',
+      tenantEmEdicaoId: null,
       custosInfra: CUSTOS_INFRA_PADRAO,
       avisos: AVISOS_INICIAIS,
       logsAuditoria: LOGS_INICIAIS,
@@ -410,7 +250,7 @@ export const useSaaSStore = create<SaaSState>()(
       selecionarTenant: (tenantId: string) => {
         set({
           tenantAtivoId: tenantId,
-          tenantEmEdicaoId: tenantId === 'global' ? 'tenant-01' : tenantId,
+          tenantEmEdicaoId: tenantId === 'global' ? null : tenantId,
         });
       },
 
@@ -670,10 +510,32 @@ export const useSaaSStore = create<SaaSState>()(
       },
     }),
     {
-      name: 'eloserve_saas_store_v5',
+      name: 'eloserve_saas_store_v6',
       partialize: (state) => {
         const { masterDesbloqueado, tentativasFalhasMaster, bloqueadoAte, ...rest } = state;
-        return rest;
+        return {
+          ...rest,
+          tenants: (rest.tenants || []).filter(
+            (t) => !['tenant-01', 'tenant-02', 'tenant-03', 'tenant-04', 'tenant-05'].includes(t.id) &&
+                   !t.nomeFantasia.includes('Fogo de Minas') &&
+                   !t.nomeFantasia.includes('Bella Napoli') &&
+                   !t.nomeFantasia.includes('Smash Burguer') &&
+                   !t.nomeFantasia.includes('Boteco & Espetos') &&
+                   !t.nomeFantasia.includes('Sushi Prime')
+          ),
+        };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.tenants = (state.tenants || []).filter(
+            (t) => !['tenant-01', 'tenant-02', 'tenant-03', 'tenant-04', 'tenant-05'].includes(t.id) &&
+                   !t.nomeFantasia.includes('Fogo de Minas') &&
+                   !t.nomeFantasia.includes('Bella Napoli') &&
+                   !t.nomeFantasia.includes('Smash Burguer') &&
+                   !t.nomeFantasia.includes('Boteco & Espetos') &&
+                   !t.nomeFantasia.includes('Sushi Prime')
+          );
+        }
       },
     }
   )

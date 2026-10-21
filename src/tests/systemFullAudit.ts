@@ -37,6 +37,144 @@ async function runAllTests() {
   console.log('🚀 EXECUTANDO AUDITORIA COMPLETA DE TODOS OS MÓDULOS');
   console.log('====================================================\n');
 
+  // Configura ambiente temporário isolado para os testes de auditoria
+  useSaaSStore.setState({
+    tenants: [
+      {
+        id: 'tenant-01',
+        nomeFantasia: 'Churrascaria Teste 1',
+        razaoSocial: 'Churrascaria Teste LTDA',
+        documento: '45.123.890/0001-12',
+        responsavelNome: 'Rodrigo Alvarenga',
+        telefoneWhatsApp: '+55 (31) 98112-9900',
+        email: 'gerencia@fogodeminas.com.br',
+        cidadeUf: 'Belo Horizonte / MG',
+        planoId: 'enterprise',
+        statusAssinatura: 'ativo',
+        valorMensalidade: 299.0,
+        dataInicio: '01/01/2026',
+        proximoVencimento: '15/11/2026',
+        instanciaWhatsAppConectada: true,
+        criadoEm: '2026-01-01',
+        dreHabilitado: true,
+        couvertArtisticoAtivo: true,
+        valorCouvertPorPessoa: 12.00,
+        valorCouvertPorComanda: 12.00,
+        diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
+      },
+      {
+        id: 'tenant-02',
+        nomeFantasia: 'Pizzaria Teste 2',
+        razaoSocial: 'Pizzaria Teste ME',
+        documento: '28.987.654/0001-33',
+        responsavelNome: 'Giovanni Rossi',
+        telefoneWhatsApp: '+55 (31) 98455-1122',
+        email: 'contato@bellanapoli.com.br',
+        cidadeUf: 'Belo Horizonte / MG',
+        planoId: 'pro',
+        statusAssinatura: 'ativo',
+        valorMensalidade: 199.0,
+        dataInicio: '10/02/2026',
+        proximoVencimento: '10/11/2026',
+        instanciaWhatsAppConectada: false,
+        criadoEm: '2026-02-10',
+        dreHabilitado: false,
+        couvertArtisticoAtivo: false,
+        valorCouvertPorPessoa: 10.00,
+        valorCouvertPorComanda: 10.00,
+        diasAoVivo: ['sexta', 'sabado'],
+      },
+    ],
+  });
+
+  useProductStore.setState({
+    produtosPorTenant: {
+      'tenant-01': [
+        {
+          id: 'p_fg_1',
+          categoriaId: 'c_fg_1',
+          nome: 'Picanha Angus na Brasa (2 pessoas)',
+          descricao: '600g de picanha importada maturada com sal de parrilla e chimichurri.',
+          precoVenda: 128.0,
+          precoCusto: 35.97,
+          setorPreparo: 'cozinha',
+          disponivel: true,
+        },
+        {
+          id: 'p_fg_7',
+          categoriaId: 'c_fg_4',
+          nome: 'Chopp Artesanal IPA 500ml',
+          descricao: 'Chopp com amargor marcante e aroma cítrico.',
+          precoVenda: 18.0,
+          precoCusto: 5.2,
+          setorPreparo: 'bar',
+          disponivel: true,
+        },
+      ],
+    },
+    categoriasPorTenant: {
+      'tenant-01': [
+        { id: 'c_fg_1', nome: 'Cortes Nobres na Brasa' },
+        { id: 'c_fg_4', nome: 'Bebidas' },
+      ],
+    },
+  });
+
+  useAppStore.setState({
+    mesasPorTenant: {
+      'tenant-01': [
+        { id: 'm1_t1', tenantId: 'tenant-01', numero: 1, capacidade: 4, setor: 'Salão', status: 'livre', totalConsumo: 0, tempoOcupadaMin: 0, comandaItens: [] },
+        { id: 'm2_t1', tenantId: 'tenant-01', numero: 2, capacidade: 4, setor: 'Salão', status: 'livre', totalConsumo: 0, tempoOcupadaMin: 0, comandaItens: [] },
+        { id: 'm3_t1', tenantId: 'tenant-01', numero: 3, capacidade: 4, setor: 'Salão', status: 'livre', totalConsumo: 0, tempoOcupadaMin: 0, comandaItens: [] },
+        { id: 'm10_t1', tenantId: 'tenant-01', numero: 10, capacidade: 4, setor: 'Salão', status: 'livre', totalConsumo: 0, tempoOcupadaMin: 0, comandaItens: [] },
+      ],
+      'tenant-02': [
+        { id: 'm1_t2', tenantId: 'tenant-02', numero: 1, capacidade: 4, setor: 'Salão', status: 'livre', totalConsumo: 0, tempoOcupadaMin: 0, comandaItens: [] },
+      ],
+    },
+  });
+
+  useEloBotStore.setState({
+    configuracoes: {
+      'tenant-01': {
+        tenantId: 'tenant-01',
+        nomeLoja: 'Churrascaria Teste 1',
+        nomeAgente: 'EloBot Fogo de Minas',
+        tomDeVoz: 'amigavel',
+        instrucoesCustomizadas: 'Especialista em carnes',
+        chavePix: 'financeiro@fogodeminas.com.br',
+        ativo: true,
+        palavrasCardapio: 'cardapio',
+        palavrasAtendente: 'humano',
+        palavrasPix: 'pix',
+        mensagemBoasVindas: 'Ola',
+        mensagemCardapio: 'Cardapio',
+        mensagemTransbordo: 'Aguarde',
+        mensagemChavePix: 'Pix',
+        produtosPersonalizados: [],
+      } as any,
+    },
+  });
+
+  useEstoqueStore.setState({
+    itens: [
+      {
+        id: 'est-picanha',
+        nome: 'Picanha Bovina Angus Resfriada',
+        categoria: 'alimentos',
+        metodoControle: 'recorrente',
+        quantidadeAtual: 15.0,
+        unidadeMedida: 'kg',
+        consumoDiarioPrevisto: 3.0,
+        estoqueMinimo: 4.0,
+        estoqueIdeal: 20.0,
+        precoCusto: 58.0,
+        statusDisponibilidade: 'disponivel',
+        fornecedorHabitual: 'Frigorífico Central',
+      },
+    ],
+  });
+
   // -----------------------------------------------------------------
   // 1. MÓDULO AUTH & ROLES
   // -----------------------------------------------------------------

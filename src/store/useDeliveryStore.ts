@@ -280,7 +280,7 @@ export const useDeliveryStore = create<DeliveryState>()(
       },
     }),
     {
-      name: 'eloserve_delivery_store_v2',
+      name: 'eloserve_delivery_store_v3',
     }
   )
 );
