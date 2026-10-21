@@ -43,7 +43,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const { getTenantAtivo, tenants, selecionarTenant, tenantAtivoId, getMRR } = useSaaSStore();
   const tenantAtual = getTenantAtivo();
   const { isFocused } = useWindowFocus();
-  const { usuarioLogado, loginRapidoPorCargo, logout, getDescricaoCargo } = useAuthStore();
+  const { usuarioLogado, logout, getDescricaoCargo } = useAuthStore();
   const infoCargo = getDescricaoCargo(usuarioLogado?.cargo);
   const isSuperAdmin = usuarioLogado?.cargo === 'super_admin';
   const isModoGlobal = tenantAtivoId === 'global';
@@ -435,40 +435,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 </div>
               </div>
 
-              <p className={`px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-                Simular Outro Cargo (Hierarquia)
-              </p>
-
-              {[
-                { cargo: 'super_admin' as const, label: 'Dono do SaaS (Italo Lemos)', icone: '👑' },
-                { cargo: 'admin_restaurante' as const, label: 'Gerente da Loja (Carlos)', icone: '👔' },
-                { cargo: 'caixa' as const, label: 'Operador de Caixa (Juliana)', icone: '🛒' },
-                { cargo: 'garcom' as const, label: 'Garçom / Salão (Lucas)', icone: '📱' },
-                { cargo: 'cozinha' as const, label: 'Cozinha / KDS (Rodrigo)', icone: '🍳' },
-              ].map((p) => (
-                <button
-                  key={p.cargo}
-                  onClick={() => {
-                    loginRapidoPorCargo(p.cargo);
-                    setMenuPerfilAberto(false);
-                  }}
-                  className={`w-full text-left px-3 py-1.5 rounded-xl text-xs flex items-center justify-between transition-colors ${
-                    usuarioLogado?.cargo === p.cargo
-                      ? 'bg-emerald-600 !text-white font-bold'
-                      : isWhite
-                      ? 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span>{p.icone}</span>
-                    <span>{p.label}</span>
-                  </span>
-                  {usuarioLogado?.cargo === p.cargo && <span className="text-[10px] !text-white">✓</span>}
-                </button>
-              ))}
-
-              <div className={`pt-2 mt-1 border-t ${isWhite ? 'border-slate-100' : 'border-slate-800'}`}>
+<div className={`pt-2 mt-1 border-t ${isWhite ? 'border-slate-100' : 'border-slate-800'}`}>
                 <button
                   onClick={() => {
                     logout();
