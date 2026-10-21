@@ -163,6 +163,13 @@ export const useAppStore = create<AppState>()(
             garcomResponsavel: 'Garçom',
           },
         ];
+        // Registra as mesas iniciais para este novo estabelecimento no estado persistente
+        set((s) => ({
+          mesasPorTenant: {
+            ...(s.mesasPorTenant || {}),
+            [idAlvo]: mesasIniciais,
+          },
+        }));
         return mesasIniciais;
       },
 

@@ -382,11 +382,14 @@ export const useEstoqueStore = create<EstoqueState>()(
       },
 
       baixarEstoquePorVenda: (produtoNome, quantidade) => {
+        if (!produtoNome) return;
         set((state) => ({
-          itens: state.itens.map((item) => {
+          itens: (state.itens || []).map((item) => {
             if (
-              item.nome.toLowerCase().includes(produtoNome.toLowerCase()) ||
-              produtoNome.toLowerCase().includes(item.nome.toLowerCase())
+              item &&
+              item.nome &&
+              (item.nome.toLowerCase().includes(produtoNome.toLowerCase()) ||
+                produtoNome.toLowerCase().includes(item.nome.toLowerCase()))
             ) {
               const novaQtd = Math.max(0, Number((item.quantidadeAtual - quantidade).toFixed(2)));
               let novoStatus: ItemEstoque['statusDisponibilidade'] = 'disponivel';
