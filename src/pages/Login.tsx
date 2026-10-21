@@ -5,13 +5,9 @@ import {
   Lock,
   Mail,
   ArrowRight,
-  ShieldCheck,
   AlertCircle,
   Eye,
   EyeOff,
-  Building2,
-  Shield,
-  Layers,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { CargoUsuario } from '../types';
@@ -60,9 +56,9 @@ export default function Login() {
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 blur-[130px] pointer-events-none rounded-full" />
       <div className="absolute bottom-10 right-10 w-80 h-80 bg-purple-500/10 blur-[120px] pointer-events-none rounded-full" />
 
-      <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-6 z-10">
-        {/* Coluna Esquerda: Formulário de Login */}
-        <div className="lg:col-span-6 bg-slate-900/90 border border-slate-800 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col justify-between">
+      <div className="w-full max-w-md z-10">
+        {/* Card Central de Login */}
+        <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col justify-between">
           <div>
             {/* Logo & Marca */}
             <div className="flex items-center gap-3 mb-6">
@@ -172,58 +168,6 @@ export default function Login() {
             <p className="text-[11px] text-slate-500">
               EloServe SaaS v2.4 • Segurança RBAC, Multi-Tenancy & Criptografia Ativas
             </p>
-          </div>
-        </div>
-
-        {/* Coluna Direita: Informações & Acesso do Admin Master */}
-        <div className="lg:col-span-6 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col justify-between space-y-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              <h3 className="text-sm font-extrabold text-white">
-                Controle Central & Autenticação
-              </h3>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed mb-4">
-              O EloServe opera com modelo de governança centralizada. O Admin Master gerencia os estabelecimentos, vincula os planos e cadastra os acessos de cada colaborador.
-            </p>
-
-            {/* Informações de Governança */}
-            <div className="space-y-3 mt-4">
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-3">
-                <Building2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-white block font-semibold text-[11px]">Criação de Estabelecimentos & Planos:</strong>
-                  <span className="text-[10px] text-slate-400 leading-relaxed block mt-0.5">
-                    O Admin Master provisiona cada restaurante, define limites de mesas, ativa o módulo de reservas e associa planos (Starter, Pro, Enterprise).
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-3">
-                <Shield className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-white block font-semibold text-[11px]">Cadastro de Colaboradores & Cargos:</strong>
-                  <span className="text-[10px] text-slate-400 leading-relaxed block mt-0.5">
-                    Os acessos de Gerentes, Caixas, Garçons, Cozinheiros e Entregadores são cadastrados pelo Administrador dentro do sistema com PIN e permissões sob medida.
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-3">
-                <Layers className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-white block font-semibold text-[11px]">Multi-Tenancy 100% Blindado:</strong>
-                  <span className="text-[10px] text-slate-400 leading-relaxed block mt-0.5">
-                    Nenhum restaurante visualiza dados, estoque, comandas ou relatórios financeiros de outros estabelecimentos.
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-[10px] text-slate-400 text-center">
-            🔐 EloServe Platform • Desenvolvido para Alta Performance Gastronômica
           </div>
         </div>
       </div>
