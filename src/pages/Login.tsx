@@ -6,21 +6,19 @@ import {
   Mail,
   ArrowRight,
   ShieldCheck,
-  Crown,
   AlertCircle,
   Eye,
   EyeOff,
   Building2,
-  KeyRound,
   Shield,
   Layers,
 } from 'lucide-react';
-import { useAuthStore, USUARIOS_PADRAO } from '../store/useAuthStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { CargoUsuario } from '../types';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, loginRapidoPorCargo } = useAuthStore();
+  const { login } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -55,20 +53,6 @@ export default function Login() {
       }
     }, 350);
   }
-
-  function handlePreencherMaster() {
-    const master = USUARIOS_PADRAO[0];
-    setEmail(master.email);
-    setSenha(master.senha || 'EloMaster@2026');
-    setErro(null);
-  }
-
-  function handleEntrarMasterDireto() {
-    const usuario = loginRapidoPorCargo('super_admin');
-    redirecionarPorCargo(usuario.cargo);
-  }
-
-  const master = USUARIOS_PADRAO[0];
 
   return (
     <div className="min-h-screen w-screen bg-slate-950 flex flex-col justify-center items-center p-4 sm:p-6 font-['Plus_Jakarta_Sans',sans-serif] select-none relative overflow-x-hidden">
@@ -204,65 +188,8 @@ export default function Login() {
               O EloServe opera com modelo de governança centralizada. O Admin Master gerencia os estabelecimentos, vincula os planos e cadastra os acessos de cada colaborador.
             </p>
 
-            {/* Card Destaque: ADMIN MASTER (Ítalo Silva) */}
-            <div className="mb-4 p-4 rounded-2xl bg-gradient-to-br from-purple-950/80 via-slate-950 to-purple-950/40 border border-purple-500/50 shadow-xl shadow-purple-500/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
-                    <Crown className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-black text-purple-200">
-                      {master.nome}
-                    </h4>
-                    <span className="text-[10px] font-bold text-purple-400">
-                      Super Admin Global • SaaS Master
-                    </span>
-                  </div>
-                </div>
-
-                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/40 uppercase">
-                  Acesso Total
-                </span>
-              </div>
-
-              <div className="bg-slate-950/80 rounded-xl p-2.5 border border-purple-500/20 text-xs font-mono space-y-1">
-                <div className="flex items-center justify-between text-slate-300 text-[11px]">
-                  <span>E-mail:</span>
-                  <span className="text-white font-bold">{master.email}</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-300 text-[11px]">
-                  <span>Senha:</span>
-                  <span className="text-white font-bold">{master.senha}</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-300 text-[11px]">
-                  <span>PIN Rápido:</span>
-                  <span className="text-white font-bold">{master.pin}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={handlePreencherMaster}
-                  className="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <KeyRound className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Preencher Login</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleEntrarMasterDireto}
-                  className="flex-1 py-2 rounded-xl text-xs font-extrabold bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <span>Entrar Direto</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
             {/* Informações de Governança */}
-            <div className="space-y-2.5">
+            <div className="space-y-3 mt-4">
               <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-3">
                 <Building2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
