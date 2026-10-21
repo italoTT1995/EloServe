@@ -111,7 +111,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   <Globe className={`w-4 h-4 ${isWhite ? 'text-purple-600' : 'text-purple-400'} shrink-0`} />
                   <div className="flex flex-col text-left">
                     <span className={`truncate max-w-[130px] sm:max-w-[220px] font-extrabold ${isWhite ? 'text-purple-950' : 'text-white'}`}>
-                      EloServe SaaS (Visão Global)
+                      ELOserve
                     </span>
                     <span className={`text-[9px] font-medium ${isWhite ? 'text-purple-700' : 'text-purple-400'}`}>
                       {tenants.length === 0 ? '0 Restaurantes Assinantes' : `${tenants.length} Restaurantes Assinantes`}
@@ -218,7 +218,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                       <Globe className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="font-bold">EloServe SaaS (Visão Global)</p>
+                      <p className="font-bold">ELOserve</p>
                       <p className={`text-[10px] ${isModoGlobal ? '!text-white/80' : isWhite ? 'text-purple-700' : 'opacity-80'}`}>
                         Administração de todos os restaurantes
                       </p>
@@ -240,21 +240,10 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
                 <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                   {tenants.length === 0 ? (
-                    <div className="py-5 px-3 text-center space-y-2">
+                    <div className="py-4 px-3 text-center">
                       <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                         Nenhum restaurante cliente cadastrado ainda.
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          selecionarTenant('global');
-                          setMenuTenantAberto(false);
-                          navigate('/saas');
-                        }}
-                        className={`text-[11px] font-bold ${isWhite ? 'text-purple-700 hover:text-purple-900' : 'text-purple-400 hover:text-purple-300'} underline cursor-pointer`}
-                      >
-                        + Cadastrar no SaaS Master
-                      </button>
                     </div>
                   ) : (
                     tenants.map((t) => (

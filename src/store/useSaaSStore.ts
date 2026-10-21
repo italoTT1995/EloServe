@@ -200,7 +200,7 @@ interface SaaSState {
 
 export const TENANT_GLOBAL: TenantRestaurante = {
   id: 'global',
-  nomeFantasia: 'EloServe SaaS (Visão Global)',
+  nomeFantasia: 'ELOserve',
   razaoSocial: 'EloServe Tecnologia e Gestão SaaS LTDA',
   documento: '45.123.890/0001-12',
   responsavelNome: 'Italo Lemos (Super Admin)',
