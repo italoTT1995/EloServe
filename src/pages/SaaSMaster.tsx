@@ -771,10 +771,6 @@ export default function SaaSMaster() {
     setModalNovoAviso(false);
   }
 
-  function handleExportarDREImpressao() {
-    window.print();
-  }
-
   function handleExportarRestaurantesCSV() {
     const cabecalho = 'ID,Nome Fantasia,Razao Social,Documento,Responsavel,WhatsApp,Email,Cidade/UF,Plano,Status,Mensalidade (R$),Vencimento\n';
     const linhas = tenants
@@ -2855,16 +2851,6 @@ export default function SaaSMaster() {
                 >
                   <Sliders className="w-3.5 h-3.5 text-purple-400" />
                   <span>Ajustar Custos Reais</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleExportarDREImpressao}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
-                  title="Imprimir ou Salvar DRE em PDF"
-                >
-                  <Printer className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Imprimir / PDF</span>
                 </button>
 
                 <div className="flex items-center bg-slate-950 p-1 rounded-2xl border border-slate-800 overflow-x-auto">
