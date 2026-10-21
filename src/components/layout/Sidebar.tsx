@@ -23,6 +23,7 @@ import {
   History,
   LayoutDashboard,
   Settings,
+  FileSpreadsheet,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -170,7 +171,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
               return [
                 { id: 'restaurantes', label: 'Restaurantes Assinantes', icon: Store, badge: 'Clientes' },
-                { id: 'editor_loja', label: 'Ambiente de Edição das Lojas', icon: Sliders, badge: 'Editar', highlight: true },
+                { id: 'dossie_mensal', label: 'Dossiê Mensal & Consultoria', icon: FileSpreadsheet, badge: 'DRE', highlight: true },
+                { id: 'editor_loja', label: 'Ambiente de Edição das Lojas', icon: Sliders, badge: 'Editar' },
                 { id: 'dre_saas', label: 'DRE Executivo & Gráficos', icon: BarChart3, badge: 'DRE' },
                 { id: 'financeiro', label: 'Métricas Financeiras & MRR', icon: TrendingUp },
                 { id: 'planos', label: 'Planos & Mensalidades', icon: Layers },
