@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { TenantRestaurante, PlanoAssinatura, TipoPlanoSaaS, StatusAssinatura } from '../types';
+import { TenantRestaurante, PlanoAssinatura, TipoPlanoSaaS, StatusAssinatura, ChamadoSuporte } from '../types';
 
 export const PLANOS_DISPONIVEIS: PlanoAssinatura[] = [
   {
@@ -115,6 +115,7 @@ export const PLANOS_DISPONIVEIS: PlanoAssinatura[] = [
 ];
 
 export type AbaMasterSaaS =
+  | 'suporte_ao_vivo'
   | 'restaurantes'
   | 'financeiro'
   | 'editor_loja'
@@ -183,6 +184,11 @@ interface SaaSState {
   getTotalAtivos: () => number;
   getTotalTrials: () => number;
   getTotalAtrasados: () => number;
+  chamadosSuporte: ChamadoSuporte[];
+  abrirChamadoSuporte: (dados: Omit<ChamadoSuporte, 'id' | 'status' | 'criadoEm'>) => ChamadoSuporte;
+  atualizarStatusChamado: (id: string, status: 'aberto' | 'em_atendimento' | 'resolvido', atendente?: string) => void;
+  getChamadosAbertos: () => ChamadoSuporte[];
+  getChamadosPorTenant: (tenantId: string) => ChamadoSuporte[];
   codigoSegurancaMaster: string;
   masterDesbloqueado: boolean;
   tentativasFalhasMaster: number;
@@ -239,6 +245,53 @@ export const useSaaSStore = create<SaaSState>()(
       custosInfra: CUSTOS_INFRA_PADRAO,
       avisos: AVISOS_INICIAIS,
       logsAuditoria: LOGS_INICIAIS,
+      chamadosSuporte: [],
+
+      abrirChamadoSuporte: (dados) => {
+        const novo: ChamadoSuporte = {
+          ...dados,
+          id: `chm-${Date.now().toString().slice(-5)}`,
+          status: 'aberto',
+          criadoEm: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        };
+        set((state) => ({
+          chamadosSuporte: [novo, ...(state.chamadosSuporte || [])],
+        }));
+        get().registrarLogAuditoria(
+          'Abertura de Chamado de Suporte',
+          'sistema',
+          `Restaurante ${dados.tenantNome} solicitou suporte: ${dados.descricao} (Prioridade: ${dados.prioridade})`
+        );
+        return novo;
+      },
+
+      atualizarStatusChamado: (id, status, atendente) => {
+        set((state) => ({
+          chamadosSuporte: (state.chamadosSuporte || []).map((ch) =>
+            ch.id === id
+              ? {
+                  ...ch,
+                  status,
+                  ...(status === 'resolvido'
+                    ? {
+                        resolvidoEm: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                        resolvidoPor: atendente || 'Super Admin Master',
+                      }
+                    : {}),
+                }
+              : ch
+          ),
+        }));
+      },
+
+      getChamadosAbertos: () => {
+        return (get().chamadosSuporte || []).filter((ch) => ch.status !== 'resolvido');
+      },
+
+      getChamadosPorTenant: (tenantId: string) => {
+        return (get().chamadosSuporte || []).filter((ch) => ch.tenantId === tenantId);
+      },
+
       codigoSegurancaMaster: '889900',
       masterDesbloqueado: false,
       tentativasFalhasMaster: 0,

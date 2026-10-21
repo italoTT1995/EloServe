@@ -19,6 +19,12 @@ import {
   TrendingUp,
   Sun,
   Moon,
+  Activity,
+  Headphones,
+  AlertTriangle,
+  X,
+  Send,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useSaaSStore } from '../../store/useSaaSStore';
@@ -38,6 +44,14 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const [menuPerfilAberto, setMenuPerfilAberto] = useState(false);
   const [menuTenantAberto, setMenuTenantAberto] = useState(false);
   const [modalAtalhosAberto, setModalAtalhosAberto] = useState(false);
+  const [modalSuporteAberto, setModalSuporteAberto] = useState(false);
+  const [formSuporte, setFormSuporte] = useState({
+    categoria: 'duvida' as 'caixa' | 'kds' | 'pedidos' | 'whatsapp' | 'duvida' | 'urgente',
+    descricao: '',
+    prioridade: 'normal' as 'normal' | 'urgente',
+    telefoneWhatsApp: '',
+  });
+  const [toastSuporte, setToastSuporte] = useState<string | null>(null);
 
   const { caixaAtual } = useAppStore();
   const { getTenantAtivo, tenants, selecionarTenant, tenantAtivoId, getMRR } = useSaaSStore();
@@ -155,6 +169,28 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   <Crown className="w-3 h-3" />
                   <span>Ambiente Super Admin (Dono do SaaS)</span>
                 </p>
+
+                {/* Atalho Direto: Torre de Monitoramento & Suporte ao Vivo */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    selecionarTenant('global');
+                    setMenuTenantAberto(false);
+                    navigate('/saas?aba=suporte_ao_vivo');
+                  }}
+                  className="w-full text-left p-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-between text-xs font-bold transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-purple-400 animate-pulse" />
+                    <div>
+                      <p className="font-bold text-white text-xs">Torre de Monitoramento & Suporte</p>
+                      <p className="text-[10px] text-purple-300">Ver o que as lojas fazem e atender suporte</p>
+                    </div>
+                  </div>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-500/40 font-bold uppercase">
+                    Ao Vivo
+                  </span>
+                </button>
 
                 {/* Opção 1: Visão Global SaaS */}
                 <button
@@ -300,6 +336,23 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
       {/* Right Indicators */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Botão de Solicitar Suporte ao Admin Master para Restaurantes */}
+        {usuarioLogado?.cargo !== 'super_admin' && (
+          <button
+            type="button"
+            onClick={() => setModalSuporteAberto(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              isWhite
+                ? 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100'
+                : 'bg-purple-950/40 text-purple-300 border-purple-500/30 hover:bg-purple-900/50'
+            }`}
+            title="Precisa de suporte? Clique para chamar o Franqueador Master!"
+          >
+            <Headphones className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+            <span className="hidden sm:inline">Suporte Master</span>
+          </button>
+        )}
+
         {/* Alternador Rápido de Visão: Painel do Dono vs Frente de Caixa */}
         {usuarioLogado?.cargo === 'admin_restaurante' && (
           <div className={`hidden md:flex items-center ${isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'} p-1 rounded-xl border text-xs`}>
@@ -472,6 +525,18 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           )}
         </div>
 
+        {/* Alerta de Chamados de Suporte para o Master */}
+        {isSuperAdmin && useSaaSStore.getState().getChamadosAbertos().length > 0 && (
+          <Link
+            to="/saas?aba=suporte_ao_vivo"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 text-xs font-black shadow-lg shadow-rose-600/30 animate-bounce transition-all"
+            title="Clique para atender o chamado de suporte do restaurante!"
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>🚨 {useSaaSStore.getState().getChamadosAbertos().length} Chamado de Suporte</span>
+          </Link>
+        )}
+
         {/* Total do Caixa Atual ou MRR do SaaS */}
         {isSuperAdmin && isModoGlobal ? (
           <div
@@ -572,6 +637,150 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </div>
         </div>
       )}
+    
+      {/* Modal de Solicitação de Suporte ao Franqueador Master */}
+      {modalSuporteAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-purple-500/40 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-purple-600/20 border border-purple-500/30 text-purple-400 flex items-center justify-center">
+                  <Headphones className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-white text-base">Solicitar Suporte ao Master</h3>
+                  <p className="text-xs text-purple-300 font-semibold">{tenantAtual.nomeFantasia}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalSuporteAberto(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!formSuporte.descricao.trim()) return;
+
+                useSaaSStore.getState().abrirChamadoSuporte({
+                  tenantId: tenantAtual.id,
+                  tenantNome: tenantAtual.nomeFantasia,
+                  solicitanteNome: usuarioLogado?.nome || 'Operador',
+                  solicitanteCargo: usuarioLogado?.cargo || 'gerente',
+                  telefoneContato: formSuporte.telefoneWhatsApp || tenantAtual.telefoneWhatsApp || '(31) 99999-9999',
+                  categoria: formSuporte.categoria,
+                  descricao: formSuporte.descricao.trim(),
+                  prioridade: formSuporte.prioridade,
+                });
+
+                setModalSuporteAberto(false);
+                setFormSuporte({
+                  categoria: 'duvida',
+                  descricao: '',
+                  prioridade: 'normal',
+                  telefoneWhatsApp: '',
+                });
+                setToastSuporte('Chamado de suporte enviado com sucesso! O Admin Master foi notificado.');
+                setTimeout(() => setToastSuporte(null), 5000);
+              }}
+              className="space-y-3.5 text-xs"
+            >
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">Qual a área do problema ou dúvida?</label>
+                <select
+                  value={formSuporte.categoria}
+                  onChange={(e) => setFormSuporte({ ...formSuporte, categoria: e.target.value as any })}
+                  className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold focus:border-purple-500 focus:outline-none"
+                >
+                  <option value="duvida">❓ Dúvida de Operação / Treinamento</option>
+                  <option value="caixa">🛒 Frente de Caixa / Fechamento de Venda</option>
+                  <option value="kds">🍳 Cozinha & Bar (KDS) / Pedidos</option>
+                  <option value="pedidos">🪑 Mesas, Comandas ou Delivery</option>
+                  <option value="whatsapp">🤖 EloBot & WhatsApp IA</option>
+                  <option value="urgente">🚨 Problema Crítico / Travamento</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">WhatsApp para Contato / Retorno:</label>
+                <input
+                  type="text"
+                  value={formSuporte.telefoneWhatsApp}
+                  onChange={(e) => setFormSuporte({ ...formSuporte, telefoneWhatsApp: e.target.value })}
+                  placeholder={tenantAtual.telefoneWhatsApp || "(31) 99999-9999"}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">Descreva o que está acontecendo *</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={formSuporte.descricao}
+                  onChange={(e) => setFormSuporte({ ...formSuporte, descricao: e.target.value })}
+                  placeholder="Explique o que precisa de ajuda para que o Franqueador Master possa te auxiliar..."
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-purple-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-4 pt-1">
+                <label className="text-slate-300 font-bold">Nível de Urgência:</label>
+                <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="prioridade"
+                    checked={formSuporte.prioridade === 'normal'}
+                    onChange={() => setFormSuporte({ ...formSuporte, prioridade: 'normal' })}
+                    className="accent-purple-500"
+                  />
+                  <span>Normal</span>
+                </label>
+                <label className="flex items-center gap-1.5 text-rose-400 font-bold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="prioridade"
+                    checked={formSuporte.prioridade === 'urgente'}
+                    onChange={() => setFormSuporte({ ...formSuporte, prioridade: 'urgente' })}
+                    className="accent-rose-500"
+                  />
+                  <span>🚨 Urgente</span>
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalSuporteAberto(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Enviar Chamado</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Toast de Notificação de Suporte */}
+      {toastSuporte && (
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-4 py-3 rounded-2xl font-bold text-xs shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-2">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>{toastSuporte}</span>
+        </div>
+      )}
+
     </header>
   );
 }

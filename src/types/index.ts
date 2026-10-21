@@ -240,6 +240,23 @@ export interface PlanoAssinatura {
   regrasTexto?: string[];
 }
 
+
+
+export interface ChamadoSuporte {
+  id: string;
+  tenantId: string;
+  tenantNome: string;
+  solicitanteNome: string;
+  solicitanteCargo: string;
+  telefoneContato: string;
+  categoria: 'caixa' | 'kds' | 'pedidos' | 'whatsapp' | 'duvida' | 'urgente';
+  descricao: string;
+  status: 'aberto' | 'em_atendimento' | 'resolvido';
+  criadoEm: string;
+  resolvidoEm?: string;
+  resolvidoPor?: string;
+  prioridade: 'normal' | 'urgente';
+}
 export interface TenantRestaurante {
   id: string;
   nomeFantasia: string;

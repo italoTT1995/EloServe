@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Building2,
+  Activity,
+  Headphones,
   Users,
   TrendingUp,
   AlertCircle,
@@ -55,6 +57,8 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useSaaSStore, AbaMasterSaaS } from '../store/useSaaSStore';
+import { useAppStore } from '../store/useAppStore';
+import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useProductStore } from '../store/useProductStore';
 import { useEloBotStore } from '../store/useEloBotStore';
 import { useThemeStore } from '../store/useThemeStore';
@@ -100,7 +104,14 @@ export default function SaaSMaster() {
     desbloquearMaster,
     bloquearMaster,
     alterarCodigoMaster,
+    chamadosSuporte,
+    getChamadosAbertos,
+    atualizarStatusChamado,
   } = useSaaSStore();
+
+  const { getMesasPorTenant, getVendasPorTenant, pedidosKDS } = useAppStore();
+  const { pedidos: pedidosDelivery } = useDeliveryStore();
+  const chamadosAbertos = getChamadosAbertos ? getChamadosAbertos() : [];
 
   const {
     getProdutosPorTenant,
@@ -1225,6 +1236,28 @@ export default function SaaSMaster() {
       {/* Abas Administrativas do Super Admin */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto scrollbar-none">
         <button
+          type="button"
+          onClick={() => handleMudarAba('suporte_ao_vivo')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            abaAtiva === 'suporte_ao_vivo'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25 ring-2 ring-purple-400'
+              : 'bg-slate-900 text-purple-300 hover:text-white border border-purple-500/30'
+          }`}
+        >
+          <Activity className="w-4 h-4 text-purple-400 animate-pulse" />
+          <span>Monitoramento & Suporte ao Vivo</span>
+          {chamadosAbertos.length > 0 ? (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600 text-white font-black animate-bounce shadow-sm">
+              🚨 {chamadosAbertos.length} {chamadosAbertos.length === 1 ? 'Chamado' : 'Chamados'}
+            </span>
+          ) : (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30 font-bold uppercase">
+              Ao Vivo
+            </span>
+          )}
+        </button>
+
+        <button
           onClick={() => handleMudarAba('restaurantes')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             abaAtiva === 'restaurantes'
@@ -1358,6 +1391,451 @@ export default function SaaSMaster() {
           <span>Configuração do Franqueador</span>
         </button>
       </div>
+
+      {/* CONTEÚDO DA ABA: MONITORAMENTO & SUPORTE AO VIVO */}
+      {abaAtiva === 'suporte_ao_vivo' && (
+        <div className="space-y-6 animate-in fade-in duration-150">
+          {/* Top Banner da Torre de Controle */}
+          <div className="bg-gradient-to-r from-purple-950/80 via-slate-900 to-indigo-950/80 border border-purple-500/40 p-5 rounded-3xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                  Torre de Controle Operacional
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold uppercase">
+                  Ao Vivo
+                </span>
+              </div>
+              <h2 className="text-xl font-black text-white tracking-tight">
+                Monitoramento das Operações & Helpdesk Master
+              </h2>
+              <p className="text-xs text-slate-300 max-w-2xl">
+                Visualize em tempo real o status operacional de cada restaurante parceiro, acompanhe mesas ocupadas, vendas do dia e atenda prontamente chamados de suporte dos gerentes.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setModalNovoTenant(true)}
+                className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Novo Restaurante</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Cards de Métricas em Tempo Real */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-sm">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+                <span className="font-bold">Restaurantes na Rede</span>
+                <Building2 className="w-4 h-4 text-purple-400" />
+              </div>
+              <p className="text-2xl font-black text-white">{tenants.length}</p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {tenants.filter((t) => t.statusAssinatura === 'ativo').length} ativos • {tenants.filter((t) => t.statusAssinatura === 'trial').length} em teste
+              </p>
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-sm">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+                <span className="font-bold">Vendas de Hoje (Rede)</span>
+                <DollarSign className="w-4 h-4 text-emerald-400" />
+              </div>
+              {(() => {
+                const todasVendas = tenants.flatMap((t) => getVendasPorTenant(t.id));
+                const totalValor = todasVendas.reduce((acc, v) => acc + (v.total || 0), 0);
+                return (
+                  <>
+                    <p className="text-2xl font-black text-emerald-400">
+                      R$ {totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {todasVendas.length} pedidos faturados
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-sm">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+                <span className="font-bold">Mesas Ocupadas Agora</span>
+                <UtensilsCrossed className="w-4 h-4 text-amber-400" />
+              </div>
+              {(() => {
+                const todasMesas = tenants.flatMap((t) => getMesasPorTenant(t.id));
+                const ocupadas = todasMesas.filter((m) => m.status === 'ocupada').length;
+                return (
+                  <>
+                    <p className="text-2xl font-black text-amber-400">{ocupadas}</p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      De {todasMesas.length} mesas distribuídas
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+
+            <div className={`p-4 rounded-2xl border shadow-sm transition-all ${
+              chamadosAbertos.length > 0
+                ? 'bg-rose-950/40 border-rose-500/50 shadow-rose-900/20'
+                : 'bg-slate-900/90 border-slate-800'
+            }`}>
+              <div className="flex items-center justify-between text-xs mb-2">
+                <span className={`font-bold ${chamadosAbertos.length > 0 ? 'text-rose-300' : 'text-slate-400'}`}>
+                  Chamados de Suporte
+                </span>
+                <Headphones className={`w-4 h-4 ${chamadosAbertos.length > 0 ? 'text-rose-400 animate-bounce' : 'text-slate-500'}`} />
+              </div>
+              <p className={`text-2xl font-black ${chamadosAbertos.length > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                {chamadosAbertos.length}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {chamadosAbertos.length > 0 ? '🚨 Requer atenção Master' : 'Nenhum chamado pendente'}
+              </p>
+            </div>
+          </div>
+
+          {/* Central de Chamados de Suporte (Helpdesk do Franqueador) */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                  <Headphones className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                    Central de Chamados dos Restaurantes
+                    {chamadosAbertos.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black animate-pulse">
+                        {chamadosAbertos.length} ABERTO(S)
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Chamados abertos diretamente pelo botão "Suporte Master" no sistema de cada restaurante.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {chamadosAbertos.length === 0 ? (
+              <div className="text-center py-8 px-4 rounded-2xl bg-slate-950/50 border border-slate-800/80">
+                <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2 opacity-80" />
+                <h4 className="text-sm font-bold text-white">Todos os Restaurantes Estão Operando com Sucesso!</h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                  Não há chamados de suporte em aberto no momento. Quando um restaurante solicitar auxílio técnico ou operacional, o chamado aparecerá aqui em tempo real.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {chamadosAbertos.map((ch) => (
+                  <div
+                    key={ch.id}
+                    className={`p-4 rounded-2xl border transition-all ${
+                      ch.prioridade === 'urgente'
+                        ? 'bg-rose-950/30 border-rose-500/60 shadow-lg shadow-rose-950/40'
+                        : 'bg-slate-950 border-purple-500/40 shadow-md'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 pb-2 border-b border-slate-800/80">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-white text-sm">{ch.tenantNome}</span>
+                          <span
+                            className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${
+                              ch.prioridade === 'urgente'
+                                ? 'bg-rose-600 text-white animate-pulse'
+                                : 'bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            {ch.prioridade === 'urgente' ? '🚨 Urgente' : 'Normal'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Solicitante: <strong className="text-purple-300">{ch.solicitanteNome}</strong> ({ch.solicitanteCargo}) • Aberto às {ch.criadoEm}
+                        </p>
+                      </div>
+
+                      <span className="text-[10px] px-2 py-0.5 rounded-lg bg-purple-950 text-purple-300 border border-purple-500/30 font-bold uppercase">
+                        {ch.categoria === 'caixa'
+                          ? '🛒 Caixa'
+                          : ch.categoria === 'kds'
+                          ? '🍳 Cozinha'
+                          : ch.categoria === 'pedidos'
+                          ? '🪑 Mesas/Delivery'
+                          : ch.categoria === 'whatsapp'
+                          ? '🤖 WhatsApp'
+                          : '❓ Dúvida'}
+                      </span>
+                    </div>
+
+                    <div className="py-3">
+                      <p className="text-xs text-slate-200 bg-slate-900/80 p-3 rounded-xl border border-slate-800/80 leading-relaxed font-sans">
+                        "{ch.descricao}"
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
+                      {ch.telefoneContato && (
+                        <a
+                          href={`https://wa.me/55${ch.telefoneContato.replace(/\D/g, '')}?text=Ol%C3%A1%20${encodeURIComponent(
+                            ch.solicitanteNome
+                          )}%2C%20aqui%20%C3%A9%20o%20Suporte%20Master%20do%20EloServe.%20Recebi%20seu%20chamado%20sobre%3A%20${encodeURIComponent(
+                            ch.descricao
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 text-[11px] transition-all shadow-sm"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>WhatsApp ({ch.telefoneContato})</span>
+                        </a>
+                      )}
+
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            selecionarTenant(ch.tenantId);
+                            navigate(ch.categoria === 'kds' ? '/kds' : ch.categoria === 'pedidos' ? '/mesas' : '/pdv');
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold flex items-center gap-1.5 text-[11px] transition-all shadow-sm cursor-pointer"
+                          title="Entrar no sistema do restaurante para ver o que está acontecendo"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Modo Suporte</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => atualizarStatusChamado(ch.id, 'resolvido', 'Ítalo Silva (Master)')}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1.5 text-[11px] transition-all cursor-pointer"
+                          title="Marcar este chamado como resolvido"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Concluir</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Torre de Controle ao Vivo de Cada Restaurante */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-purple-400" />
+                  Operações ao Vivo por Restaurante
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Acompanhe exatamente o que está acontecendo nas mesas, balcão, cozinha e caixa de cada cliente em tempo real.
+                </p>
+              </div>
+            </div>
+
+            {tenants.length === 0 ? (
+              <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-3xl space-y-3">
+                <Store className="w-10 h-10 text-slate-600 mx-auto" />
+                <h4 className="text-sm font-bold text-white">Nenhum Restaurante Cadastrado no Momento</h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  A base foi inicializada limpa para o lançamento comercial. Cadastre os novos restaurantes clientes para iniciar o monitoramento.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setModalNovoTenant(true)}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Cadastrar Primeiro Restaurante</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {tenants.map((t) => {
+                  const mesas = getMesasPorTenant(t.id);
+                  const mesasOcupadas = mesas.filter((m) => m.status === 'ocupada');
+                  const totalConsumoMesas = mesasOcupadas.reduce((acc, m) => acc + (m.totalConsumo || 0), 0);
+
+                  const vendas = getVendasPorTenant(t.id);
+                  const totalVendasValor = vendas.reduce((acc, v) => acc + (v.total || 0), 0);
+
+                  const chamadosLoja = (chamadosSuporte || []).filter(
+                    (ch) => ch.tenantId === t.id && ch.status !== 'resolvido'
+                  );
+
+                  const whatsappConfig = useEloBotStore.getState().getConfig(t.id);
+                  const isWhatsappAtivo = whatsappConfig?.statusInstancia === 'conectado';
+
+                  const emoji =
+                    t.id === 'tenant-05'
+                      ? '🍣'
+                      : t.id === 'tenant-02'
+                      ? '🍕'
+                      : t.id === 'tenant-03'
+                      ? '🍔'
+                      : t.id === 'tenant-04'
+                      ? '🍢'
+                      : '🥩';
+
+                  return (
+                    <div
+                      key={t.id}
+                      className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl hover:border-purple-500/40 transition-all space-y-4"
+                    >
+                      {/* Topo do Card do Restaurante */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-2xl shrink-0 shadow-inner">
+                            {emoji}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-base font-extrabold text-white">{t.nomeFantasia}</h4>
+                              {chamadosLoja.length > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black animate-bounce">
+                                  🚨 {chamadosLoja.length} Suporte
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400">
+                              {t.documento || 'CNPJ não informado'} • Responsável: <strong className="text-slate-300">{t.responsavelNome}</strong>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-1">
+                          <span
+                            className={`text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider ${
+                              t.statusAssinatura === 'ativo'
+                                ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
+                                : t.statusAssinatura === 'trial'
+                                ? 'bg-amber-950 text-amber-400 border border-amber-500/30'
+                                : 'bg-rose-950 text-rose-400 border border-rose-500/30'
+                            }`}
+                          >
+                            {t.statusAssinatura}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-950 text-purple-300 border border-purple-500/30 font-bold uppercase">
+                            Plano {t.planoId}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Grade de Indicadores em Tempo Real da Loja */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                          <span className="text-[10px] text-slate-400 font-bold block mb-0.5">Vendas Hoje</span>
+                          <span className="text-emerald-400 font-extrabold text-xs block truncate">
+                            R$ {totalVendasValor.toFixed(2)}
+                          </span>
+                          <span className="text-[10px] text-slate-500">{vendas.length} pedidos</span>
+                        </div>
+
+                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                          <span className="text-[10px] text-slate-400 font-bold block mb-0.5">Mesas Salão</span>
+                          <span className="text-amber-400 font-extrabold text-xs block">
+                            {mesasOcupadas.length} / {mesas.length} ocupadas
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            R$ {totalConsumoMesas.toFixed(2)} aberto
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                          <span className="text-[10px] text-slate-400 font-bold block mb-0.5">WhatsApp Robô</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                isWhatsappAtivo ? 'bg-emerald-400 animate-ping' : 'bg-slate-600'
+                              }`}
+                            />
+                            <span
+                              className={`text-[11px] font-bold ${
+                                isWhatsappAtivo ? 'text-emerald-400' : 'text-slate-400'
+                              }`}
+                            >
+                              {isWhatsappAtivo ? 'Online' : 'Desconectado'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-500">EloBot IA</span>
+                        </div>
+
+                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                          <span className="text-[10px] text-slate-400 font-bold block mb-0.5">Status Suporte</span>
+                          <span
+                            className={`text-[11px] font-bold block ${
+                              chamadosLoja.length > 0 ? 'text-rose-400' : 'text-emerald-400'
+                            }`}
+                          >
+                            {chamadosLoja.length > 0 ? `🚨 ${chamadosLoja.length} Pendente` : '✅ Estável'}
+                          </span>
+                          <span className="text-[10px] text-slate-500">Operação Normal</span>
+                        </div>
+                      </div>
+
+                      {/* Barra de Ações Rápidas do Master */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
+                        {t.telefoneWhatsApp ? (
+                          <a
+                            href={`https://wa.me/55${t.telefoneWhatsApp.replace(/\D/g, '')}?text=Ol%C3%A1%20${encodeURIComponent(
+                              t.responsavelNome
+                            )}%2C%20aqui%20%C3%A9%20o%20Suporte%20Master%20EloServe.`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-700/80 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>WhatsApp Gerente</span>
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-slate-500">Sem telefone cadastrado</span>
+                        )}
+
+                        <div className="flex items-center gap-2 ml-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTenantEmEdicaoId(t.id);
+                              handleMudarAba('editor_loja');
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                            title="Editar cardápio, dados e configurações desta loja"
+                          >
+                            <Sliders className="w-3.5 h-3.5" />
+                            <span>Configurar</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              selecionarTenant(t.id);
+                              navigate('/pdv');
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md shadow-purple-600/30 flex items-center gap-1.5 cursor-pointer"
+                            title="Acessar o sistema como este restaurante para prestar suporte"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Modo Suporte (Entrar)</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* CONTEÚDO DA ABA 1: RESTAURANTES ASSINANTES */}
       {abaAtiva === 'restaurantes' && (
