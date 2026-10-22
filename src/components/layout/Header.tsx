@@ -76,7 +76,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
   return (
     <header className={`h-16 px-4 sm:px-6 ${
-      isWhite ? 'bg-white border-b border-slate-200' : 'bg-slate-900 border-b border-slate-800'
+      isWhite ? 'bg-[#F8FAFC] border-b border-slate-200' : 'bg-[#0F172A] border-b border-[#1E293B]'
     } flex items-center justify-between select-none`}>
       {/* Left: Mobile Menu Toggle & Store Switcher */}
       <div className="flex items-center gap-3">
@@ -99,8 +99,8 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               className={`flex items-center gap-1.5 sm:gap-2.5 text-left text-xs sm:text-sm font-bold transition-all px-2.5 py-1.5 rounded-xl border cursor-pointer ${
                 isModoGlobal
                   ? isWhite
-                    ? 'bg-purple-50 border-purple-200 hover:border-purple-300 text-purple-950 shadow-sm'
-                    : 'bg-purple-950/40 border-purple-500/30 hover:border-purple-400 text-white'
+                    ? 'bg-orange-50 border-orange-200 hover:border-orange-300 text-slate-900 shadow-sm'
+                    : 'bg-[#1E293B] border-slate-700 hover:border-[#FF6B00]/60 text-white'
                   : isWhite
                   ? 'bg-amber-50 border-amber-300 hover:border-amber-400 text-amber-950 shadow-sm'
                   : 'bg-amber-950/40 border-amber-500/30 hover:border-amber-400 text-white'
@@ -108,20 +108,20 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             >
               {isModoGlobal ? (
                 <>
-                  <Globe className={`w-4 h-4 ${isWhite ? 'text-purple-600' : 'text-purple-400'} shrink-0`} />
+                  <Globe className="w-4 h-4 text-[#FF6B00] shrink-0" />
                   <div className="flex flex-col text-left">
-                    <span className={`truncate max-w-[130px] sm:max-w-[220px] font-extrabold ${isWhite ? 'text-purple-950' : 'text-white'}`}>
+                    <span className={`truncate max-w-[130px] sm:max-w-[220px] font-extrabold ${isWhite ? 'text-slate-900' : 'text-white'}`}>
                       ELOserve
                     </span>
-                    <span className={`text-[9px] font-medium ${isWhite ? 'text-purple-700' : 'text-purple-400'}`}>
+                    <span className={`text-[9px] font-medium ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
                       {tenants.length === 0 ? '0 Restaurantes Assinantes' : `${tenants.length} Restaurantes Assinantes`}
                     </span>
                   </div>
-                  <ChevronDown className={`w-3 h-3 opacity-70 shrink-0 ${isWhite ? 'text-purple-700' : 'text-purple-300'}`} />
+                  <ChevronDown className="w-3 h-3 opacity-70 shrink-0 text-[#FF6B00]" />
                   <span className={`hidden md:inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
                     isWhite
-                      ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                      : 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                      ? 'bg-orange-100 text-[#FF6B00] border border-orange-200'
+                      : 'bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/40'
                   }`}>
                     MASTER
                   </span>
@@ -161,12 +161,12 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
             {menuTenantAberto && (
               <div className={`absolute left-0 mt-2 w-72 ${
-                isWhite ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+                isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-700'
               } border rounded-2xl p-2 shadow-2xl z-50 space-y-1.5 animate-in fade-in duration-100`}>
                 <p className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                  isWhite ? 'text-purple-800' : 'text-purple-400'
+                  isWhite ? 'text-[#FF6B00]' : 'text-orange-400'
                 }`}>
-                  <Crown className="w-3 h-3" />
+                  <Crown className="w-3 h-3 text-[#FF6B00]" />
                   <span>Ambiente Super Admin (Dono do SaaS)</span>
                 </p>
 
@@ -178,16 +178,16 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                     setMenuTenantAberto(false);
                     navigate('/saas?aba=suporte_ao_vivo');
                   }}
-                  className="w-full text-left p-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-between text-xs font-bold transition-all cursor-pointer"
+                  className="w-full text-left p-2.5 rounded-xl bg-[#FF6B00]/15 hover:bg-[#FF6B00]/25 border border-[#FF6B00]/40 text-[#FF6B00] flex items-center justify-between text-xs font-bold transition-all cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-purple-400 animate-pulse" />
+                    <Activity className="w-4 h-4 text-[#FF6B00] animate-pulse" />
                     <div>
                       <p className="font-bold text-white text-xs">Torre de Monitoramento & Suporte</p>
-                      <p className="text-[10px] text-purple-300">Ver o que as lojas fazem e atender suporte</p>
+                      <p className="text-[10px] text-orange-300">Ver o que as lojas fazem e atender suporte</p>
                     </div>
                   </div>
-                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-500/40 font-bold uppercase">
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/40 font-bold uppercase">
                     Ao Vivo
                   </span>
                 </button>
@@ -201,10 +201,10 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   }}
                   className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
                     isModoGlobal
-                      ? 'bg-purple-600 !text-white font-bold shadow-md shadow-purple-600/30'
+                      ? 'bg-[#FF6B00] !text-white font-bold shadow-md shadow-[#FF6B00]/30'
                       : isWhite
-                      ? 'text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200'
-                      : 'text-purple-300 bg-purple-950/30 hover:bg-purple-900/40 border border-purple-500/20'
+                      ? 'text-slate-900 bg-orange-50 hover:bg-orange-100 border border-orange-200'
+                      : 'text-slate-200 bg-[#0F172A] hover:bg-slate-800 border border-slate-700'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
@@ -212,14 +212,14 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                       isModoGlobal
                         ? 'bg-white/20 !text-white'
                         : isWhite
-                        ? 'bg-purple-200 text-purple-800'
-                        : 'bg-purple-500/20 text-purple-300'
+                        ? 'bg-orange-100 text-[#FF6B00]'
+                        : 'bg-[#FF6B00]/20 text-[#FF6B00]'
                     }`}>
                       <Globe className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="font-bold">ELOserve</p>
-                      <p className={`text-[10px] ${isModoGlobal ? '!text-white/80' : isWhite ? 'text-purple-700' : 'opacity-80'}`}>
+                      <p className={`text-[10px] ${isModoGlobal ? '!text-white/80' : isWhite ? 'text-slate-600' : 'opacity-80'}`}>
                         Administração de todos os restaurantes
                       </p>
                     </div>
@@ -532,14 +532,14 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             title="Receita Recorrente Mensal (MRR) de todos os restaurantes clientes do EloServe"
             className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${
               isWhite
-                ? 'bg-purple-50 border border-purple-200'
-                : 'bg-purple-950/60 border border-purple-500/30'
+                ? 'bg-emerald-50 border border-emerald-300'
+                : 'bg-emerald-950/40 border border-emerald-500/30'
             }`}
           >
-            <TrendingUp className={`w-3.5 h-3.5 ${isWhite ? 'text-purple-600' : 'text-purple-400'}`} />
+            <TrendingUp className="w-3.5 h-3.5 text-[#10B981]" />
             <div className="flex items-baseline gap-1.5">
-              <span className={`text-[10px] font-medium ${isWhite ? 'text-purple-800' : 'text-purple-300'}`}>MRR SaaS:</span>
-              <span className={`text-xs font-bold font-mono ${isWhite ? 'text-purple-950' : 'text-purple-300'}`}>
+              <span className={`text-[10px] font-medium ${isWhite ? 'text-emerald-800' : 'text-emerald-400'}`}>MRR SaaS:</span>
+              <span className={`text-xs font-bold font-mono ${isWhite ? 'text-emerald-700' : 'text-[#10B981]'}`}>
                 R$ {mrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
               </span>
             </div>
@@ -751,7 +751,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 cursor-pointer flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#E66000] text-white font-bold shadow-lg shadow-[#FF6B00]/30 cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Enviar Chamado</span>

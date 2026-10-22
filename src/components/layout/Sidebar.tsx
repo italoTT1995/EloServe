@@ -99,13 +99,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <aside
       className={`fixed lg:static inset-y-0 left-0 z-40 w-64 ${
-        isWhite ? 'bg-white border-r border-slate-200' : 'bg-slate-900 border-r border-slate-800'
+        isWhite ? 'bg-[#F8FAFC] border-r border-slate-200' : 'bg-[#0F172A] border-r border-[#1E293B]'
       } flex flex-col h-screen select-none transition-transform duration-300 ease-in-out ${
         isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
       }`}
     >
       {/* Brand Header */}
-      <div className={`h-16 px-5 border-b ${isWhite ? 'border-slate-200' : 'border-slate-800'} flex items-center justify-between`}>
+      <div className={`h-16 px-5 border-b ${isWhite ? 'border-slate-200' : 'border-[#1E293B]'} flex items-center justify-between`}>
         <Link
           to={
             usuarioLogado?.cargo === 'super_admin' && isModoGlobal
@@ -121,9 +121,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           />
           <span
             className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
-              usuarioLogado?.cargo === 'super_admin' && isModoGlobal
-                ? isWhite ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-purple-950 text-purple-300 border border-purple-500/30'
-                : isWhite ? 'bg-orange-100 text-[#FF6B00] border border-orange-200' : 'bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/40'
+              isWhite
+                ? 'bg-orange-100 text-[#FF6B00] border border-orange-200'
+                : 'bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/40'
             }`}
           >
             {usuarioLogado?.cargo === 'super_admin' && isModoGlobal ? 'Master' : 'PDV'}
@@ -145,9 +145,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         {usuarioLogado?.cargo === 'super_admin' && isModoGlobal ? (
           <div className="space-y-1">
             <p className={`px-3 text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5 ${
-              isWhite ? 'text-purple-800' : 'text-purple-400'
+              isWhite ? 'text-[#FF6B00]' : 'text-orange-400'
             }`}>
-              <Crown className="w-3.5 h-3.5" />
+              <Crown className="w-3.5 h-3.5 text-[#FF6B00]" />
               <span>Administração SaaS Master</span>
             </p>
 
@@ -177,14 +177,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     }}
                     className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
                       isTabActive
-                        ? 'bg-purple-600 !text-white shadow-lg shadow-purple-600/25 font-bold'
+                        ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-bold'
                         : item.highlight
                         ? isWhite
-                          ? 'text-purple-900 bg-purple-50 border border-purple-200 hover:bg-purple-100 font-bold'
-                          : 'text-purple-300 bg-purple-950/30 border border-purple-500/30 hover:bg-purple-900/40'
+                          ? 'text-[#FF6B00] bg-orange-50 border border-orange-200 hover:bg-orange-100 font-bold'
+                          : 'text-orange-400 bg-orange-950/30 border border-[#FF6B00]/30 hover:bg-orange-900/40'
                         : isWhite
-                        ? 'text-slate-700 hover:text-purple-700 hover:bg-purple-50/70 font-semibold'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                        ? 'text-slate-700 hover:text-[#FF6B00] hover:bg-orange-50/70 font-semibold'
+                        : 'text-slate-300 hover:text-white hover:bg-[#1E293B]'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -192,8 +192,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         isTabActive
                           ? '!text-white'
                           : isWhite
-                          ? 'text-purple-600'
-                          : 'text-purple-400'
+                          ? 'text-[#FF6B00]'
+                          : 'text-orange-400'
                       }`} />
                       <span>{item.label}</span>
                     </div>
@@ -202,8 +202,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         isTabActive
                           ? 'bg-white/20 !text-white'
                           : isWhite
-                          ? 'bg-purple-100 text-purple-900 border border-purple-200'
-                          : 'bg-purple-950 text-purple-300 border border-purple-500/30'
+                          ? 'bg-orange-100 text-[#FF6B00] border border-orange-200'
+                          : 'bg-[#1E293B] text-orange-300 border border-[#FF6B00]/30'
                       }`}>
                         {item.badge}
                       </span>
@@ -219,26 +219,26 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             {usuarioLogado?.cargo === 'super_admin' && !isModoGlobal && (
               <div className={`px-3 py-2 mb-2 rounded-xl border text-[11px] space-y-1.5 ${
                 isWhite
-                  ? 'bg-purple-50 border-purple-200 text-purple-900'
-                  : 'bg-purple-950/40 border-purple-500/30 text-purple-300'
+                  ? 'bg-orange-50 border-orange-200 text-slate-900'
+                  : 'bg-[#1E293B] border-[#FF6B00]/30 text-slate-200'
               }`}>
                 <div className="flex items-center justify-between">
                   <span className="font-bold flex items-center gap-1">
-                    <Crown className={`w-3.5 h-3.5 ${isWhite ? 'text-purple-600' : 'text-purple-400'}`} />
+                    <Crown className="w-3.5 h-3.5 text-[#FF6B00]" />
                     <span>Modo Suporte</span>
                   </span>
                   <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${
-                    isWhite ? 'bg-purple-200 text-purple-800' : 'bg-purple-500/20 text-purple-200'
+                    isWhite ? 'bg-orange-200 text-[#FF6B00]' : 'bg-[#FF6B00]/20 text-orange-200'
                   }`}>LOJA</span>
                 </div>
-                <p className={`text-[11px] font-extrabold truncate ${isWhite ? 'text-purple-950' : 'text-white'}`}>{tenantAtual.nomeFantasia}</p>
+                <p className={`text-[11px] font-extrabold truncate ${isWhite ? 'text-slate-900' : 'text-white'}`}>{tenantAtual.nomeFantasia}</p>
                 <button
                   type="button"
                   onClick={() => {
                     selecionarTenant('global');
                     navigate('/saas');
                   }}
-                  className="w-full mt-1 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 !text-white font-bold text-[10px] transition-colors cursor-pointer text-center flex items-center justify-center gap-1 shadow-sm"
+                  className="w-full mt-1 py-1 rounded-lg bg-[#FF6B00] hover:bg-[#E66000] !text-white font-bold text-[10px] transition-colors cursor-pointer text-center flex items-center justify-center gap-1 shadow-sm shadow-[#FF6B00]/20"
                 >
                   <span className="!text-white">↩ Voltar ao SaaS Master</span>
                 </button>
@@ -263,13 +263,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   className={({ isActive }) =>
                     `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
                       isActive
-                        ? isWhite
-                          ? 'bg-orange-500 !text-white font-bold shadow-md shadow-orange-500/20'
-                          : 'bg-slate-800 text-white font-bold shadow-sm'
+                        ? 'bg-[#FF6B00] !text-white font-bold shadow-lg shadow-[#FF6B00]/30'
                         : isWhite
-                        ? 'text-slate-700 hover:text-orange-600 hover:bg-orange-50/70 font-semibold'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                    } ${item.highlight && !isActive ? (isWhite ? 'text-orange-600 font-bold' : 'text-orange-400') : ''}`
+                        ? 'text-slate-700 hover:text-[#FF6B00] hover:bg-orange-50/70 font-semibold'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-[#1E293B]'
+                    } ${item.highlight && !isActive ? (isWhite ? 'text-[#FF6B00] font-bold' : 'text-orange-400') : ''}`
                   }
                 >
                   {({ isActive }) => (
@@ -321,10 +319,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       className={({ isActive }) =>
                         `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
                           isActive
-                            ? 'bg-emerald-500 !text-white shadow-lg shadow-emerald-500/25 font-bold'
+                            ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-bold'
                             : isWhite
-                            ? 'text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/70 font-semibold'
-                            : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                            ? 'text-slate-700 hover:text-[#FF6B00] hover:bg-orange-50/70 font-semibold'
+                            : 'text-slate-300 hover:text-white hover:bg-[#1E293B]'
                         }`
                       }
                     >
@@ -335,7 +333,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                               isActive
                                 ? '!text-white'
                                 : isWhite
-                                ? 'text-emerald-700'
+                                ? 'text-[#FF6B00]'
                                 : 'text-slate-400'
                             }`} />
                             <span>{item.label}</span>
@@ -344,10 +342,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             <span
                               className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold ${
                                 isActive
-                                  ? 'bg-emerald-600 !text-white'
+                                  ? 'bg-white/20 !text-white'
                                   : isWhite
                                   ? 'bg-slate-100 text-slate-700 border border-slate-200'
-                                  : 'bg-slate-800 text-slate-400'
+                                  : 'bg-[#1E293B] text-slate-400'
                               }`}
                             >
                               {item.badge}

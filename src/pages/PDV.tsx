@@ -563,7 +563,7 @@ export default function PDV() {
               }
               setModalPagamentoAberto(true);
             }}
-            className="col-span-2 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-95"
+            className="col-span-2 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#E66000] text-white font-bold text-xs shadow-lg shadow-[#FF6B00]/25 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-95"
           >
             <Receipt className="w-4 h-4" />
             <span>Receber (F9)</span>
@@ -823,7 +823,7 @@ export default function PDV() {
           <button
             disabled={itens.length === 0}
             onClick={() => setModalPagamentoAberto(true)}
-            className="px-3.5 sm:px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-extrabold shadow-lg shadow-emerald-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3.5 sm:px-4 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#E66000] text-white text-xs font-extrabold shadow-lg shadow-[#FF6B00]/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Receber (F9)
           </button>
