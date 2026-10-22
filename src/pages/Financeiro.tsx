@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
   TrendingDown,
@@ -38,9 +39,15 @@ import {
   Users,
   Bike,
   Apple,
-  Sparkle,
   Search,
   Check,
+  Upload,
+  FileText,
+  Copy,
+  Eye,
+  Building2,
+  FileCheck,
+  Info,
 } from 'lucide-react';
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -48,10 +55,18 @@ import { useAppStore } from '../store/useAppStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
 import { useProductStore } from '../store/useProductStore';
 import { useThemeStore } from '../store/useThemeStore';
-import { DespesaOperacionalRestaurante, VendaRealizada } from '../types';
+import {
+  DespesaOperacionalRestaurante,
+  VendaRealizada,
+  NotaFiscalRegistro,
+  TipoNotaFiscal,
+  ModeloDocumentoFiscal,
+  StatusNotaFiscal,
+} from '../types';
+import { extrairDadosXmlNFe } from '../utils/nfeXmlParser';
 
 type PeriodoFiltro = 'hoje' | '7dias' | 'mes_atual' | 'mes_anterior' | 'ano_atual' | 'todos';
-type SubAbaFinanceiro = 'gastos' | 'dre' | 'indicadores';
+type SubAbaFinanceiro = 'notas_fiscais' | 'gastos' | 'dre' | 'indicadores';
 
 // Configuração das Categorias que se Enquadram no DRE
 export const CATEGORIAS_DRE: Record<
@@ -115,6 +130,68 @@ export const CATEGORIAS_DRE: Record<
   },
 };
 
+// Map de Tipos de Notas Fiscais
+export const MAPA_TIPO_NF: Record<
+  TipoNotaFiscal,
+  {
+    rotulo: string;
+    direcao: 'entrada' | 'saida';
+    linhaDRE: string;
+    cor: string;
+    badgeCor: string;
+  }
+> = {
+  entrada_insumos: {
+    rotulo: 'Entrada: Compras & Insumos',
+    direcao: 'entrada',
+    linhaDRE: '4.0 CMV (Custo das Mercadorias)',
+    cor: 'text-[#10B981]',
+    badgeCor: 'bg-[#10B981]/15 text-[#10B981] border-[#10B981]/30',
+  },
+  entrada_embalagens: {
+    rotulo: 'Entrada: Embalagens Delivery',
+    direcao: 'entrada',
+    linhaDRE: '6.3 Despesas Comerciais & Embalagens',
+    cor: 'text-purple-400',
+    badgeCor: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+  },
+  entrada_servicos: {
+    rotulo: 'Entrada: NFS-e Serviços Tomados',
+    direcao: 'entrada',
+    linhaDRE: '6.4 Serviços, TI & Manutenção',
+    cor: 'text-[#FF6B00]',
+    badgeCor: 'bg-[#FF6B00]/15 text-[#FF6B00] border-[#FF6B00]/30',
+  },
+  entrada_utilidades: {
+    rotulo: 'Entrada: Contas / Ocupação (Luz, Gás)',
+    direcao: 'entrada',
+    linhaDRE: '6.2 Ocupação & Utilidades',
+    cor: 'text-amber-400',
+    badgeCor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  },
+  entrada_equipamento: {
+    rotulo: 'Entrada: Equipamentos & Ativo',
+    direcao: 'entrada',
+    linhaDRE: '6.5 Imobilizado / Outras',
+    cor: 'text-blue-400',
+    badgeCor: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  },
+  saida_venda: {
+    rotulo: 'Saída: NFC-e / Venda Consumidor',
+    direcao: 'saida',
+    linhaDRE: '1.0 Receita Operacional Bruta',
+    cor: 'text-emerald-400',
+    badgeCor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+  },
+  outros: {
+    rotulo: 'Outros Documentos Fiscais',
+    direcao: 'entrada',
+    linhaDRE: '6.5 Outras Despesas',
+    cor: 'text-slate-400',
+    badgeCor: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
+  },
+};
+
 // Templates de Lançamento Rápido em 1 Clique
 const ATALHOS_LANCAMENTO_RAPIDO = [
   {
@@ -150,8 +227,8 @@ const ATALHOS_LANCAMENTO_RAPIDO = [
     cor: 'text-orange-400',
   },
   {
-    rotulo: 'Diária de Equipe',
-    descricao: 'Diária Extra (Garçom / Cozinha)',
+    rotulo: 'Diária Garçom / Free',
+    descricao: 'Diária de Freelancer / Apoio de Turno',
     categoria: 'pessoal' as const,
     tipo: 'variavel' as const,
     icone: Users,
@@ -159,31 +236,33 @@ const ATALHOS_LANCAMENTO_RAPIDO = [
   },
   {
     rotulo: 'Embalagens Delivery',
-    descricao: 'Embalagens e Descartáveis Delivery',
+    descricao: 'Embalagens térmicas e sacolas kraft',
     categoria: 'financeiro' as const,
     tipo: 'variavel' as const,
     icone: Bike,
-    cor: 'text-[#FF6B00]',
+    cor: 'text-purple-400',
   },
   {
-    rotulo: 'Feira / Hortifruti',
-    descricao: 'Compras de Hortifruti e Feira',
+    rotulo: 'Feira & Hortifrúti',
+    descricao: 'Compra de Legumes, Verduras e Temperos',
     categoria: 'insumos' as const,
     tipo: 'variavel' as const,
     icone: Apple,
     cor: 'text-emerald-400',
   },
   {
-    rotulo: 'Produtos de Limpeza',
-    descricao: 'Material de Limpeza e Higiene',
+    rotulo: 'Limpeza & Higiene',
+    descricao: 'Produtos de Limpeza e Sanitização',
     categoria: 'servicos' as const,
     tipo: 'variavel' as const,
-    icone: Sparkle,
-    cor: 'text-purple-400',
+    icone: Sparkles,
+    cor: 'text-[#FF6B00]',
   },
 ];
 
 export default function Financeiro() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { tema } = useThemeStore();
   const isWhite = tema === 'light';
   const { usuarioLogado } = useAuthStore();
@@ -191,6 +270,7 @@ export default function Financeiro() {
   const tenantAtual = getTenantAtivo();
   const currentTenantId = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
 
+  // Stores
   const {
     getVendasPorTenant,
     getDespesasPorTenant,
@@ -198,22 +278,68 @@ export default function Financeiro() {
     editarDespesaRestaurante,
     alternarStatusPagamentoDespesa,
     removerDespesaRestaurante,
+    getNotasFiscaisPorTenant,
+    adicionarNotaFiscal,
+    editarNotaFiscal,
+    removerNotaFiscal,
   } = useAppStore();
 
   const { fichasTecnicas, itens: itensEstoque } = useEstoqueStore();
-  const { getProdutosPorTenant } = useProductStore();
 
-  // Estados locais
-  const [subAba, setSubAba] = useState<SubAbaFinanceiro>('gastos');
+  // Estados locais de navegação e filtros
+  const [subAba, setSubAba] = useState<SubAbaFinanceiro>(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('aba') === 'notas_fiscais' || location.pathname === '/notas-fiscais') {
+      return 'notas_fiscais';
+    }
+    if (searchParams.get('aba') === 'dre') return 'dre';
+    if (searchParams.get('aba') === 'indicadores') return 'indicadores';
+    return 'gastos';
+  });
+
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('mes_atual');
   const [buscaTexto, setBuscaTexto] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pago' | 'pendente'>('todos');
+  const [filtroTipoNF, setFiltroTipoNF] = useState<string>('todas');
+  const [filtroStatusNF, setFiltroStatusNF] = useState<string>('todas');
+
+  // Modais de Despesas
   const [modalGastoAberto, setModalGastoAberto] = useState(false);
   const [gastoEmEdicaoId, setGastoEmEdicaoId] = useState<string | null>(null);
+
+  // Modais de Notas Fiscais
+  const [modalNFAberto, setModalNFAberto] = useState(false);
+  const [modalImportarXmlAberto, setModalImportarXmlAberto] = useState(false);
+  const [modalDanfeAberto, setModalDanfeAberto] = useState(false);
+  const [nfVisualizando, setNfVisualizando] = useState<NotaFiscalRegistro | null>(null);
+  const [nfEmEdicaoId, setNfEmEdicaoId] = useState<string | null>(null);
+
+  // XML Import State
+  const [xmlInputTexto, setXmlInputTexto] = useState('');
+  const [nomeArquivoXmlSelecionado, setNomeArquivoXmlSelecionado] = useState('');
+  const [erroXml, setErroXml] = useState<string | null>(null);
+  const [xmlPrevia, setXmlPrevia] = useState<Omit<NotaFiscalRegistro, 'id' | 'criadoEm'> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Toast
   const [toastNotificacao, setToastNotificacao] = useState<string | null>(null);
 
-  // Form State
+  function exibirToast(msg: string) {
+    setToastNotificacao(msg);
+    setTimeout(() => setToastNotificacao(null), 4000);
+  }
+
+  // Sincronizar sub-aba com URL se mudar via histórico
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const abaParam = searchParams.get('aba');
+    if (location.pathname === '/notas-fiscais' || abaParam === 'notas_fiscais') {
+      setSubAba('notas_fiscais');
+    }
+  }, [location]);
+
+  // Form State: Despesa
   const [formDespesa, setFormDespesa] = useState<{
     descricao: string;
     categoria: DespesaOperacionalRestaurante['categoria'];
@@ -224,6 +350,8 @@ export default function Financeiro() {
     statusPagamento: 'pago' | 'pendente';
     dataVencimento?: string;
     observacoes?: string;
+    notaFiscalId?: string;
+    numeroNotaFiscal?: string;
   }>({
     descricao: '',
     categoria: 'ocupacao',
@@ -236,14 +364,55 @@ export default function Financeiro() {
     observacoes: '',
   });
 
-  function exibirToast(msg: string) {
-    setToastNotificacao(msg);
-    setTimeout(() => setToastNotificacao(null), 4000);
-  }
+  // Form State: Nota Fiscal
+  const [formNF, setFormNF] = useState<{
+    numero: string;
+    serie: string;
+    chaveAcesso: string;
+    modelo: ModeloDocumentoFiscal;
+    tipo: TipoNotaFiscal;
+    emitenteRazaoSocial: string;
+    emitenteCnpjCpf: string;
+    destinatarioRazaoSocial: string;
+    destinatarioCnpjCpf: string;
+    dataEmissao: string;
+    valorTotalProdutos: string;
+    valorFrete: string;
+    valorTotalNota: string;
+    valorIcms: string;
+    valorPis: string;
+    valorCofins: string;
+    valorIss: string;
+    status: StatusNotaFiscal;
+    observacoes: string;
+    lancarNoLivroCaixa: boolean;
+  }>({
+    numero: '',
+    serie: '1',
+    chaveAcesso: '',
+    modelo: 'NFe_55',
+    tipo: 'entrada_insumos',
+    emitenteRazaoSocial: '',
+    emitenteCnpjCpf: '',
+    destinatarioRazaoSocial: tenantAtual.nomeFantasia,
+    destinatarioCnpjCpf: tenantAtual.documento || '11.222.333/0001-44',
+    dataEmissao: new Date().toISOString().split('T')[0],
+    valorTotalProdutos: '',
+    valorFrete: '0',
+    valorTotalNota: '',
+    valorIcms: '0',
+    valorPis: '0',
+    valorCofins: '0',
+    valorIss: '0',
+    status: 'autorizada',
+    observacoes: '',
+    lancarNoLivroCaixa: true,
+  });
 
-  // Carrega vendas e despesas isoladas da loja ativa
+  // Carrega vendas, despesas e notas fiscais isoladas da loja ativa
   const todasVendasLoja = getVendasPorTenant(currentTenantId);
   const todasDespesasLoja = getDespesasPorTenant(currentTenantId);
+  const todasNotasFiscaisLoja = getNotasFiscaisPorTenant(currentTenantId);
 
   // Helper para verificar datas e aplicar filtros de período
   function dataPertenceAoPeriodo(dataHoraStr: string, filtro: PeriodoFiltro): boolean {
@@ -300,7 +469,7 @@ export default function Financeiro() {
     return true;
   }
 
-  // Vendas e Despesas filtradas pelo período selecionado
+  // Filtragens pelo período selecionado
   const vendasFiltradas = useMemo(() => {
     return todasVendasLoja.filter((v) => dataPertenceAoPeriodo(v.dataHora, periodo));
   }, [todasVendasLoja, periodo]);
@@ -309,7 +478,11 @@ export default function Financeiro() {
     return todasDespesasLoja.filter((d) => dataPertenceAoPeriodo(d.data, periodo));
   }, [todasDespesasLoja, periodo]);
 
-  // Despesas da visualização do Livro Caixa (com busca e filtro de categoria)
+  const notasFiscaisFiltradas = useMemo(() => {
+    return todasNotasFiscaisLoja.filter((n) => dataPertenceAoPeriodo(n.dataEmissao, periodo));
+  }, [todasNotasFiscaisLoja, periodo]);
+
+  // Despesas da visualização do Livro Caixa
   const despesasLivroCaixa = useMemo(() => {
     return despesasFiltradas.filter((d) => {
       const matchBusca =
@@ -327,7 +500,24 @@ export default function Financeiro() {
     });
   }, [despesasFiltradas, buscaTexto, filtroCategoria, filtroStatus]);
 
-  // CÁLCULOS DO DRE COMPLETO DO RESTAURANTE
+  // Notas Fiscais com busca e filtros de tipo/status
+  const notasFiscaisExibicao = useMemo(() => {
+    return notasFiscaisFiltradas.filter((n) => {
+      const matchBusca =
+        !buscaTexto ||
+        n.numero.toLowerCase().includes(buscaTexto.toLowerCase()) ||
+        n.emitenteRazaoSocial.toLowerCase().includes(buscaTexto.toLowerCase()) ||
+        (n.chaveAcesso && n.chaveAcesso.toLowerCase().includes(buscaTexto.toLowerCase())) ||
+        n.emitenteCnpjCpf.toLowerCase().includes(buscaTexto.toLowerCase());
+
+      const matchTipo = filtroTipoNF === 'todas' || n.tipo === filtroTipoNF;
+      const matchStatus = filtroStatusNF === 'todas' || n.status === filtroStatusNF;
+
+      return matchBusca && matchTipo && matchStatus;
+    });
+  }, [notasFiscaisFiltradas, buscaTexto, filtroTipoNF, filtroStatusNF]);
+
+  // CÁLCULOS DO DRE COMPLETO DO RESTAURANTE (INTEGRADO COM NOTAS FISCAIS)
   const dadosDRE = useMemo(() => {
     let receitaBrutaVendas = 0;
     let vendasBalcao = 0;
@@ -421,87 +611,454 @@ export default function Financeiro() {
           };
         }
         mapaLucroProdutos[chaveProd].quantidade += item.quantidade;
-        mapaLucroProdutos[chaveProd].receita += item.subtotal;
+        mapaLucroProdutos[chaveProd].receita += (item.precoUnitario || 0) * item.quantidade;
         mapaLucroProdutos[chaveProd].custo += custoLinha;
-        mapaLucroProdutos[chaveProd].lucro += (item.subtotal - custoLinha);
+        mapaLucroProdutos[chaveProd].lucro += (item.precoUnitario || 0) * item.quantidade - custoLinha;
       });
     });
 
-    const receitaLiquida = Math.max(0, receitaBrutaVendas - totalCancelamentos - totalDescontos);
-    const lucroBruto = Math.max(0, receitaLiquida - cmvTotal);
+    // -------------------------------------------------------------
+    // INTEGRAÇÃO COM NOTAS FISCAIS
+    // -------------------------------------------------------------
+    // Compras de Insumos Faturadas com NF-e (Carne, Bebidas, Hortifrúti)
+    const nfsInsumos = notasFiscaisFiltradas.filter(
+      (n) => n.direcao === 'entrada' && (n.tipo === 'entrada_insumos' || n.linhaDRE === 'cmv') && n.status !== 'cancelada'
+    );
+    const totalComprasInsumosNF = nfsInsumos.reduce((acc, n) => acc + n.valorTotalNota, 0);
+
+    // Embalagens Faturadas com NF-e
+    const nfsEmbalagens = notasFiscaisFiltradas.filter(
+      (n) => n.direcao === 'entrada' && (n.tipo === 'entrada_embalagens' || n.linhaDRE === 'comercial_embalagens') && n.status !== 'cancelada'
+    );
+    const totalEmbalagensNF = nfsEmbalagens.reduce((acc, n) => acc + n.valorTotalNota, 0);
+
+    // Serviços Tomados com NFS-e (TI, Manutenção, Limpeza)
+    const nfsServicos = notasFiscaisFiltradas.filter(
+      (n) => n.direcao === 'entrada' && (n.tipo === 'entrada_servicos' || n.linhaDRE === 'servicos') && n.status !== 'cancelada'
+    );
+    const totalServicosNF = nfsServicos.reduce((acc, n) => acc + n.valorTotalNota, 0);
+
+    // Utilidades / Ocupação com NF (Energia, Gás)
+    const nfsOcupacao = notasFiscaisFiltradas.filter(
+      (n) => n.direcao === 'entrada' && (n.tipo === 'entrada_utilidades' || n.linhaDRE === 'ocupacao') && n.status !== 'cancelada'
+    );
+    const totalOcupacaoNF = nfsOcupacao.reduce((acc, n) => acc + n.valorTotalNota, 0);
+
+    // Vendas Fiscais emitidas ao consumidor (NFC-e de Saída)
+    const nfsSaidaVendas = notasFiscaisFiltradas.filter(
+      (n) => (n.direcao === 'saida' || n.tipo === 'saida_venda') && n.status !== 'cancelada'
+    );
+    const totalVendasFiscaisNF = nfsSaidaVendas.reduce((acc, n) => acc + n.valorTotalNota, 0);
+
+    // Impostos destacados em notas fiscais (ICMS + PIS + COFINS + ISS)
+    const totalImpostosNF = notasFiscaisFiltradas
+      .filter((n) => n.status !== 'cancelada')
+      .reduce((acc, n) => acc + (n.valorIcms || 0) + (n.valorPis || 0) + (n.valorCofins || 0) + (n.valorIss || 0), 0);
+
+    // CUSTO DOS INSUMOS AVULSOS DO LIVRO DE GASTOS
+    const despesasInsumosLivro = despesasFiltradas
+      .filter((d) => d.categoria === 'insumos')
+      .reduce((acc, d) => acc + d.valor, 0);
+
+    // CMV TOTAL UNIFICADO = CMV da Ficha Técnica + Insumos de NFs de Fornecedores + Feira Avulsa do Livro
+    // Para não duplicar se a ficha técnica já calculou o insumo, usamos o maior entre o CMV teórico e as NFs de insumos, ou somamos as compras extras.
+    const cmvFinalDRE = Math.max(cmvTotal, totalComprasInsumosNF) + despesasInsumosLivro;
+
+    // Despesas Operacionais por Categoria
+    const despesasPessoal = despesasFiltradas.filter((d) => d.categoria === 'pessoal').reduce((acc, d) => acc + d.valor, 0);
+    const despesasOcupacao = despesasFiltradas.filter((d) => d.categoria === 'ocupacao').reduce((acc, d) => acc + d.valor, 0) + totalOcupacaoNF;
+    const despesasComerciais = despesasFiltradas.filter((d) => d.categoria === 'financeiro').reduce((acc, d) => acc + d.valor, 0) + taxasCartaoEstimadas + totalEmbalagensNF;
+    const despesasServicos = despesasFiltradas.filter((d) => d.categoria === 'servicos').reduce((acc, d) => acc + d.valor, 0) + totalServicosNF;
+    const outrasDespesas = despesasFiltradas.filter((d) => d.categoria === 'outros').reduce((acc, d) => acc + d.valor, 0);
+
+    const totalDespesasOperacionais = despesasPessoal + despesasOcupacao + despesasComerciais + despesasServicos + outrasDespesas;
+
+    // RECEITA OPERACIONAL BRUTA INTEGRADA (PDV + Vendas Faturadas em NFC-e que não foram no PDV)
+    const receitaBrutaTotal = Math.max(receitaBrutaVendas, totalVendasFiscaisNF) + (receitaBrutaVendas > 0 && totalVendasFiscaisNF > 0 && totalVendasFiscaisNF > receitaBrutaVendas ? totalVendasFiscaisNF - receitaBrutaVendas : 0);
+
+    // DEDUÇÕES DA RECEITA (Impostos das Notas Fiscais + Estornos + Descontos)
+    const impostosSobreVenda = totalImpostosNF > 0 ? totalImpostosNF : receitaBrutaTotal * 0.045; // Estimativa Simples Nacional 4.5% se não tiver NF
+    const totalDeducoesReceita = totalDescontos + totalCancelamentos + impostosSobreVenda;
+
+    // RECEITA OPERACIONAL LÍQUIDA (ROL)
+    const receitaLiquida = Math.max(0, receitaBrutaTotal - totalDeducoesReceita);
+
+    // LUCRO BRUTO / MARGEM DE CONTRIBUIÇÃO
+    const lucroBruto = receitaLiquida - cmvFinalDRE;
     const margemBrutaPct = receitaLiquida > 0 ? (lucroBruto / receitaLiquida) * 100 : 0;
 
-    // Despesas cadastradas agrupadas pelas contas do DRE
-    const despesasPorCategoria: Record<DespesaOperacionalRestaurante['categoria'], number> = {
-      ocupacao: 0,
-      pessoal: 0,
-      servicos: 0,
-      insumos: 0,
-      financeiro: 0,
-      outros: 0,
-    };
-
-    let totalGastosCadastrados = 0;
-    let totalGastosPendentes = 0;
-
-    despesasFiltradas.forEach((d) => {
-      despesasPorCategoria[d.categoria] = (despesasPorCategoria[d.categoria] || 0) + d.valor;
-      totalGastosCadastrados += d.valor;
-      if (d.statusPagamento === 'pendente') {
-        totalGastosPendentes += d.valor;
-      }
-    });
-
-    // Insumos avulsos lançados no financeiro se somam ao CMV
-    const cmvFinalApurado = cmvTotal + despesasPorCategoria.insumos;
-
-    // Total de Despesas Operacionais (excluindo insumos já no CMV, e somando taxas de maquininha)
-    const despesasOperacionaisSemInsumos =
-      despesasPorCategoria.ocupacao +
-      despesasPorCategoria.pessoal +
-      despesasPorCategoria.servicos +
-      despesasPorCategoria.financeiro +
-      despesasPorCategoria.outros +
-      taxasCartaoEstimadas;
-
-    const resultadoOperacionalReal = lucroBruto - despesasOperacionaisSemInsumos - despesasPorCategoria.insumos;
+    // RESULTADO LÍQUIDO REAL DO RESTAURANTE
+    const resultadoOperacionalReal = lucroBruto - totalDespesasOperacionais;
     const margemLiquidaPct = receitaLiquida > 0 ? (resultadoOperacionalReal / receitaLiquida) * 100 : 0;
 
-    // Ponto de Equilíbrio (Break-Even)
-    // Custos Fixos / Margem de Contribuição %
-    const despesasFixas = despesasFiltradas.filter((d) => d.tipo === 'fixa').reduce((acc, d) => acc + d.valor, 0);
-    const pontoEquilibrio = margemBrutaPct > 0 ? (despesasFixas / (margemBrutaPct / 100)) : 0;
+    // PONTO DE EQUILÍBRIO (BREAK-EVEN)
+    const custosFixosTotais =
+      despesasFiltradas.filter((d) => d.tipo === 'fixa').reduce((acc, d) => acc + d.valor, 0) +
+      despesasPessoal +
+      despesasOcupacao;
 
-    const topProdutosLucrativos = Object.values(mapaLucroProdutos)
+    const indiceMargemContribuicao = receitaLiquida > 0 ? lucroBruto / receitaLiquida : 0.65;
+    const pontoEquilibrioFinanceiro =
+      indiceMargemContribuicao > 0 ? custosFixosTotais / indiceMargemContribuicao : custosFixosTotais * 1.5;
+
+    // Top Produtos Rentáveis
+    const topProdutosRentaveis = Object.values(mapaLucroProdutos)
       .sort((a, b) => b.lucro - a.lucro)
       .slice(0, 5);
 
     return {
       receitaBrutaVendas,
+      receitaBrutaTotal,
       vendasBalcao,
       vendasMesas,
       vendasDelivery,
       totalDescontos,
       totalCancelamentos,
-      qtdVendasConcluidas,
-      qtdVendasCanceladas,
+      impostosSobreVenda,
+      totalDeducoesReceita,
       receitaLiquida,
-      cmvTotal: cmvFinalApurado,
+      cmvTotal,
+      totalComprasInsumosNF,
+      totalEmbalagensNF,
+      totalServicosNF,
+      totalOcupacaoNF,
+      totalVendasFiscaisNF,
+      totalImpostosNF,
+      cmvFinalDRE,
       lucroBruto,
       margemBrutaPct,
+      despesasPessoal,
+      despesasOcupacao,
+      despesasComerciais,
+      despesasServicos,
+      outrasDespesas,
+      totalDespesasOperacionais,
       taxasCartaoEstimadas,
-      despesasPorCategoria,
-      totalGastosCadastrados,
-      totalGastosPendentes,
-      despesasOperacionaisSemInsumos,
       resultadoOperacionalReal,
       margemLiquidaPct,
-      despesasFixas,
-      pontoEquilibrio,
-      topProdutosLucrativos,
+      pontoEquilibrioFinanceiro,
+      custosFixosTotais,
+      qtdVendasConcluidas,
+      qtdVendasCanceladas,
+      totalItensVendidos,
+      itensComCustoCalculado,
+      topProdutosRentaveis,
+      qtdNotasFiscais: notasFiscaisFiltradas.length,
     };
-  }, [vendasFiltradas, despesasFiltradas, fichasTecnicas, itensEstoque]);
+  }, [vendasFiltradas, despesasFiltradas, notasFiscaisFiltradas, fichasTecnicas, itensEstoque]);
 
+  // -------------------------------------------------------------
+  // HANDLERS DE NOTAS FISCAIS
+  // -------------------------------------------------------------
+  function abrirModalNovaNF() {
+    setNfEmEdicaoId(null);
+    setFormNF({
+      numero: '',
+      serie: '1',
+      chaveAcesso: '',
+      modelo: 'NFe_55',
+      tipo: 'entrada_insumos',
+      emitenteRazaoSocial: '',
+      emitenteCnpjCpf: '',
+      destinatarioRazaoSocial: tenantAtual.nomeFantasia,
+      destinatarioCnpjCpf: tenantAtual.documento || '11.222.333/0001-44',
+      dataEmissao: new Date().toISOString().split('T')[0],
+      valorTotalProdutos: '',
+      valorFrete: '0',
+      valorTotalNota: '',
+      valorIcms: '0',
+      valorPis: '0',
+      valorCofins: '0',
+      valorIss: '0',
+      status: 'autorizada',
+      observacoes: '',
+      lancarNoLivroCaixa: true,
+    });
+    setModalNFAberto(true);
+  }
+
+  function abrirModalEditarNF(nf: NotaFiscalRegistro) {
+    setNfEmEdicaoId(nf.id);
+    setFormNF({
+      numero: nf.numero,
+      serie: nf.serie || '1',
+      chaveAcesso: nf.chaveAcesso || '',
+      modelo: nf.modelo,
+      tipo: nf.tipo,
+      emitenteRazaoSocial: nf.emitenteRazaoSocial,
+      emitenteCnpjCpf: nf.emitenteCnpjCpf,
+      destinatarioRazaoSocial: nf.destinatarioRazaoSocial || tenantAtual.nomeFantasia,
+      destinatarioCnpjCpf: nf.destinatarioCnpjCpf || '',
+      dataEmissao: nf.dataEmissao,
+      valorTotalProdutos: nf.valorTotalProdutos.toString(),
+      valorFrete: (nf.valorFrete || 0).toString(),
+      valorTotalNota: nf.valorTotalNota.toString(),
+      valorIcms: (nf.valorIcms || 0).toString(),
+      valorPis: (nf.valorPis || 0).toString(),
+      valorCofins: (nf.valorCofins || 0).toString(),
+      valorIss: (nf.valorIss || 0).toString(),
+      status: nf.status,
+      observacoes: nf.observacoes || '',
+      lancarNoLivroCaixa: false,
+    });
+    setModalNFAberto(true);
+  }
+
+  function handleSalvarNF(e: React.FormEvent) {
+    e.preventDefault();
+    const vTotal = parseFloat(formNF.valorTotalNota.replace(',', '.')) || 0;
+    const vProd = parseFloat(formNF.valorTotalProdutos.replace(',', '.')) || vTotal;
+    const vFrete = parseFloat(formNF.valorFrete.replace(',', '.')) || 0;
+    const vIcms = parseFloat(formNF.valorIcms.replace(',', '.')) || 0;
+    const vPis = parseFloat(formNF.valorPis.replace(',', '.')) || 0;
+    const vCofins = parseFloat(formNF.valorCofins.replace(',', '.')) || 0;
+    const vIss = parseFloat(formNF.valorIss.replace(',', '.')) || 0;
+
+    if (!formNF.numero.trim()) {
+      alert('Por favor, informe o número da Nota Fiscal.');
+      return;
+    }
+    if (vTotal <= 0) {
+      alert('O valor da Nota Fiscal deve ser maior que zero.');
+      return;
+    }
+
+    const mapaDRE = MAPA_TIPO_NF[formNF.tipo];
+    let linhaDRE: NotaFiscalRegistro['linhaDRE'] = 'cmv';
+    if (formNF.tipo === 'entrada_embalagens') linhaDRE = 'comercial_embalagens';
+    else if (formNF.tipo === 'entrada_servicos') linhaDRE = 'servicos';
+    else if (formNF.tipo === 'entrada_utilidades') linhaDRE = 'ocupacao';
+    else if (formNF.tipo === 'saida_venda') linhaDRE = 'receita_bruta';
+    else if (formNF.tipo === 'entrada_insumos') linhaDRE = 'cmv';
+    else linhaDRE = 'outros';
+
+    if (nfEmEdicaoId) {
+      editarNotaFiscal(nfEmEdicaoId, {
+        numero: formNF.numero,
+        serie: formNF.serie,
+        chaveAcesso: formNF.chaveAcesso || undefined,
+        modelo: formNF.modelo,
+        tipo: formNF.tipo,
+        direcao: formNF.tipo === 'saida_venda' ? 'saida' : 'entrada',
+        emitenteRazaoSocial: formNF.emitenteRazaoSocial,
+        emitenteCnpjCpf: formNF.emitenteCnpjCpf,
+        destinatarioRazaoSocial: formNF.destinatarioRazaoSocial,
+        destinatarioCnpjCpf: formNF.destinatarioCnpjCpf,
+        dataEmissao: formNF.dataEmissao,
+        dataCompetencia: formNF.dataEmissao.slice(0, 7),
+        valorTotalProdutos: vProd,
+        valorFrete: vFrete,
+        valorTotalNota: vTotal,
+        valorIcms: vIcms,
+        valorPis: vPis,
+        valorCofins: vCofins,
+        valorIss: vIss,
+        status: formNF.status,
+        linhaDRE,
+        observacoes: formNF.observacoes,
+      });
+      exibirToast(`Nota Fiscal #${formNF.numero} atualizada e integrada ao DRE!`);
+    } else {
+      adicionarNotaFiscal({
+        tenantId: currentTenantId,
+        numero: formNF.numero,
+        serie: formNF.serie,
+        chaveAcesso: formNF.chaveAcesso || undefined,
+        modelo: formNF.modelo,
+        tipo: formNF.tipo,
+        direcao: formNF.tipo === 'saida_venda' ? 'saida' : 'entrada',
+        emitenteRazaoSocial: formNF.emitenteRazaoSocial || 'FORNECEDOR DIVERSOS',
+        emitenteCnpjCpf: formNF.emitenteCnpjCpf || '00.000.000/0001-00',
+        destinatarioRazaoSocial: formNF.destinatarioRazaoSocial,
+        destinatarioCnpjCpf: formNF.destinatarioCnpjCpf,
+        dataEmissao: formNF.dataEmissao,
+        dataCompetencia: formNF.dataEmissao.slice(0, 7),
+        valorTotalProdutos: vProd,
+        valorFrete: vFrete,
+        valorTotalNota: vTotal,
+        valorIcms: vIcms,
+        valorPis: vPis,
+        valorCofins: vCofins,
+        valorIss: vIss,
+        status: formNF.status,
+        linhaDRE,
+        observacoes: formNF.observacoes,
+        cadastradoPor: usuarioLogado?.nome || 'Gestor do Restaurante',
+      });
+
+      // Se solicitado, lança também no Livro Caixa
+      if (formNF.lancarNoLivroCaixa && formNF.tipo !== 'saida_venda') {
+        let catGasto: DespesaOperacionalRestaurante['categoria'] = 'insumos';
+        if (formNF.tipo === 'entrada_embalagens') catGasto = 'financeiro';
+        else if (formNF.tipo === 'entrada_servicos') catGasto = 'servicos';
+        else if (formNF.tipo === 'entrada_utilidades') catGasto = 'ocupacao';
+
+        adicionarDespesaRestaurante({
+          tenantId: currentTenantId,
+          descricao: `NF-e #${formNF.numero} - ${formNF.emitenteRazaoSocial || 'Compra Fornecedor'}`,
+          categoria: catGasto,
+          valor: vTotal,
+          data: formNF.dataEmissao,
+          tipo: 'variavel',
+          formaPagamento: 'boleto',
+          statusPagamento: 'pago',
+          observacoes: `Integrado via Nota Fiscal #${formNF.numero}. Chave: ${formNF.chaveAcesso || 'N/I'}`,
+          numeroNotaFiscal: formNF.numero,
+          cadastradoPor: usuarioLogado?.nome || 'Gestor do Restaurante',
+        });
+      }
+
+      exibirToast(`Nota Fiscal #${formNF.numero} lançada com sucesso! DRE atualizado.`);
+    }
+
+    setModalNFAberto(false);
+  }
+
+  function handleExcluirNF(id: string, numero: string) {
+    if (confirm(`Deseja realmente remover a Nota Fiscal #${numero}? Isso afetará o cálculo do DRE.`)) {
+      removerNotaFiscal(id);
+      exibirToast(`Nota Fiscal #${numero} removida do sistema.`);
+    }
+  }
+
+  function abrirDanfe(nf: NotaFiscalRegistro) {
+    setNfVisualizando(nf);
+    setModalDanfeAberto(true);
+  }
+
+  function gerarChaveAcessoAleatoria() {
+    let chave = '352610';
+    for (let i = 0; i < 38; i++) {
+      chave += Math.floor(Math.random() * 10).toString();
+    }
+    setFormNF((prev) => ({ ...prev, chaveAcesso: chave }));
+    exibirToast('Chave de acesso de 44 dígitos simulada!');
+  }
+
+  function copiarChave(chave?: string) {
+    if (!chave) return;
+    navigator.clipboard.writeText(chave);
+    exibirToast('Chave de acesso copiada para a área de transferência!');
+  }
+
+  // XML Import Handlers
+  function handleUploadArquivoXml(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setNomeArquivoXmlSelecionado(file.name);
+    setErroXml(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const conteudo = event.target?.result as string;
+      setXmlInputTexto(conteudo);
+      processarXmlTexto(conteudo);
+    };
+    reader.readAsText(file);
+  }
+
+  function processarXmlTexto(conteudo: string) {
+    setErroXml(null);
+    const resultado = extrairDadosXmlNFe(conteudo, currentTenantId);
+    if (!resultado.sucesso || !resultado.nota) {
+      setErroXml(resultado.erro || 'Falha ao decodificar a Nota Fiscal.');
+      setXmlPrevia(null);
+      return;
+    }
+    setXmlPrevia(resultado.nota);
+  }
+
+  function confirmarImportacaoXml() {
+    if (!xmlPrevia) return;
+
+    adicionarNotaFiscal({
+      ...xmlPrevia,
+      tenantId: currentTenantId,
+      cadastradoPor: usuarioLogado?.nome || 'Gestor do Restaurante',
+    });
+
+    // Se for entrada de insumos ou embalagens, já cria despesa correspondente para o fluxo de caixa
+    if (xmlPrevia.direcao === 'entrada') {
+      let cat: DespesaOperacionalRestaurante['categoria'] = 'insumos';
+      if (xmlPrevia.tipo === 'entrada_embalagens') cat = 'financeiro';
+      else if (xmlPrevia.tipo === 'entrada_servicos') cat = 'servicos';
+      else if (xmlPrevia.tipo === 'entrada_utilidades') cat = 'ocupacao';
+
+      adicionarDespesaRestaurante({
+        tenantId: currentTenantId,
+        descricao: `XML NF-e #${xmlPrevia.numero} - ${xmlPrevia.emitenteRazaoSocial}`,
+        categoria: cat,
+        valor: xmlPrevia.valorTotalNota,
+        data: xmlPrevia.dataEmissao,
+        tipo: 'variavel',
+        formaPagamento: 'boleto',
+        statusPagamento: 'pago',
+        observacoes: `Importado via arquivo XML. Chave: ${xmlPrevia.chaveAcesso || 'N/I'}`,
+        numeroNotaFiscal: xmlPrevia.numero,
+        cadastradoPor: usuarioLogado?.nome || 'Gestor do Restaurante',
+      });
+    }
+
+    exibirToast(`XML da NF-e #${xmlPrevia.numero} importado com sucesso! DRE atualizado.`);
+    setModalImportarXmlAberto(false);
+    setXmlInputTexto('');
+    setXmlPrevia(null);
+    setNomeArquivoXmlSelecionado('');
+  }
+
+  function exportarNotasFiscaisCSV() {
+    const cabecalho = [
+      'ID',
+      'Modelo',
+      'Número',
+      'Série',
+      'Chave de Acesso',
+      'Data Emissão',
+      'Tipo / DRE',
+      'Emitente / Razão Social',
+      'CNPJ / CPF',
+      'Valor Produtos (R$)',
+      'Valor Frete (R$)',
+      'ICMS (R$)',
+      'PIS/COFINS (R$)',
+      'Valor Total NF (R$)',
+      'Status SEFAZ',
+    ];
+
+    const linhas = notasFiscaisExibicao.map((n) => [
+      n.id,
+      n.modelo,
+      n.numero,
+      n.serie || '1',
+      n.chaveAcesso || '',
+      n.dataEmissao,
+      `"${MAPA_TIPO_NF[n.tipo]?.rotulo || n.tipo}"`,
+      `"${n.emitenteRazaoSocial.replace(/"/g, '""')}"`,
+      `"${n.emitenteCnpjCpf}"`,
+      n.valorTotalProdutos.toFixed(2),
+      (n.valorFrete || 0).toFixed(2),
+      (n.valorIcms || 0).toFixed(2),
+      ((n.valorPis || 0) + (n.valorCofins || 0)).toFixed(2),
+      n.valorTotalNota.toFixed(2),
+      n.status,
+    ]);
+
+    const csvContent = '\uFEFF' + [cabecalho.join(','), ...linhas.map((l) => l.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `notas_fiscais_${tenantAtual.nomeFantasia.toLowerCase().replace(/\s+/g, '_')}_${periodo}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    exibirToast('Planilha de Notas Fiscais exportada com sucesso para CSV!');
+  }
+
+  // -------------------------------------------------------------
+  // HANDLERS DO LIVRO DE GASTOS
+  // -------------------------------------------------------------
   function abrirModalNovoGasto() {
     setGastoEmEdicaoId(null);
     setFormDespesa({
@@ -529,23 +1086,25 @@ export default function Financeiro() {
       formaPagamento: 'pix',
       statusPagamento: 'pago',
       dataVencimento: new Date().toISOString().split('T')[0],
-      observacoes: '',
+      observacoes: `Lançamento rápido: ${atalho.rotulo}`,
     });
     setModalGastoAberto(true);
   }
 
-  function abrirModalEditarGasto(gasto: DespesaOperacionalRestaurante) {
-    setGastoEmEdicaoId(gasto.id);
+  function abrirModalEditarGasto(desp: DespesaOperacionalRestaurante) {
+    setGastoEmEdicaoId(desp.id);
     setFormDespesa({
-      descricao: gasto.descricao,
-      categoria: gasto.categoria,
-      valor: gasto.valor.toString(),
-      data: gasto.data,
-      tipo: gasto.tipo,
-      formaPagamento: gasto.formaPagamento || 'pix',
-      statusPagamento: gasto.statusPagamento || 'pago',
-      dataVencimento: gasto.dataVencimento || gasto.data,
-      observacoes: gasto.observacoes || '',
+      descricao: desp.descricao,
+      categoria: desp.categoria,
+      valor: desp.valor.toString(),
+      data: desp.data,
+      tipo: desp.tipo,
+      formaPagamento: desp.formaPagamento || 'pix',
+      statusPagamento: desp.statusPagamento || 'pago',
+      dataVencimento: desp.dataVencimento || desp.data,
+      observacoes: desp.observacoes || '',
+      notaFiscalId: desp.notaFiscalId,
+      numeroNotaFiscal: desp.numeroNotaFiscal,
     });
     setModalGastoAberto(true);
   }
@@ -553,8 +1112,8 @@ export default function Financeiro() {
   function handleSalvarGasto(e: React.FormEvent) {
     e.preventDefault();
     const valorNum = parseFloat(formDespesa.valor.replace(',', '.'));
-    if (!formDespesa.descricao || isNaN(valorNum) || valorNum <= 0) {
-      alert('Informe uma descrição válida e um valor numérico positivo.');
+    if (!valorNum || valorNum <= 0) {
+      alert('Por favor, informe um valor monetário válido maior que zero.');
       return;
     }
 
@@ -635,12 +1194,12 @@ export default function Financeiro() {
         </div>
       )}
 
-      {/* 1. Header Principal: Gestão Financeira & DRE */}
+      {/* 1. Header Principal: Gestão Financeira, Notas Fiscais & DRE */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider bg-[#FF6B00]/15 text-[#FF6B00] border border-[#FF6B00]/30">
-              Controle de Entradas, Saídas & DRE
+              Controle Financeiro, Fiscal & DRE
             </span>
             <span className="text-xs text-slate-400 font-medium">
               Estabelecimento: <strong className={isWhite ? 'text-slate-900' : 'text-white'}>{tenantAtual.nomeFantasia}</strong>
@@ -651,7 +1210,7 @@ export default function Financeiro() {
             <span>Financeiro & DRE</span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5 max-w-2xl leading-relaxed">
-            Registre todos os gastos do restaurante de forma simplificada. Cada despesa é categorizada automaticamente e se enquadra nas linhas oficiais do DRE em tempo real.
+            Central completa onde você adiciona tudo que é financeiro — de despesas diárias até <strong>Notas Fiscais (NF-e/NFC-e/XML)</strong> — com geração automática do DRE em tempo real.
           </p>
         </div>
 
@@ -678,37 +1237,42 @@ export default function Financeiro() {
             <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* Exportar CSV */}
+          {/* Importar XML NF-e */}
           <button
             type="button"
-            onClick={exportarGastosCSV}
+            onClick={() => {
+              setErroXml(null);
+              setXmlPrevia(null);
+              setXmlInputTexto('');
+              setModalImportarXmlAberto(true);
+            }}
+            className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              isWhite
+                ? 'bg-orange-50 border-orange-200 text-[#FF6B00] hover:bg-orange-100'
+                : 'bg-[#FF6B00]/15 border-[#FF6B00]/40 text-orange-300 hover:bg-[#FF6B00]/25'
+            }`}
+            title="Importar arquivo XML da SEFAZ para alimentar o DRE instantaneamente"
+          >
+            <Upload className="w-3.5 h-3.5 text-[#FF6B00]" />
+            <span>Importar XML</span>
+          </button>
+
+          {/* Nova Nota Fiscal */}
+          <button
+            type="button"
+            onClick={abrirModalNovaNF}
             className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               isWhite
                 ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                 : 'bg-[#1E293B] border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white'
             }`}
-            title="Exportar planilha formatada para análise de dados do consultor"
+            title="Lançar Nota Fiscal de Fornecedor ou Serviço"
           >
-            <Download className="w-3.5 h-3.5 text-[#10B981]" />
-            <span className="hidden sm:inline">Exportar CSV</span>
+            <QrCode className="w-3.5 h-3.5 text-[#10B981]" />
+            <span>+ Nota Fiscal</span>
           </button>
 
-          {/* Imprimir DRE */}
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              isWhite
-                ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                : 'bg-[#1E293B] border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white'
-            }`}
-            title="Imprimir relatório DRE limpo"
-          >
-            <Printer className="w-3.5 h-3.5 text-slate-400" />
-            <span className="hidden sm:inline">Imprimir DRE</span>
-          </button>
-
-          {/* Botão Primário: Lançar Gasto em Laranja Oficial #FF6B00 */}
+          {/* Botão Primário: Lançar Gasto */}
           <button
             type="button"
             onClick={abrirModalNovoGasto}
@@ -720,7 +1284,7 @@ export default function Financeiro() {
         </div>
       </div>
 
-      {/* 2. Cards Executivos de Resumo Financeiro (Visão Geral em Tempo Real) */}
+      {/* 2. Cards Executivos de Resumo Financeiro & Fiscal */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Card 1: Faturamento Líquido (Entradas) */}
         <div className={`p-4 rounded-2xl border transition-all ${
@@ -728,7 +1292,7 @@ export default function Financeiro() {
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Receita Líquida (Vendas)
+              Receita Líquida (ROL)
             </span>
             <div className="w-8 h-8 rounded-xl bg-[#10B981]/15 text-[#10B981] flex items-center justify-center font-bold">
               <TrendingUp className="w-4 h-4" />
@@ -740,18 +1304,18 @@ export default function Financeiro() {
             </span>
           </div>
           <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-medium">
-            <span>{dadosDRE.qtdVendasConcluidas} vendas realizadas</span>
-            <span>Salão + Delivery</span>
+            <span>{dadosDRE.qtdVendasConcluidas} vendas PDV</span>
+            <span>R$ {dadosDRE.totalVendasFiscaisNF.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} em NFC-e</span>
           </div>
         </div>
 
-        {/* Card 2: CMV (Custo de Alimentos & Insumos) */}
+        {/* Card 2: CMV e Compras com Nota Fiscal */}
         <div className={`p-4 rounded-2xl border transition-all ${
           isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800 shadow-lg'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              CMV (Insumos/Estoque)
+              CMV & Insumos em NF
             </span>
             <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center font-bold">
               <Package className="w-4 h-4" />
@@ -759,45 +1323,37 @@ export default function Financeiro() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-xl sm:text-2xl font-black font-mono text-amber-400">
-              R$ {dadosDRE.cmvTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              R$ {dadosDRE.cmvFinalDRE.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
           <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-medium">
-            <span>
-              {dadosDRE.receitaLiquida > 0
-                ? `${((dadosDRE.cmvTotal / dadosDRE.receitaLiquida) * 100).toFixed(1)}% da receita`
-                : '0% da receita'}
+            <span className="text-amber-400 font-bold">
+              R$ {dadosDRE.totalComprasInsumosNF.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} em NF-e Fornecedores
             </span>
-            <span className="text-amber-400/90 font-semibold">Ficha Técnica</span>
+            <span>Linha 4.0 DRE</span>
           </div>
         </div>
 
-        {/* Card 3: Gastos Operacionais Cadastrados */}
+        {/* Card 3: Despesas Operacionais & NFS-e */}
         <div className={`p-4 rounded-2xl border transition-all ${
           isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800 shadow-lg'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Total de Gastos (Saídas)
+              Gastos & Notas de Serviços
             </span>
-            <div className="w-8 h-8 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center font-bold">
-              <TrendingDown className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center font-bold">
+              <Receipt className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-xl sm:text-2xl font-black font-mono text-rose-400">
-              R$ {dadosDRE.totalGastosCadastrados.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span className="text-xl sm:text-2xl font-black font-mono text-purple-400">
+              R$ {dadosDRE.totalDespesasOperacionais.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
           <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-medium">
-            <span>{despesasFiltradas.length} lançamentos</span>
-            {dadosDRE.totalGastosPendentes > 0 ? (
-              <span className="text-amber-400 font-bold">
-                R$ {dadosDRE.totalGastosPendentes.toFixed(0)} pendentes
-              </span>
-            ) : (
-              <span className="text-[#10B981] font-semibold">Tudo em dia</span>
-            )}
+            <span>Fixas + Variáveis</span>
+            <span>R$ {dadosDRE.totalServicosNF.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} em NFS-e</span>
           </div>
         </div>
 
@@ -813,7 +1369,7 @@ export default function Financeiro() {
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Resultado Líquido (DRE)
+              Resultado Líquido Real
             </span>
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
               dadosDRE.resultadoOperacionalReal >= 0
@@ -848,7 +1404,7 @@ export default function Financeiro() {
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-[#FF6B00]" />
-            <span>Lançamento Rápido Simplificado (1 Clique)</span>
+            <span>Lançamento Rápido em 1 Clique</span>
           </span>
           <span className="text-[10px] text-slate-400 hidden sm:inline">
             Clique no gasto frequente para abrir o formulário já pré-preenchido
@@ -882,9 +1438,31 @@ export default function Financeiro() {
         </div>
       </div>
 
-      {/* 4. Sub-Abas de Navegação (Livro de Gastos vs DRE vs Indicadores) */}
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-        <div className="flex items-center gap-2">
+      {/* 4. Sub-Abas de Navegação (Notas Fiscais vs Livro Caixa vs DRE vs Indicadores) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Sub-Aba 1: Notas Fiscais */}
+          <button
+            type="button"
+            onClick={() => setSubAba('notas_fiscais')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              subAba === 'notas_fiscais'
+                ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/25'
+                : isWhite
+                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <QrCode className="w-4 h-4" />
+            <span>Notas Fiscais & XML</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+              subAba === 'notas_fiscais' ? 'bg-white/20 !text-white' : 'bg-orange-500/20 text-[#FF6B00]'
+            }`}>
+              {notasFiscaisFiltradas.length}
+            </span>
+          </button>
+
+          {/* Sub-Aba 2: Livro de Gastos */}
           <button
             type="button"
             onClick={() => setSubAba('gastos')}
@@ -897,7 +1475,7 @@ export default function Financeiro() {
             }`}
           >
             <Receipt className="w-4 h-4" />
-            <span>Livro de Gastos & Despesas</span>
+            <span>Livro Caixa & Gastos</span>
             <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
               subAba === 'gastos' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
             }`}>
@@ -905,6 +1483,7 @@ export default function Financeiro() {
             </span>
           </button>
 
+          {/* Sub-Aba 3: DRE */}
           <button
             type="button"
             onClick={() => setSubAba('dre')}
@@ -919,10 +1498,11 @@ export default function Financeiro() {
             <FileSpreadsheet className="w-4 h-4" />
             <span>DRE Demonstrativo Oficial</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-[#10B981] font-bold">
-              Ao Vivo
+              Integrado
             </span>
           </button>
 
+          {/* Sub-Aba 4: Indicadores */}
           <button
             type="button"
             onClick={() => setSubAba('indicadores')}
@@ -935,73 +1515,407 @@ export default function Financeiro() {
             }`}
           >
             <Percent className="w-4 h-4" />
-            <span>Distribuição & Ponto de Equilíbrio</span>
+            <span>Ponto de Equilíbrio & Top Produtos</span>
+          </button>
+        </div>
+
+        {/* Ações Rápidas por Sub-aba */}
+        <div className="flex items-center gap-2">
+          {subAba === 'notas_fiscais' && (
+            <button
+              type="button"
+              onClick={exportarNotasFiscaisCSV}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
+                isWhite ? 'bg-white border-slate-200 text-slate-700' : 'bg-[#1E293B] border-slate-700 text-slate-300'
+              }`}
+            >
+              <Download className="w-3.5 h-3.5 text-[#10B981]" />
+              <span>Exportar NFs (CSV)</span>
+            </button>
+          )}
+
+          {subAba === 'gastos' && (
+            <button
+              type="button"
+              onClick={exportarGastosCSV}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
+                isWhite ? 'bg-white border-slate-200 text-slate-700' : 'bg-[#1E293B] border-slate-700 text-slate-300'
+              }`}
+            >
+              <Download className="w-3.5 h-3.5 text-[#10B981]" />
+              <span>Exportar Gastos (CSV)</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
+              isWhite ? 'bg-white border-slate-200 text-slate-700' : 'bg-[#1E293B] border-slate-700 text-slate-300'
+            }`}
+          >
+            <Printer className="w-3.5 h-3.5 text-slate-400" />
+            <span>Imprimir</span>
           </button>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* ABA 1: LIVRO DE GASTOS & DESPESAS (LANÇAMENTOS)                            */}
+      {/* ABA 1: CENTRAL DE NOTAS FISCAIS & XML SEFAZ                                */}
       {/* ========================================================================= */}
-      {subAba === 'gastos' && (
+      {subAba === 'notas_fiscais' && (
         <div className="space-y-4">
+          {/* Banner Informativo de Integração com o DRE */}
+          <div className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+            isWhite ? 'bg-orange-50/60 border-orange-200' : 'bg-[#FF6B00]/10 border-[#FF6B00]/30'
+          }`}>
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#FF6B00] text-white flex items-center justify-center shrink-0 font-bold shadow-lg shadow-[#FF6B00]/30">
+                <FileCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <span>Central Fiscal Inteligente • NF-e, NFC-e & NFS-e</span>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30 uppercase font-mono">
+                    Gera DRE Automático
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Importe XMLs da SEFAZ ou cadastre as notas fiscais de compras de fornecedores. O sistema extrai itens, valores e impostos, alimentando instantaneamente a <strong>Linha 4.0 (CMV)</strong> e as despesas do DRE.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSubAba('dre')}
+                className="px-3.5 py-2 rounded-xl bg-[#1E293B] hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-[#10B981]" />
+                <span>Ver Impacto no DRE</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setErroXml(null);
+                  setXmlPrevia(null);
+                  setXmlInputTexto('');
+                  setModalImportarXmlAberto(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#E66000] text-white font-bold text-xs shadow-md shadow-[#FF6B00]/30 flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>+ Importar XML SEFAZ</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Cards de Métricas Fiscais */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className={`p-3.5 rounded-xl border ${isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'}`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                🥩 Compras de Insumos (NF-e ➔ CMV)
+              </span>
+              <span className="text-lg font-black font-mono text-[#10B981]">
+                R$ {dadosDRE.totalComprasInsumosNF.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+              <p className="text-[10px] text-slate-400 mt-1">Alimenta Linha 4.0 do DRE</p>
+            </div>
+
+            <div className={`p-3.5 rounded-xl border ${isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'}`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                📦 Embalagens Delivery em NF
+              </span>
+              <span className="text-lg font-black font-mono text-purple-400">
+                R$ {dadosDRE.totalEmbalagensNF.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+              <p className="text-[10px] text-slate-400 mt-1">Alimenta Linha 6.3 Comercial</p>
+            </div>
+
+            <div className={`p-3.5 rounded-xl border ${isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'}`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                🛠️ Serviços Tomados (NFS-e)
+              </span>
+              <span className="text-lg font-black font-mono text-[#FF6B00]">
+                R$ {dadosDRE.totalServicosNF.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+              <p className="text-[10px] text-slate-400 mt-1">Alimenta Linha 6.4 Serviços</p>
+            </div>
+
+            <div className={`p-3.5 rounded-xl border ${isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'}`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                ⚖️ Impostos Destacados em Notas
+              </span>
+              <span className="text-lg font-black font-mono text-amber-400">
+                R$ {dadosDRE.totalImpostosNF.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+              <p className="text-[10px] text-slate-400 mt-1">ICMS, PIS, COFINS & ISS</p>
+            </div>
+          </div>
+
           {/* Barra de Filtros e Busca */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <div className={`p-3.5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+            isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
+          }`}>
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={buscaTexto}
                 onChange={(e) => setBuscaTexto(e.target.value)}
-                placeholder="Buscar por descrição (ex: Cemig, Aluguel, Diária)..."
-                className={`w-full pl-10 pr-4 py-2 rounded-xl text-xs border focus:outline-none focus:border-[#FF6B00] transition-colors ${
+                placeholder="Buscar por número da NF, fornecedor, CNPJ ou chave de acesso..."
+                className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
                   isWhite
-                    ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
-                    : 'bg-[#1E293B] border-slate-800 text-white placeholder:text-slate-500'
+                    ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[#FF6B00]'
+                    : 'bg-[#0F172A] border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FF6B00]'
                 }`}
               />
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Filtro por Categoria */}
+              {/* Filtro por Tipo de NF */}
               <select
-                value={filtroCategoria}
-                onChange={(e) => setFiltroCategoria(e.target.value)}
+                value={filtroTipoNF}
+                onChange={(e) => setFiltroTipoNF(e.target.value)}
                 className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                  isWhite
-                    ? 'bg-white border-slate-200 text-slate-800'
-                    : 'bg-[#1E293B] border-slate-800 text-slate-200'
+                  isWhite ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#0F172A] border-slate-700 text-slate-200'
                 }`}
               >
-                <option value="todas">Todas as Categorias DRE</option>
-                <option value="ocupacao">🏢 Ocupação & Contas</option>
-                <option value="pessoal">👥 Equipe & Diárias</option>
-                <option value="servicos">✨ Serviços & Manutenção</option>
-                <option value="insumos">🥬 Insumos Avulsos (CMV)</option>
-                <option value="financeiro">🛵 Comercial & Embalagens</option>
-                <option value="outros">📦 Outras Despesas</option>
+                <option value="todas">Todos os Tipos de NF</option>
+                <option value="entrada_insumos">🥩 Insumos / Compras (CMV)</option>
+                <option value="entrada_embalagens">📦 Embalagens Delivery</option>
+                <option value="entrada_servicos">🛠️ NFS-e Serviços Tomados</option>
+                <option value="entrada_utilidades">💡 Utilidades (Luz, Gás)</option>
+                <option value="saida_venda">📤 Saída: Vendas NFC-e</option>
               </select>
 
               {/* Filtro por Status */}
               <select
-                value={filtroStatus}
-                onChange={(e) => setFiltroStatus(e.target.value as any)}
+                value={filtroStatusNF}
+                onChange={(e) => setFiltroStatusNF(e.target.value)}
                 className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                  isWhite
-                    ? 'bg-white border-slate-200 text-slate-800'
-                    : 'bg-[#1E293B] border-slate-800 text-slate-200'
+                  isWhite ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#0F172A] border-slate-700 text-slate-200'
                 }`}
               >
-                <option value="todos">Todos os Status</option>
-                <option value="pago">✅ Pagos</option>
-                <option value="pendente">⏳ Pendentes</option>
+                <option value="todas">Todos os Status</option>
+                <option value="autorizada">Autorizadas SEFAZ</option>
+                <option value="cancelada">Canceladas</option>
+                <option value="pendente">Pendentes</option>
               </select>
             </div>
           </div>
 
-          {/* Tabela de Lançamentos */}
-          <div className={`rounded-2xl border overflow-hidden ${
-            isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800 shadow-xl'
+          {/* Tabela de Notas Fiscais */}
+          <div className={`rounded-2xl border overflow-hidden shadow-xl ${
+            isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
+          }`}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className={`border-b text-[11px] font-bold uppercase tracking-wider ${
+                    isWhite ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-[#0F172A] border-slate-800 text-slate-400'
+                  }`}>
+                    <th className="py-3 px-4">Modelo / N° NF</th>
+                    <th className="py-3 px-4">Emitente / Fornecedor</th>
+                    <th className="py-3 px-4">Data Emissão</th>
+                    <th className="py-3 px-4">Enquadramento DRE</th>
+                    <th className="py-3 px-4">Impostos</th>
+                    <th className="py-3 px-4 text-right">Valor Total</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className={`divide-y ${isWhite ? 'divide-slate-100' : 'divide-slate-800/60'}`}>
+                  {notasFiscaisExibicao.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        <div className="max-w-sm mx-auto space-y-2">
+                          <QrCode className="w-10 h-10 text-slate-500 mx-auto stroke-[1.5]" />
+                          <p className="font-bold text-sm text-slate-300">Nenhuma Nota Fiscal encontrada</p>
+                          <p className="text-xs text-slate-400">
+                            Importe um arquivo XML da SEFAZ ou cadastre uma nova nota manualmente para alimentar o DRE.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    notasFiscaisExibicao.map((nf) => {
+                      const cfgTipo = MAPA_TIPO_NF[nf.tipo] || MAPA_TIPO_NF.outros;
+                      return (
+                        <tr key={nf.id} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-black font-mono border ${
+                                nf.modelo === 'NFe_55'
+                                  ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                                  : nf.modelo === 'NFCe_65'
+                                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                  : 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                              }`}>
+                                {nf.modelo.replace('_', ' ')}
+                              </span>
+                              <div>
+                                <span className="font-mono font-bold text-white block">
+                                  #{nf.numero} <span className="text-[10px] text-slate-500">Série {nf.serie || '1'}</span>
+                                </span>
+                                {nf.chaveAcesso && (
+                                  <button
+                                    type="button"
+                                    onClick={() => copiarChave(nf.chaveAcesso)}
+                                    className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 font-mono group"
+                                    title="Clique para copiar os 44 dígitos da chave"
+                                  >
+                                    <span>{nf.chaveAcesso.slice(0, 6)}...{nf.chaveAcesso.slice(-4)}</span>
+                                    <Copy className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <p className="font-bold text-white text-xs truncate max-w-[220px]">
+                              {nf.emitenteRazaoSocial}
+                            </p>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              CNPJ: {nf.emitenteCnpjCpf}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap text-slate-300 font-mono text-[11px]">
+                            {nf.dataEmissao.split('-').reverse().join('/')}
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border inline-block ${cfgTipo.badgeCor}`}>
+                              {cfgTipo.linhaDRE}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap font-mono text-[11px]">
+                            {nf.valorIcms ? (
+                              <span className="text-slate-300">
+                                ICMS: <strong className="text-amber-400">R$ {nf.valorIcms.toFixed(2)}</strong>
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-black text-sm text-white">
+                            R$ {nf.valorTotalNota.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                              nf.status === 'autorizada'
+                                ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30'
+                                : nf.status === 'cancelada'
+                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            }`}>
+                              {nf.status === 'autorizada' ? 'Autorizada' : nf.status === 'cancelada' ? 'Cancelada' : 'Pendente'}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => abrirDanfe(nf)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                                title="Visualizar DANFE & Detalhes da Nota"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => abrirModalEditarNF(nf)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                                title="Editar Nota Fiscal"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleExcluirNF(nf.id, nf.numero)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                title="Remover Nota Fiscal"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ABA 2: LIVRO DE GASTOS & DESPESAS                                          */}
+      {/* ========================================================================= */}
+      {subAba === 'gastos' && (
+        <div className="space-y-4">
+          {/* Filtros e Busca de Despesas */}
+          <div className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+            isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
+          }`}>
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={buscaTexto}
+                onChange={(e) => setBuscaTexto(e.target.value)}
+                placeholder="Buscar por descrição da despesa ou categoria contábil..."
+                className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
+                  isWhite
+                    ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[#FF6B00]'
+                    : 'bg-[#0F172A] border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FF6B00]'
+                }`}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={filtroCategoria}
+                onChange={(e) => setFiltroCategoria(e.target.value)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                  isWhite ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#0F172A] border-slate-700 text-slate-200'
+                }`}
+              >
+                <option value="todas">Todas as Categorias</option>
+                <option value="ocupacao">🏠 Ocupação & Utilidades (6.2)</option>
+                <option value="pessoal">👥 Equipe & Pessoal (6.1)</option>
+                <option value="servicos">✨ Serviços & Sistemas (6.4)</option>
+                <option value="insumos">🥦 Insumos Avulsos (CMV 4.0)</option>
+                <option value="financeiro">🛵 Comercial & Embalagens (6.3)</option>
+                <option value="outros">📦 Outras Despesas (6.5)</option>
+              </select>
+
+              <select
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value as any)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                  isWhite ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#0F172A] border-slate-700 text-slate-200'
+                }`}
+              >
+                <option value="todos">Status: Todos</option>
+                <option value="pago">✅ Pagos</option>
+                <option value="pendente">⏳ Pendentes (A Pagar)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Tabela do Livro de Despesas */}
+          <div className={`rounded-2xl border overflow-hidden shadow-xl ${
+            isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
           }`}>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
@@ -1011,25 +1925,19 @@ export default function Financeiro() {
                   }`}>
                     <th className="py-3 px-4">Data</th>
                     <th className="py-3 px-4">Descrição do Gasto</th>
-                    <th className="py-3 px-4">Enquadramento no DRE</th>
-                    <th className="py-3 px-4">Forma</th>
+                    <th className="py-3 px-4">Categoria / Linha DRE</th>
                     <th className="py-3 px-4">Tipo</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Valor</th>
+                    <th className="py-3 px-4">Pagamento</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-right">Valor (R$)</th>
                     <th className="py-3 px-4 text-center">Ações</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${isWhite ? 'divide-slate-100' : 'divide-slate-800/60'}`}>
                   {despesasLivroCaixa.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <Receipt className="w-8 h-8 text-slate-500 opacity-60" />
-                          <p className="font-bold">Nenhum gasto encontrado para os filtros selecionados.</p>
-                          <p className="text-[11px] text-slate-500">
-                            Clique em "+ Lançar Gasto" ou utilize os atalhos rápidos acima para registrar.
-                          </p>
-                        </div>
+                      <td colSpan={8} className="py-10 text-center text-slate-400">
+                        Nenhum lançamento de gasto encontrado para o filtro aplicado.
                       </td>
                     </tr>
                   ) : (
@@ -1039,64 +1947,67 @@ export default function Financeiro() {
                       const isPago = desp.statusPagamento !== 'pendente';
 
                       return (
-                        <tr
-                          key={desp.id}
-                          className={`transition-colors ${
-                            isWhite ? 'hover:bg-slate-50/80' : 'hover:bg-slate-800/40'
-                          }`}
-                        >
-                          <td className="py-3 px-4 font-mono text-slate-400 whitespace-nowrap">
+                        <tr key={desp.id} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-4 whitespace-nowrap text-slate-300 font-mono text-[11px]">
                             {desp.data.split('-').reverse().join('/')}
                           </td>
+
                           <td className="py-3 px-4">
-                            <span className="font-bold text-slate-200 block text-xs">
-                              {desp.descricao}
-                            </span>
-                            {desp.cadastradoPor && (
-                              <span className="text-[10px] text-slate-500">
-                                Por {desp.cadastradoPor}
-                              </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white text-xs">{desp.descricao}</span>
+                              {desp.numeroNotaFiscal && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-400 font-mono font-bold">
+                                  NF #{desp.numeroNotaFiscal}
+                                </span>
+                              )}
+                            </div>
+                            {desp.observacoes && (
+                              <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{desp.observacoes}</p>
                             )}
                           </td>
+
                           <td className="py-3 px-4 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${catInfo.corBadge}`}
-                              title={catInfo.descricao}
-                            >
-                              <IconeCat className="w-3 h-3" />
-                              <span>{catInfo.titulo}</span>
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <IconeCat className={`w-3.5 h-3.5 ${catInfo.corIcone}`} />
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${catInfo.corBadge}`}>
+                                {catInfo.linhaDRE}
+                              </span>
+                            </div>
                           </td>
-                          <td className="py-3 px-4 uppercase text-[10px] font-bold text-slate-400 whitespace-nowrap">
-                            {desp.formaPagamento || 'PIX'}
-                          </td>
+
                           <td className="py-3 px-4 whitespace-nowrap">
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
                               desp.tipo === 'fixa'
-                                ? 'bg-slate-800 text-slate-300'
-                                : 'bg-slate-800/50 text-slate-400'
+                                ? 'bg-slate-800 text-slate-300 border border-slate-700'
+                                : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                             }`}>
                               {desp.tipo === 'fixa' ? 'Fixa' : 'Variável'}
                             </span>
                           </td>
-                          <td className="py-3 px-4 whitespace-nowrap">
+
+                          <td className="py-3 px-4 whitespace-nowrap text-slate-300 font-mono text-[11px] uppercase">
+                            {desp.formaPagamento || 'pix'}
+                          </td>
+
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => alternarStatusPagamentoDespesa(desp.id)}
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                              className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
                                 isPago
-                                  ? 'bg-[#10B981]/15 text-[#10B981] border-[#10B981]/30 hover:bg-[#10B981]/25'
-                                  : 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+                                  ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30 hover:bg-[#10B981]/30'
+                                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30'
                               }`}
-                              title="Clique para alternar status entre Pago e Pendente"
+                              title="Clique para alternar entre Pago e Pendente"
                             >
-                              {isPago ? <Check className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                              <span>{isPago ? 'Pago' : 'Pendente'}</span>
+                              {isPago ? 'Pago ✅' : 'Pendente ⏳'}
                             </button>
                           </td>
-                          <td className="py-3 px-4 text-right font-mono font-black text-xs text-rose-400 whitespace-nowrap">
-                            R$ {desp.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+                          <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-black text-rose-400 text-sm">
+                            - R$ {desp.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
+
                           <td className="py-3 px-4 text-center whitespace-nowrap">
                             <div className="flex items-center justify-center gap-1.5">
                               <button
@@ -1122,24 +2033,6 @@ export default function Financeiro() {
                     })
                   )}
                 </tbody>
-                {despesasLivroCaixa.length > 0 && (
-                  <tfoot>
-                    <tr className={`border-t font-black text-xs ${
-                      isWhite ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#0F172A] border-slate-800 text-white'
-                    }`}>
-                      <td colSpan={6} className="py-3.5 px-4 text-right uppercase tracking-wider text-[11px] text-slate-400">
-                        Total dos Lançamentos Filtrados ({despesasLivroCaixa.length}):
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono text-rose-400 text-sm">
-                        R${' '}
-                        {despesasLivroCaixa
-                          .reduce((acc, d) => acc + d.valor, 0)
-                          .toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                )}
               </table>
             </div>
           </div>
@@ -1147,7 +2040,7 @@ export default function Financeiro() {
       )}
 
       {/* ========================================================================= */}
-      {/* ABA 2: DRE DEMONSTRATIVO OFICIAL LINHA A LINHA                             */}
+      {/* ABA 3: DRE DEMONSTRATIVO OFICIAL INTEGRADO COM NOTAS FISCAIS              */}
       {/* ========================================================================= */}
       {subAba === 'dre' && (
         <div className="space-y-4">
@@ -1159,8 +2052,11 @@ export default function Financeiro() {
                 <FileSpreadsheet className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-extrabold text-white">
-                  DRE Operacional — {tenantAtual.nomeFantasia}
+                <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                  <span>DRE Operacional — {tenantAtual.nomeFantasia}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#10B981]/20 text-[#10B981] font-mono font-bold">
+                    Integrado com {dadosDRE.qtdNotasFiscais} Notas Fiscais
+                  </span>
                 </h3>
                 <p className="text-xs text-slate-400">
                   Período: <strong className="text-slate-200 uppercase">{periodo.replace('_', ' ')}</strong> • Apuração contábil em tempo real
@@ -1193,7 +2089,7 @@ export default function Financeiro() {
                     isWhite ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-[#0F172A] border-slate-800 text-slate-400'
                   }`}>
                     <th className="py-3 px-4">Linha do DRE</th>
-                    <th className="py-3 px-4">Origem / Composição</th>
+                    <th className="py-3 px-4">Origem / Composição Fiscal & Caixa</th>
                     <th className="py-3 px-4 text-right">Valor Acumulado</th>
                     <th className="py-3 px-4 text-right">% Receita (ROL)</th>
                   </tr>
@@ -1205,29 +2101,29 @@ export default function Financeiro() {
                       1. (+) RECEITA OPERACIONAL BRUTA
                     </td>
                     <td className="py-3 px-4 font-sans text-slate-400 text-[11px]">
-                      Salão (R$ {dadosDRE.vendasMesas.toFixed(0)}) • Delivery (R$ {dadosDRE.vendasDelivery.toFixed(0)}) • Balcão (R$ {dadosDRE.vendasBalcao.toFixed(0)})
+                      Salão (R$ {dadosDRE.vendasMesas.toFixed(0)}) • Delivery (R$ {dadosDRE.vendasDelivery.toFixed(0)}) • Balcão (R$ {dadosDRE.vendasBalcao.toFixed(0)}) + NFC-e Emitidas
                     </td>
                     <td className="py-3 px-4 text-right font-black text-white text-xs">
-                      R$ {dadosDRE.receitaBrutaVendas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {dadosDRE.receitaBrutaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="py-3 px-4 text-right text-slate-400">
                       -
                     </td>
                   </tr>
 
-                  {/* 2. Deduções */}
+                  {/* 2. Deduções e Impostos Fiscais */}
                   <tr>
                     <td className="py-2.5 px-4 font-sans font-semibold text-slate-300 pl-8">
-                      2. (-) Deduções da Receita & Cancelamentos
+                      2. (-) Deduções da Receita & Tributos
                     </td>
                     <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
-                      Descontos no Caixa (R$ {dadosDRE.totalDescontos.toFixed(2)}) + Estornos
+                      Descontos/Estornos (R$ {dadosDRE.totalDescontos.toFixed(2)}) + Impostos em Notas (R$ {dadosDRE.impostosSobreVenda.toFixed(2)})
                     </td>
                     <td className="py-2.5 px-4 text-right text-rose-400">
-                      - R$ {(dadosDRE.totalDescontos + dadosDRE.totalCancelamentos).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      - R$ {dadosDRE.totalDeducoesReceita.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="py-2.5 px-4 text-right text-slate-400">
-                      {dadosDRE.receitaLiquida > 0 ? (((dadosDRE.totalDescontos + dadosDRE.totalCancelamentos) / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
+                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.totalDeducoesReceita / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
                     </td>
                   </tr>
 
@@ -1237,7 +2133,7 @@ export default function Financeiro() {
                       3. (=) RECEITA OPERACIONAL LÍQUIDA (ROL)
                     </td>
                     <td className="py-3 px-4 font-sans text-slate-400 text-[11px]">
-                      Base de apuração para todos os indicadores de margem
+                      Base contábil líquida para apuração de todos os indicadores
                     </td>
                     <td className="py-3 px-4 text-right font-black text-[#10B981] text-sm">
                       R$ {dadosDRE.receitaLiquida.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -1249,152 +2145,139 @@ export default function Financeiro() {
 
                   {/* 4. CMV */}
                   <tr>
-                    <td className="py-3 px-4 font-sans font-bold text-amber-300 pl-8">
-                      4. (-) CMV — Custo das Mercadorias Vendidas
+                    <td className="py-3 px-4 font-sans font-semibold text-rose-400 pl-8">
+                      4. (-) CMV (Custo das Mercadorias Vendidas)
                     </td>
                     <td className="py-3 px-4 font-sans text-slate-400 text-[11px]">
-                      Ficha Técnica dos Pratos + Baixas de Estoque + Insumos de Feira
+                      <span className="font-bold text-amber-400">
+                        🏷️ Inclui R$ {dadosDRE.totalComprasInsumosNF.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em Compras com NF-e de Fornecedores
+                      </span> + Ficha Técnica de pratos
                     </td>
-                    <td className="py-3 px-4 text-right font-bold text-amber-400">
-                      - R$ {dadosDRE.cmvTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <td className="py-3 px-4 text-right text-rose-400 font-bold">
+                      - R$ {dadosDRE.cmvFinalDRE.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="py-3 px-4 text-right text-amber-400">
-                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.cmvTotal / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
+                    <td className="py-3 px-4 text-right text-slate-400">
+                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.cmvFinalDRE / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
                     </td>
                   </tr>
 
                   {/* 5. Lucro Bruto */}
                   <tr className="bg-slate-900/40">
                     <td className="py-3 px-4 font-sans font-black text-white text-xs">
-                      5. (=) MARGEM DE CONTRIBUIÇÃO / LUCRO BRUTO
+                      5. (=) LUCRO BRUTO (MARGEM DE CONTRIBUIÇÃO)
                     </td>
                     <td className="py-3 px-4 font-sans text-slate-400 text-[11px]">
-                      Receita Líquida menos o Custo de Mercadorias (CMV)
+                      Sobra operacional para pagamento de todas as despesas fixas da casa
                     </td>
-                    <td className="py-3 px-4 text-right font-black text-white text-xs">
+                    <td className="py-3 px-4 text-right font-black text-white text-sm">
                       R$ {dadosDRE.lucroBruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="py-3 px-4 text-right font-bold text-white">
+                    <td className="py-3 px-4 text-right font-black text-[#10B981]">
                       {dadosDRE.margemBrutaPct.toFixed(1)}%
                     </td>
                   </tr>
 
-                  {/* 6. Despesas Operacionais (Registros do Financeiro) */}
-                  <tr className="bg-slate-950/40 font-bold text-slate-300">
-                    <td colSpan={4} className="py-2.5 px-4 font-sans text-xs uppercase tracking-wider text-[#FF6B00] flex items-center gap-1.5">
-                      <Receipt className="w-3.5 h-3.5" />
-                      <span>6. (-) GASTOS OPERACIONAIS (Registrados na Aba Financeiro)</span>
+                  {/* 6. Despesas Operacionais */}
+                  <tr className="bg-slate-950/20">
+                    <td colSpan={4} className="py-2 px-4 font-sans font-black text-slate-400 uppercase text-[10px] tracking-wider">
+                      6. (-) DESPESAS OPERACIONAIS FIXAS & VARIÁVEIS
                     </td>
                   </tr>
 
-                  {/* 6.1 Pessoal */}
                   <tr>
-                    <td className="py-2 px-4 font-sans text-slate-300 pl-12 flex items-center gap-2">
-                      <Users className="w-3 h-3 text-blue-400" />
-                      <span>6.1 Despesas com Pessoal & Diárias</span>
+                    <td className="py-2.5 px-4 font-sans text-slate-300 pl-8">
+                      6.1 Despesas com Pessoal & Equipe
                     </td>
-                    <td className="py-2 px-4 font-sans text-slate-400 text-[11px]">
-                      Salários, garçons extras, pró-labore e vales
+                    <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
+                      Salários, diárias de garçons/extras e adiantamentos
                     </td>
-                    <td className="py-2 px-4 text-right text-rose-400">
-                      - R$ {dadosDRE.despesasPorCategoria.pessoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <td className="py-2.5 px-4 text-right text-rose-400">
+                      - R$ {dadosDRE.despesasPessoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="py-2 px-4 text-right text-slate-400">
-                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasPorCategoria.pessoal / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
+                    <td className="py-2.5 px-4 text-right text-slate-400">
+                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasPessoal / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
                     </td>
                   </tr>
 
-                  {/* 6.2 Ocupação */}
                   <tr>
-                    <td className="py-2 px-4 font-sans text-slate-300 pl-12 flex items-center gap-2">
-                      <Store className="w-3 h-3 text-amber-400" />
-                      <span>6.2 Despesas de Ocupação & Utilidades</span>
+                    <td className="py-2.5 px-4 font-sans text-slate-300 pl-8">
+                      6.2 Ocupação & Utilidades
                     </td>
-                    <td className="py-2 px-4 font-sans text-slate-400 text-[11px]">
-                      Aluguel, Luz (Cemig), Água, Gás de cozinha, IPTU
+                    <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
+                      Aluguel, Luz, Água e Gás de Cozinha (inclui faturas e NFs)
                     </td>
-                    <td className="py-2 px-4 text-right text-rose-400">
-                      - R$ {dadosDRE.despesasPorCategoria.ocupacao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <td className="py-2.5 px-4 text-right text-rose-400">
+                      - R$ {dadosDRE.despesasOcupacao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="py-2 px-4 text-right text-slate-400">
-                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasPorCategoria.ocupacao / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
+                    <td className="py-2.5 px-4 text-right text-slate-400">
+                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasOcupacao / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
                     </td>
                   </tr>
 
-                  {/* 6.3 Comercial & Vendas */}
                   <tr>
-                    <td className="py-2 px-4 font-sans text-slate-300 pl-12 flex items-center gap-2">
-                      <Bike className="w-3 h-3 text-purple-400" />
-                      <span>6.3 Despesas Comerciais, Vendas & Embalagens</span>
+                    <td className="py-2.5 px-4 font-sans text-slate-300 pl-8">
+                      6.3 Comercial, Embalagens & Vendas
                     </td>
-                    <td className="py-2 px-4 font-sans text-slate-400 text-[11px]">
-                      Embalagens delivery + Taxas Maquininha (R$ {dadosDRE.taxasCartaoEstimadas.toFixed(0)})
+                    <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
+                      Embalagens delivery (R$ {dadosDRE.totalEmbalagensNF.toFixed(2)} em NF) + Taxas de Cartão
                     </td>
-                    <td className="py-2 px-4 text-right text-rose-400">
-                      - R$ {(dadosDRE.despesasPorCategoria.financeiro + dadosDRE.taxasCartaoEstimadas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <td className="py-2.5 px-4 text-right text-rose-400">
+                      - R$ {dadosDRE.despesasComerciais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="py-2 px-4 text-right text-slate-400">
-                      {dadosDRE.receitaLiquida > 0 ? (((dadosDRE.despesasPorCategoria.financeiro + dadosDRE.taxasCartaoEstimadas) / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
+                    <td className="py-2.5 px-4 text-right text-slate-400">
+                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasComerciais / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
                     </td>
                   </tr>
 
-                  {/* 6.4 Serviços & Manutenção */}
                   <tr>
-                    <td className="py-2 px-4 font-sans text-slate-300 pl-12 flex items-center gap-2">
-                      <Sparkles className="w-3 h-3 text-[#FF6B00]" />
-                      <span>6.4 Serviços, Sistemas & Manutenção</span>
+                    <td className="py-2.5 px-4 font-sans text-slate-300 pl-8">
+                      6.4 Serviços, TI & Manutenção
                     </td>
-                    <td className="py-2 px-4 font-sans text-slate-400 text-[11px]">
-                      Software SaaS eloGastrô, internet, limpeza, manutenção
+                    <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
+                      NFS-e de Serviços Tomados (R$ {dadosDRE.totalServicosNF.toFixed(2)}) + Sistema eloGastrô e limpeza
                     </td>
-                    <td className="py-2 px-4 text-right text-rose-400">
-                      - R$ {dadosDRE.despesasPorCategoria.servicos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <td className="py-2.5 px-4 text-right text-rose-400">
+                      - R$ {dadosDRE.despesasServicos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="py-2 px-4 text-right text-slate-400">
-                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasPorCategoria.servicos / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
+                    <td className="py-2.5 px-4 text-right text-slate-400">
+                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasServicos / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
                     </td>
                   </tr>
 
-                  {/* 6.5 Outras Despesas */}
                   <tr>
-                    <td className="py-2 px-4 font-sans text-slate-300 pl-12 flex items-center gap-2">
-                      <Layers className="w-3 h-3 text-slate-400" />
-                      <span>6.5 Outras Despesas Operacionais</span>
+                    <td className="py-2.5 px-4 font-sans text-slate-300 pl-8">
+                      6.5 Outras Despesas Operacionais
                     </td>
-                    <td className="py-2 px-4 font-sans text-slate-400 text-[11px]">
-                      Despesas diversas e eventuais
+                    <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
+                      Imprevistos gerais, taxas de alvará e material de escritório
                     </td>
-                    <td className="py-2 px-4 text-right text-rose-400">
-                      - R$ {dadosDRE.despesasPorCategoria.outros.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <td className="py-2.5 px-4 text-right text-rose-400">
+                      - R$ {dadosDRE.outrasDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="py-2 px-4 text-right text-slate-400">
-                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasPorCategoria.outros / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
+                    <td className="py-2.5 px-4 text-right text-slate-400">
+                      {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.outrasDespesas / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
                     </td>
                   </tr>
 
-                  {/* 7. RESULTADO OPERACIONAL LÍQUIDO */}
-                  <tr className={`border-t-2 ${
+                  {/* 7. Resultado Líquido Final */}
+                  <tr className={`border-t-2 font-black ${
                     dadosDRE.resultadoOperacionalReal >= 0
-                      ? 'bg-[#10B981]/15 border-[#10B981]'
-                      : 'bg-rose-500/15 border-rose-500'
+                      ? 'bg-[#10B981]/15 text-[#10B981]'
+                      : 'bg-rose-500/15 text-rose-400'
                   }`}>
-                    <td className={`py-4 px-4 font-sans font-black text-sm ${
-                      dadosDRE.resultadoOperacionalReal >= 0 ? 'text-[#10B981]' : 'text-rose-400'
-                    }`}>
-                      7. (=) RESULTADO OPERACIONAL LÍQUIDO (LUCRO REAL)
+                    <td className="py-4 px-4 font-sans text-sm">
+                      7. (=) RESULTADO LÍQUIDO REAL DO RESTAURANTE
                     </td>
-                    <td className="py-4 px-4 font-sans text-slate-300 text-xs font-semibold">
-                      Sobra final no bolso do restaurante após todas as saídas
+                    <td className="py-4 px-4 font-sans text-[11px]">
+                      {dadosDRE.resultadoOperacionalReal >= 0
+                        ? '🎉 Lucro Líquido Real gerado pela operação no período'
+                        : '⚠️ Prejuízo Operacional verificado no período'}
                     </td>
-                    <td className={`py-4 px-4 text-right font-black text-base ${
-                      dadosDRE.resultadoOperacionalReal >= 0 ? 'text-[#10B981]' : 'text-rose-400'
-                    }`}>
+                    <td className="py-4 px-4 text-right text-base font-black">
                       R$ {dadosDRE.resultadoOperacionalReal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className={`py-4 px-4 text-right font-black text-sm ${
-                      dadosDRE.resultadoOperacionalReal >= 0 ? 'text-[#10B981]' : 'text-rose-400'
-                    }`}>
-                      {dadosDRE.margemLiquidaPct.toFixed(1)}%
+                    <td className="py-4 px-4 text-right text-sm font-black">
+                      {dadosDRE.margemLiquidaPct.toFixed(1)}% ROL
                     </td>
                   </tr>
                 </tbody>
@@ -1405,194 +2288,710 @@ export default function Financeiro() {
       )}
 
       {/* ========================================================================= */}
-      {/* ABA 3: DISTRIBUIÇÃO DE CUSTOS & PONTO DE EQUILÍBRIO                        */}
+      {/* ABA 4: DISTRIBUIÇÃO & PONTO DE EQUILÍBRIO                                  */}
       {/* ========================================================================= */}
       {subAba === 'indicadores' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Card: Ponto de Equilíbrio (Break-Even) */}
-          <div className={`p-5 rounded-2xl border space-y-4 ${
-            isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
-          }`}>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#FF6B00]/15 text-[#FF6B00] flex items-center justify-center font-bold">
-                <Percent className="w-5 h-5" />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Ponto de Equilíbrio (Break-Even) */}
+            <div className={`p-5 rounded-2xl border space-y-4 ${
+              isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#FF6B00]/15 text-[#FF6B00] flex items-center justify-center font-bold">
+                  <Percent className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Ponto de Equilíbrio Operacional</h3>
+                  <p className="text-xs text-slate-400">Meta mínima de faturamento para cobrir todos os custos</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-extrabold text-white">
-                  Ponto de Equilíbrio Operacional
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Quanto seu restaurante precisa faturar para não ter prejuízo
+
+              <div className="p-4 rounded-xl bg-[#0F172A] border border-slate-800 space-y-2">
+                <span className="text-xs text-slate-400 font-medium">Faturamento Mínimo Necessário:</span>
+                <p className="text-2xl font-black font-mono text-[#FF6B00]">
+                  R$ {dadosDRE.pontoEquilibrioFinanceiro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
+                <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>Custos Fixos Mensais:</span>
+                  <strong className="text-slate-200 font-mono">
+                    R$ {dadosDRE.custosFixosTotais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </strong>
+                </div>
               </div>
-            </div>
 
-            <div className="p-4 rounded-xl bg-[#0F172A] border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Custos Fixos do Mês:</span>
-                <span className="font-mono font-bold text-white">
-                  R$ {dadosDRE.despesasFixas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Margem de Contribuição Média:</span>
-                <span className="font-mono font-bold text-[#FF6B00]">
-                  {dadosDRE.margemBrutaPct.toFixed(1)}%
-                </span>
-              </div>
-              <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-200">Faturamento Mínimo Necessário:</span>
-                <span className="font-mono font-black text-[#10B981] text-sm">
-                  R$ {dadosDRE.pontoEquilibrio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Com o faturamento atual de <strong className="text-white">R$ {dadosDRE.receitaLiquida.toFixed(2)}</strong>, seu restaurante está{' '}
-              {dadosDRE.receitaLiquida >= dadosDRE.pontoEquilibrio ? (
-                <span className="text-[#10B981] font-bold">
-                  acima do ponto de equilíbrio (operando no lucro)
-                </span>
-              ) : (
-                <span className="text-rose-400 font-bold">
-                  abaixo do ponto de equilíbrio (necessário aumentar vendas ou reduzir despesas fixas)
-                </span>
-              )}.
-            </p>
-          </div>
-
-          {/* Card: Produtos Mais Lucrativos da Casa */}
-          <div className={`p-5 rounded-2xl border space-y-4 ${
-            isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
-          }`}>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#10B981]/15 text-[#10B981] flex items-center justify-center font-bold">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-extrabold text-white">
-                  Top 5 Pratos Mais Lucrativos
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Pratos que mais deixam dinheiro no caixa após descontar o CMV
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {dadosDRE.topProdutosLucrativos.length === 0 ? (
-                <p className="text-xs text-slate-400 py-6 text-center">
-                  Nenhuma venda com cálculo de lucro registrada neste período.
-                </p>
-              ) : (
-                dadosDRE.topProdutosLucrativos.map((prod, idx) => (
+              <div className="space-y-1.5 text-xs text-slate-300">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span>Meta Atingida no Período:</span>
+                  <span className="font-mono text-[#10B981]">
+                    {dadosDRE.pontoEquilibrioFinanceiro > 0
+                      ? ((dadosDRE.receitaLiquida / dadosDRE.pontoEquilibrioFinanceiro) * 100).toFixed(1)
+                      : '0'}%
+                  </span>
+                </div>
+                <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
                   <div
-                    key={idx}
-                    className="p-3 rounded-xl bg-[#0F172A] border border-slate-800 flex items-center justify-between text-xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-[10px]">
-                        {idx + 1}
-                      </span>
-                      <div>
-                        <span className="font-bold text-slate-200 block">{prod.nome}</span>
-                        <span className="text-[10px] text-slate-400">
-                          {prod.quantidade} unidades vendidas
+                    className="h-full bg-gradient-to-r from-[#FF6B00] to-[#10B981] transition-all duration-500 rounded-full"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        dadosDRE.pontoEquilibrioFinanceiro > 0
+                          ? (dadosDRE.receitaLiquida / dadosDRE.pontoEquilibrioFinanceiro) * 100
+                          : 0
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Top 5 Produtos Mais Lucrativos */}
+            <div className={`p-5 rounded-2xl border space-y-3 ${
+              isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#10B981]/15 text-[#10B981] flex items-center justify-center font-bold">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Top 5 Produtos Mais Rentáveis</h3>
+                  <p className="text-xs text-slate-400">Itens com maior margem de contribuição no caixa</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {dadosDRE.topProdutosRentaveis.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-6 text-center">Nenhuma venda registrada no período selecionado.</p>
+                ) : (
+                  dadosDRE.topProdutosRentaveis.map((prod, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-xl bg-[#0F172A] border border-slate-800 flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-lg bg-[#FF6B00]/20 text-[#FF6B00] font-black text-[10px] flex items-center justify-center font-mono">
+                          #{idx + 1}
+                        </span>
+                        <div>
+                          <p className="font-bold text-white line-clamp-1">{prod.nome}</p>
+                          <span className="text-[10px] text-slate-400 font-mono">{prod.quantidade} unidades vendidas</span>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="font-mono font-bold text-[#10B981] block">
+                          + R$ {prod.lucro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          Margem: {prod.receita > 0 ? ((prod.lucro / prod.receita) * 100).toFixed(0) : '0'}%
                         </span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="font-mono font-black text-[#10B981] block">
-                        + R$ {prod.lucro.toFixed(2)}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        Receita: R$ {prod.receita.toFixed(0)}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: LANÇAR / EDITAR GASTO SIMPLIFICADO                                 */}
+      {/* MODAL 1: IMPORTAR ARQUIVO XML DA SEFAZ                                     */}
       {/* ========================================================================= */}
-      {modalGastoAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-[#1E293B] border border-slate-700/80 rounded-3xl p-6 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Linha de acento laranja */}
-            <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-transparent via-[#FF6B00] to-transparent opacity-90" />
-
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+      {modalImportarXmlAberto && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#1E293B] border border-slate-700 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#FF6B00]/15 text-[#FF6B00] flex items-center justify-center font-bold">
-                  <Receipt className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-xl bg-[#FF6B00]/20 text-[#FF6B00] flex items-center justify-center font-bold">
+                  <Upload className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-white">
-                    {gastoEmEdicaoId ? 'Editar Gasto do Restaurante' : 'Lançar Novo Gasto no Financeiro'}
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    O valor é deduzido automaticamente no DRE da loja.
-                  </p>
+                  <h3 className="text-base font-extrabold text-white">Importar XML de Nota Fiscal (SEFAZ)</h3>
+                  <p className="text-[11px] text-slate-400">Leitura instantânea de NF-e (Modelo 55) e NFC-e para o DRE</p>
                 </div>
               </div>
-
               <button
                 type="button"
-                onClick={() => setModalGastoAberto(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                onClick={() => setModalImportarXmlAberto(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSalvarGasto} className="space-y-4 pt-4">
-              {/* Descrição */}
+            {/* Área de Seleção de Arquivo XML */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-slate-700 hover:border-[#FF6B00] bg-[#0F172A] rounded-2xl p-6 text-center cursor-pointer transition-colors group"
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xml"
+                onChange={handleUploadArquivoXml}
+                className="hidden"
+              />
+              <Upload className="w-8 h-8 text-slate-500 group-hover:text-[#FF6B00] mx-auto mb-2 transition-colors" />
+              <p className="text-xs font-bold text-white">
+                {nomeArquivoXmlSelecionado ? (
+                  <span className="text-[#10B981] font-mono">Arquivo: {nomeArquivoXmlSelecionado}</span>
+                ) : (
+                  'Clique ou arraste um arquivo XML de NF-e (.xml)'
+                )}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">Compatível com notas fiscais de fornecedores emitidas pela SEFAZ</p>
+            </div>
+
+            {/* Ou Colar Conteúdo do XML */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                Ou cole o texto XML da Nota Fiscal abaixo:
+              </label>
+              <textarea
+                value={xmlInputTexto}
+                onChange={(e) => {
+                  setXmlInputTexto(e.target.value);
+                  if (e.target.value.trim()) processarXmlTexto(e.target.value);
+                }}
+                rows={4}
+                placeholder="<nfeProc xmlns=...><NFe>...</NFe></nfeProc>"
+                className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-[#FF6B00]"
+              />
+            </div>
+
+            {/* Mensagem de Erro se houver */}
+            {erroXml && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{erroXml}</span>
+              </div>
+            )}
+
+            {/* Pré-visualização da Nota Decodificada */}
+            {xmlPrevia && (
+              <div className="p-4 rounded-2xl bg-[#0F172A] border border-[#10B981]/30 space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#10B981] flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Nota Fiscal Decodificada com Sucesso!</span>
+                  </span>
+                  <span className="text-xs font-mono font-black text-white">
+                    NF #{xmlPrevia.numero} • Série {xmlPrevia.serie || '1'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Emitente:</span>
+                    <strong className="text-white font-sans text-xs truncate block">{xmlPrevia.emitenteRazaoSocial}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Data Emissão:</span>
+                    <strong className="text-white font-mono">{xmlPrevia.dataEmissao}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Linha DRE:</span>
+                    <strong className="text-[#10B981] font-sans text-xs">{MAPA_TIPO_NF[xmlPrevia.tipo]?.linhaDRE}</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 block">Valor Total:</span>
+                    <strong className="text-lg font-black font-mono text-[#10B981]">
+                      R$ {xmlPrevia.valorTotalNota.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Itens da NF se houver */}
+                {xmlPrevia.itens && xmlPrevia.itens.length > 0 && (
+                  <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+                    <span>Itens extraídos: <strong>{xmlPrevia.itens.length} produto(s)</strong> (ex: {xmlPrevia.itens[0].descricao})</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Botões do Modal */}
+            <div className="flex items-center gap-2 pt-3 border-t border-slate-700">
+              <button
+                type="button"
+                onClick={() => setModalImportarXmlAberto(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-700 text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!xmlPrevia}
+                onClick={confirmarImportacaoXml}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-[#FF6B00]/30 transition-all cursor-pointer"
+              >
+                Confirmar & Alimentar DRE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 2: LANÇAR / EDITAR NOTA FISCAL MANUALMENTE                          */}
+      {/* ========================================================================= */}
+      {modalNFAberto && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#1E293B] border border-slate-700 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#10B981]/20 text-[#10B981] flex items-center justify-center font-bold">
+                  <QrCode className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">
+                    {nfEmEdicaoId ? 'Editar Nota Fiscal' : 'Lançar Nota Fiscal Manualmente'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Preencha os dados da nota fiscal de compra, serviço ou venda</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalNFAberto(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarNF} className="space-y-3.5">
+              {/* Modelo e Tipo / Enquadramento DRE */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Modelo do Documento Fiscal *
+                  </label>
+                  <select
+                    value={formNF.modelo}
+                    onChange={(e) => setFormNF({ ...formNF, modelo: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-[#FF6B00]"
+                  >
+                    <option value="NFe_55">NF-e (Mod. 55 - Compra de Fornecedor / Atacado)</option>
+                    <option value="NFCe_65">NFC-e (Mod. 65 - Venda Consumidor Final)</option>
+                    <option value="NFSe_servico">NFS-e (Nota de Serviços Tomados)</option>
+                    <option value="CF_e_SAT">CF-e SAT / Cupom Fiscal</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Tipo & Linha no DRE *
+                  </label>
+                  <select
+                    value={formNF.tipo}
+                    onChange={(e) => setFormNF({ ...formNF, tipo: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-[#FF6B00]"
+                  >
+                    <option value="entrada_insumos">🥩 Entrada: Compras de Insumos & Carnes (CMV 4.0)</option>
+                    <option value="entrada_embalagens">📦 Entrada: Embalagens Delivery (Comercial 6.3)</option>
+                    <option value="entrada_servicos">🛠️ Entrada: NFS-e Serviços Tomados (Serviços 6.4)</option>
+                    <option value="entrada_utilidades">💡 Entrada: Contas / Utilidades (Ocupação 6.2)</option>
+                    <option value="entrada_equipamento">🍳 Entrada: Equipamentos & Ativo Imobilizado</option>
+                    <option value="saida_venda">📤 Saída: Vendas Fiscais (Receita Bruta 1.0)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Número, Série e Chave de Acesso */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Número da NF *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formNF.numero}
+                    onChange={(e) => setFormNF({ ...formNF, numero: e.target.value })}
+                    placeholder="Ex: 000184"
+                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono font-bold text-white focus:outline-none focus:border-[#FF6B00]"
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Série
+                  </label>
+                  <input
+                    type="text"
+                    value={formNF.serie}
+                    onChange={(e) => setFormNF({ ...formNF, serie: e.target.value })}
+                    placeholder="1"
+                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono text-white focus:outline-none"
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Data Emissão *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formNF.dataEmissao}
+                    onChange={(e) => setFormNF({ ...formNF, dataEmissao: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Chave de Acesso (44 dígitos) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-300">
+                    Chave de Acesso da NF-e (44 Dígitos)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={gerarChaveAcessoAleatoria}
+                    className="text-[10px] text-[#FF6B00] hover:underline font-bold"
+                  >
+                    Gerar Chave de Teste
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  maxLength={44}
+                  value={formNF.chaveAcesso}
+                  onChange={(e) => setFormNF({ ...formNF, chaveAcesso: e.target.value.replace(/\D/g, '') })}
+                  placeholder="35261012345678000195550010000001841000001840"
+                  className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono text-white tracking-widest focus:outline-none focus:border-[#FF6B00]"
+                />
+              </div>
+
+              {/* Fornecedor / Razão Social e CNPJ */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Razão Social do Emitente / Fornecedor *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formNF.emitenteRazaoSocial}
+                    onChange={(e) => setFormNF({ ...formNF, emitenteRazaoSocial: e.target.value })}
+                    placeholder="Ex: FRIGORIFICO BOI GORDO ALIMENTOS S/A"
+                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-[#FF6B00]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    CNPJ ou CPF do Emitente *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formNF.emitenteCnpjCpf}
+                    onChange={(e) => setFormNF({ ...formNF, emitenteCnpjCpf: e.target.value })}
+                    placeholder="00.000.000/0001-00"
+                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Valores e Impostos */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Valor Total da NF *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">R$</span>
+                    <input
+                      type="text"
+                      required
+                      value={formNF.valorTotalNota}
+                      onChange={(e) => setFormNF({ ...formNF, valorTotalNota: e.target.value })}
+                      placeholder="0,00"
+                      className="w-full pl-8 pr-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono font-bold text-white focus:outline-none focus:border-[#FF6B00]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    ICMS Destacado
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">R$</span>
+                    <input
+                      type="text"
+                      value={formNF.valorIcms}
+                      onChange={(e) => setFormNF({ ...formNF, valorIcms: e.target.value })}
+                      placeholder="0,00"
+                      className="w-full pl-8 pr-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono text-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Status na SEFAZ
+                  </label>
+                  <select
+                    value={formNF.status}
+                    onChange={(e) => setFormNF({ ...formNF, status: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white focus:outline-none"
+                  >
+                    <option value="autorizada">✅ Autorizada</option>
+                    <option value="pendente">⏳ Pendente</option>
+                    <option value="cancelada">❌ Cancelada</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Checkbox inteligente: Lançar no Livro Caixa */}
+              {!nfEmEdicaoId && formNF.tipo !== 'saida_venda' && (
+                <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#0F172A] border border-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formNF.lancarNoLivroCaixa}
+                    onChange={(e) => setFormNF({ ...formNF, lancarNoLivroCaixa: e.target.checked })}
+                    className="w-4 h-4 text-[#FF6B00] rounded focus:ring-0"
+                  />
+                  <span className="text-xs text-slate-300 font-medium">
+                    Lançar também como despesa no <strong>Livro Caixa</strong> (Contas Pagas)
+                  </span>
+                </label>
+              )}
+
+              {/* Botões do Modal */}
+              <div className="flex items-center gap-2 pt-3 border-t border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setModalNFAberto(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-700 text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-[#FF6B00]/30 transition-all cursor-pointer"
+                >
+                  {nfEmEdicaoId ? 'Salvar Alterações' : 'Confirmar & Lançar no DRE'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: VISUALIZADOR DE DANFE / DETALHES DA NOTA FISCAL                  */}
+      {/* ========================================================================= */}
+      {modalDanfeAberto && nfVisualizando && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#1E293B] border border-slate-700 w-full max-w-3xl rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">
+                    DANFE Simplificado • Documento Fiscal Eletrônico
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {nfVisualizando.modelo.replace('_', ' ')} — N° {nfVisualizando.numero} (Série {nfVisualizando.serie || '1'})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalDanfeAberto(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Chave de Acesso Formatada */}
+            {nfVisualizando.chaveAcesso && (
+              <div className="p-3 rounded-2xl bg-[#0F172A] border border-slate-800 flex items-center justify-between gap-2">
+                <div className="overflow-hidden">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Chave de Acesso SEFAZ (44 Dígitos):</span>
+                  <p className="font-mono text-xs font-bold text-[#10B981] tracking-widest break-all">
+                    {nfVisualizando.chaveAcesso}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copiarChave(nfVisualizando.chaveAcesso)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copiar</span>
+                </button>
+              </div>
+            )}
+
+            {/* Dados do Emitente e Destinatário */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 rounded-2xl bg-[#0F172A] border border-slate-800 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+                  <Building2 className="w-3 h-3 text-[#FF6B00]" />
+                  <span>Emitente / Fornecedor:</span>
+                </span>
+                <p className="font-bold text-white text-sm">{nfVisualizando.emitenteRazaoSocial}</p>
+                <p className="text-slate-400 font-mono text-[11px]">CNPJ: {nfVisualizando.emitenteCnpjCpf}</p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#0F172A] border border-slate-800 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+                  <Store className="w-3 h-3 text-[#10B981]" />
+                  <span>Destinatário:</span>
+                </span>
+                <p className="font-bold text-white text-sm">{nfVisualizando.destinatarioRazaoSocial || tenantAtual.nomeFantasia}</p>
+                <p className="text-slate-400 font-mono text-[11px]">CNPJ: {nfVisualizando.destinatarioCnpjCpf || tenantAtual.documento || '11.222.333/0001-44'}</p>
+              </div>
+            </div>
+
+            {/* Tabela de Itens da NF se houver */}
+            {nfVisualizando.itens && nfVisualizando.itens.length > 0 ? (
+              <div className="border border-slate-800 rounded-2xl overflow-hidden">
+                <div className="bg-[#0F172A] px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-slate-300">
+                  Produtos / Mercadorias da Nota Fiscal ({nfVisualizando.itens.length})
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-900/60 text-[10px] text-slate-400 font-bold uppercase border-b border-slate-800">
+                        <th className="py-2 px-3">Item</th>
+                        <th className="py-2 px-3">Qtd</th>
+                        <th className="py-2 px-3 text-right">Preço Unit</th>
+                        <th className="py-2 px-3 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                      {nfVisualizando.itens.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-800/40">
+                          <td className="py-2 px-3 font-sans text-white font-medium">
+                            {item.descricao}
+                          </td>
+                          <td className="py-2 px-3 text-slate-300">
+                            {item.quantidade} {item.unidade}
+                          </td>
+                          <td className="py-2 px-3 text-right text-slate-300">
+                            R$ {item.valorUnitario.toFixed(2)}
+                          </td>
+                          <td className="py-2 px-3 text-right font-bold text-[#10B981]">
+                            R$ {item.valorTotal.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-[#0F172A] text-xs text-slate-400">
+                Nenhum detalhamento individual de itens gravado para esta nota.
+              </div>
+            )}
+
+            {/* Totais do DANFE */}
+            <div className="p-4 rounded-2xl bg-[#0F172A] border border-slate-800 flex items-center justify-between text-xs">
+              <div className="space-y-1">
+                <span className="text-slate-400 block text-[11px]">Enquadramento Contábil:</span>
+                <strong className="text-[#10B981] font-bold text-sm block">
+                  {MAPA_TIPO_NF[nfVisualizando.tipo]?.linhaDRE}
+                </strong>
+                {nfVisualizando.valorIcms ? (
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    ICMS destacado: R$ {nfVisualizando.valorIcms.toFixed(2)}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="text-right">
+                <span className="text-slate-400 text-xs block">Valor Total do Documento:</span>
+                <span className="text-2xl font-black font-mono text-[#10B981]">
+                  R$ {nfVisualizando.valorTotalNota.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Fechar */}
+            <div className="pt-2 text-right">
+              <button
+                type="button"
+                onClick={() => setModalDanfeAberto(false)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors cursor-pointer"
+              >
+                Fechar Visualizador
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 4: LANÇAR / EDITAR GASTO SIMPLIFICADO NO LIVRO CAIXA                */}
+      {/* ========================================================================= */}
+      {modalGastoAberto && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#1E293B] border border-slate-700 w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#FF6B00]/20 text-[#FF6B00] flex items-center justify-center font-bold">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">
+                    {gastoEmEdicaoId ? 'Editar Despesa' : 'Novo Lançamento de Gasto'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Classificação simplificada que se enquadra no DRE</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalGastoAberto(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarGasto} className="space-y-3.5">
               <div>
                 <label className="text-xs font-bold text-slate-300 block mb-1">
-                  Descrição do Gasto *
+                  Descrição do Gasto / Fornecedor *
                 </label>
                 <input
                   type="text"
                   required
                   value={formDespesa.descricao}
                   onChange={(e) => setFormDespesa({ ...formDespesa, descricao: e.target.value })}
-                  placeholder="Ex: Conta de Luz CEMIG, Aluguel Outubro, Diária Garçom..."
-                  className="w-full px-3 py-2.5 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#FF6B00]"
+                  placeholder="Ex: Conta de Energia Elétrica (Luz) - Cemig"
+                  className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#FF6B00]"
                 />
               </div>
 
-              {/* Categoria com Enquadramento no DRE */}
               <div>
                 <label className="text-xs font-bold text-slate-300 block mb-1">
-                  Categoria & Enquadramento no DRE *
+                  Categoria Contábil (Linha DRE) *
                 </label>
                 <select
                   value={formDespesa.categoria}
                   onChange={(e) => setFormDespesa({ ...formDespesa, categoria: e.target.value as any })}
-                  className="w-full px-3 py-2.5 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white font-semibold focus:outline-none focus:border-[#FF6B00]"
+                  className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-[#FF6B00]"
                 >
-                  <option value="ocupacao">🏢 Ocupação & Utilidades (Aluguel, Luz, Água, Gás) ➔ DRE: Linha 6.2</option>
-                  <option value="pessoal">👥 Equipe & Pessoal (Salários, Diárias Extras, Pró-Labore) ➔ DRE: Linha 6.1</option>
-                  <option value="servicos">✨ Serviços & Manutenção (Sistemas SaaS, Limpeza, Contabilidade) ➔ DRE: Linha 6.4</option>
-                  <option value="insumos">🥬 Insumos Avulsos & Feira (Compras Rápidas de Emergência) ➔ DRE: Linha 4.0 CMV</option>
-                  <option value="financeiro">🛵 Comercial & Vendas (Embalagens Delivery, Taxas de Cartão) ➔ DRE: Linha 6.3</option>
-                  <option value="outros">📦 Outras Despesas Administrativas & Eventuais ➔ DRE: Linha 6.5</option>
+                  <option value="ocupacao">🏠 Ocupação & Utilidades (Aluguel, Luz, Água, Gás) ➔ Linha 6.2</option>
+                  <option value="pessoal">👥 Equipe & Pessoal (Salários, Diárias, Pró-Labore) ➔ Linha 6.1</option>
+                  <option value="servicos">✨ Serviços, Sistemas & Limpeza (eloGastrô, Internet) ➔ Linha 6.4</option>
+                  <option value="insumos">🥦 Insumos Avulsos & Feira (Carvão, Feira, Gelo) ➔ Linha 4.0 CMV</option>
+                  <option value="financeiro">🛵 Comercial & Embalagens (Embalagens delivery) ➔ Linha 6.3</option>
+                  <option value="outros">📦 Outras Despesas Operacionais ➔ Linha 6.5</option>
                 </select>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Linha no DRE:{' '}
-                  <strong className="text-[#FF6B00]">
-                    {CATEGORIAS_DRE[formDespesa.categoria]?.linhaDRE}
-                  </strong>
-                </p>
               </div>
 
-              {/* Valor e Data */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-300 block mb-1">
@@ -1627,7 +3026,6 @@ export default function Financeiro() {
                 </div>
               </div>
 
-              {/* Forma de Pagamento, Tipo e Status */}
               <div className="grid grid-cols-3 gap-2.5">
                 <div>
                   <label className="text-[11px] font-bold text-slate-300 block mb-1">
@@ -1675,7 +3073,6 @@ export default function Financeiro() {
                 </div>
               </div>
 
-              {/* Botões do Modal */}
               <div className="flex items-center gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"

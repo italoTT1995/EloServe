@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { SessaoCaixa, Mesa, PedidoKDS, VendaRealizada, ItemComandaMesa, DespesaOperacionalRestaurante, MovimentoCaixa } from '../types';
+import { SessaoCaixa, Mesa, PedidoKDS, VendaRealizada, ItemComandaMesa, DespesaOperacionalRestaurante, MovimentoCaixa, NotaFiscalRegistro } from '../types';
 import { useEstoqueStore } from './useEstoqueStore';
 import { MESAS_POR_TENANT } from './initialMesas';
+import { NOTAS_FISCAIS_INICIAIS } from './initialNotasFiscais';
 
 interface AppState {
   caixaAtual: SessaoCaixa;
@@ -15,12 +16,17 @@ interface AppState {
   pedidosKDS: PedidoKDS[];
   vendas: VendaRealizada[];
   despesasRestaurante: DespesaOperacionalRestaurante[];
+  notasFiscais: NotaFiscalRegistro[];
   getVendasPorTenant: (tenantId?: string) => VendaRealizada[];
   getDespesasPorTenant: (tenantId?: string) => DespesaOperacionalRestaurante[];
+  getNotasFiscaisPorTenant: (tenantId?: string) => NotaFiscalRegistro[];
   adicionarDespesaRestaurante: (despesa: Omit<DespesaOperacionalRestaurante, 'id'>) => void;
   editarDespesaRestaurante: (id: string, dados: Partial<DespesaOperacionalRestaurante>) => void;
   alternarStatusPagamentoDespesa: (id: string) => void;
   removerDespesaRestaurante: (id: string) => void;
+  adicionarNotaFiscal: (nota: Omit<NotaFiscalRegistro, 'id' | 'criadoEm'>) => void;
+  editarNotaFiscal: (id: string, dados: Partial<NotaFiscalRegistro>) => void;
+  removerNotaFiscal: (id: string) => void;
   abrirCaixa: (saldoInicial: number) => void;
   fecharCaixa: () => void;
   registrarSangria: (valor: number, motivo: string, operador?: string) => { sucesso: boolean; mensagem?: string };
@@ -182,6 +188,8 @@ export const useAppStore = create<AppState>()(
 
       despesasRestaurante: [],
 
+      notasFiscais: NOTAS_FISCAIS_INICIAIS,
+
       getVendasPorTenant: (tenantId?: string) => {
         const state = get();
         const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
@@ -226,6 +234,42 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           despesasRestaurante: (state.despesasRestaurante || []).filter((d) => d.id !== id),
         }));
+      },
+
+      getNotasFiscaisPorTenant: (tenantId?: string) => {
+        const state = get();
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const lista = state.notasFiscais && state.notasFiscais.length > 0 ? state.notasFiscais : NOTAS_FISCAIS_INICIAIS;
+        return lista.filter((n) => !n.tenantId || n.tenantId === idAlvo);
+      },
+
+      adicionarNotaFiscal: (nota) => {
+        const nova: NotaFiscalRegistro = {
+          ...nota,
+          id: 'nf-' + Date.now().toString().slice(-6),
+          criadoEm: new Date().toISOString(),
+        };
+        set((state) => ({
+          notasFiscais: [nova, ...(state.notasFiscais && state.notasFiscais.length > 0 ? state.notasFiscais : NOTAS_FISCAIS_INICIAIS)],
+        }));
+      },
+
+      editarNotaFiscal: (id, dados) => {
+        set((state) => {
+          const listaAtual = state.notasFiscais && state.notasFiscais.length > 0 ? state.notasFiscais : NOTAS_FISCAIS_INICIAIS;
+          return {
+            notasFiscais: listaAtual.map((n) => (n.id === id ? { ...n, ...dados } : n)),
+          };
+        });
+      },
+
+      removerNotaFiscal: (id) => {
+        set((state) => {
+          const listaAtual = state.notasFiscais && state.notasFiscais.length > 0 ? state.notasFiscais : NOTAS_FISCAIS_INICIAIS;
+          return {
+            notasFiscais: listaAtual.filter((n) => n.id !== id),
+          };
+        });
       },
 
       abrirCaixa: (saldoInicial) =>

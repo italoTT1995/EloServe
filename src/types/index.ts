@@ -413,6 +413,77 @@ export interface DespesaOperacionalRestaurante {
   statusPagamento?: 'pago' | 'pendente';
   dataVencimento?: string;
   observacoes?: string;
+  notaFiscalId?: string;
+  numeroNotaFiscal?: string;
+}
+
+// -------------------------------------------------------------
+// NOTAS FISCAIS & DOCUMENTOS FISCAIS (NF-e, NFC-e, NFS-e)
+// -------------------------------------------------------------
+export type TipoNotaFiscal =
+  | 'entrada_insumos'     // Compra de matéria-prima / alimentos -> DRE CMV (Linha 4.0)
+  | 'entrada_embalagens'  // Embalagens para delivery -> DRE Comercial & Embalagens (Linha 6.3)
+  | 'entrada_servicos'    // NFS-e Serviços Tomados (manutenção, TI, dedetização) -> DRE Serviços (Linha 6.4)
+  | 'entrada_utilidades'  // Contas com NF (Energia, Gás, Internet) -> DRE Ocupação (Linha 6.2)
+  | 'entrada_equipamento' // Imobilizado / Máquinas / Fogões
+  | 'saida_venda'         // NFC-e / NF-e emitida ao consumidor -> DRE Receita Bruta (Linha 1.0)
+  | 'outros';
+
+export type ModeloDocumentoFiscal = 'NFe_55' | 'NFCe_65' | 'NFSe_servico' | 'CF_e_SAT' | 'cupom_fiscal';
+
+export type StatusNotaFiscal = 'autorizada' | 'cancelada' | 'pendente' | 'em_processamento';
+
+export interface ItemNotaFiscal {
+  id: string;
+  codigo?: string;
+  descricao: string;
+  ncm?: string;
+  cfop?: string;
+  quantidade: number;
+  unidade: string;
+  valorUnitario: number;
+  valorTotal: number;
+  aliquotaIcms?: number;
+  valorIcms?: number;
+}
+
+export interface NotaFiscalRegistro {
+  id: string;
+  tenantId: string;
+  numero: string;               // Ex: '000142'
+  serie?: string;               // Ex: '1'
+  chaveAcesso?: string;         // 44 dígitos
+  modelo: ModeloDocumentoFiscal;
+  tipo: TipoNotaFiscal;
+  direcao: 'entrada' | 'saida';
+  emitenteRazaoSocial: string;
+  emitenteCnpjCpf: string;
+  destinatarioRazaoSocial?: string;
+  destinatarioCnpjCpf?: string;
+  dataEmissao: string;          // YYYY-MM-DD
+  dataCompetencia?: string;
+  valorTotalProdutos: number;
+  valorFrete?: number;
+  valorOutrasDespesas?: number;
+  valorDesconto?: number;
+  valorTotalNota: number;
+  
+  // Impostos destacados
+  valorIcms?: number;
+  valorPis?: number;
+  valorCofins?: number;
+  valorIss?: number;
+  
+  status: StatusNotaFiscal;
+  itens?: ItemNotaFiscal[];
+  nomeArquivoXml?: string;
+  xmlConteudo?: string;
+  observacoes?: string;
+  cadastradoPor?: string;
+  criadoEm: string;
+  
+  // Enquadramento no DRE
+  linhaDRE: 'cmv' | 'receita_bruta' | 'deducoes_impostos' | 'ocupacao' | 'comercial_embalagens' | 'servicos' | 'outros';
 }
 
 // -------------------------------------------------------------

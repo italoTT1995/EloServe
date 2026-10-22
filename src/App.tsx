@@ -160,9 +160,17 @@ export default function App() {
                     }
                   />
 
-                  {/* Financeiro, DRE do Restaurante & Relatórios Gerenciais */}
+                  {/* Financeiro, Notas Fiscais, DRE do Restaurante & Relatórios */}
                   <Route
                     path="/financeiro"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <Financeiro />
+                      </RotaProtegida>
+                    }
+                  />
+                  <Route
+                    path="/notas-fiscais"
                     element={
                       <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
                         <Financeiro />
