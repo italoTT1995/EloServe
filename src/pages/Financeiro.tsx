@@ -169,7 +169,7 @@ export const MAPA_TIPO_NF: Record<
   },
 };
 
-const CATEGORIAS_PREENCHIMENTO_RAPIDO = [
+const ATALHOS_LANCAMENTO_RAPIDO = [
   { rotulo: 'Luz (Energia)', descricao: 'Conta de Energia Elétrica', categoria: 'ocupacao' as const, tipo: 'variavel' as const, icone: Lightbulb, cor: 'text-amber-400' },
   { rotulo: 'Água / Esgoto', descricao: 'Conta de Água e Saneamento', categoria: 'ocupacao' as const, tipo: 'variavel' as const, icone: Droplet, cor: 'text-blue-400' },
   { rotulo: 'Aluguel do Ponto', descricao: 'Aluguel Comercial do Imóvel', categoria: 'ocupacao' as const, tipo: 'fixa' as const, icone: Store, cor: 'text-amber-400' },
@@ -954,9 +954,9 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       {/* ========================================================================= */}
       {subAba === 'gastos' && (
         <div className="space-y-4">
-          {/* Categorias Rápidas de Gastos */}
+          {/* Atalhos Rápidos de 1 Clique */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-            {CATEGORIAS_PREENCHIMENTO_RAPIDO.map((a, idx) => {
+            {ATALHOS_LANCAMENTO_RAPIDO.map((a, idx) => {
               const Icone = a.icone;
               return (
                 <button
