@@ -7,6 +7,7 @@ import Mesas from './pages/Mesas';
 import KDS from './pages/KDS';
 import Cardapio from './pages/Cardapio';
 import Caixa from './pages/Caixa';
+import Financeiro from './pages/Financeiro';
 import Relatorios from './pages/Relatorios';
 import EloBot from './pages/EloBot';
 import SaaSMaster from './pages/SaaSMaster';
@@ -159,12 +160,20 @@ export default function App() {
                     }
                   />
 
-                  {/* DRE Financeiro do Restaurante & Relatórios */}
+                  {/* Financeiro, DRE do Restaurante & Relatórios Gerenciais */}
+                  <Route
+                    path="/financeiro"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <Financeiro />
+                      </RotaProtegida>
+                    }
+                  />
                   <Route
                     path="/dre"
                     element={
                       <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
-                        <Relatorios />
+                        <Financeiro />
                       </RotaProtegida>
                     }
                   />
@@ -172,7 +181,7 @@ export default function App() {
                     path="/relatorios"
                     element={
                       <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
-                        <Relatorios />
+                        <Financeiro />
                       </RotaProtegida>
                     }
                   />

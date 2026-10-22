@@ -18,6 +18,8 @@ interface AppState {
   getVendasPorTenant: (tenantId?: string) => VendaRealizada[];
   getDespesasPorTenant: (tenantId?: string) => DespesaOperacionalRestaurante[];
   adicionarDespesaRestaurante: (despesa: Omit<DespesaOperacionalRestaurante, 'id'>) => void;
+  editarDespesaRestaurante: (id: string, dados: Partial<DespesaOperacionalRestaurante>) => void;
+  alternarStatusPagamentoDespesa: (id: string) => void;
   removerDespesaRestaurante: (id: string) => void;
   abrirCaixa: (saldoInicial: number) => void;
   fecharCaixa: () => void;
@@ -199,6 +201,24 @@ export const useAppStore = create<AppState>()(
         };
         set((state) => ({
           despesasRestaurante: [nova, ...(state.despesasRestaurante || [])],
+        }));
+      },
+
+      editarDespesaRestaurante: (id, dados) => {
+        set((state) => ({
+          despesasRestaurante: (state.despesasRestaurante || []).map((d) =>
+            d.id === id ? { ...d, ...dados } : d
+          ),
+        }));
+      },
+
+      alternarStatusPagamentoDespesa: (id) => {
+        set((state) => ({
+          despesasRestaurante: (state.despesasRestaurante || []).map((d) =>
+            d.id === id
+              ? { ...d, statusPagamento: d.statusPagamento === 'pendente' ? 'pago' : 'pendente' }
+              : d
+          ),
         }));
       },
 

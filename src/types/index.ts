@@ -409,6 +409,10 @@ export interface DespesaOperacionalRestaurante {
   data: string;
   tipo: 'fixa' | 'variavel';
   cadastradoPor?: string;
+  formaPagamento?: 'pix' | 'dinheiro' | 'boleto' | 'transferencia' | 'cartao';
+  statusPagamento?: 'pago' | 'pendente';
+  dataVencimento?: string;
+  observacoes?: string;
 }
 
 // -------------------------------------------------------------
