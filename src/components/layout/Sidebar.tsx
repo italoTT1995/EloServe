@@ -50,7 +50,6 @@ const menuItemsDonoSimples: MenuItemDef[] = [
   { path: '/mesas', label: 'Mesas', icon: LayoutGrid, cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
   { path: '/estoque', label: 'Estoque', icon: Package, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/caixa', label: 'Caixa', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante', 'caixa'] },
-  { path: '/financeiro', label: 'Financeiro & DRE', icon: BarChart3, badge: 'NF-e', highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/elobot', label: 'Marketing', icon: Megaphone, highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/funcionarios', label: 'Funcionários', icon: Users, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/delivery', label: 'Entregas/Entregadores', icon: Bike, cargos: ['super_admin', 'admin_restaurante', 'caixa', 'entregador'] },
@@ -63,7 +62,6 @@ const menuItemsOperacao: MenuItemDef[] = [
   { path: '/delivery', label: 'Delivery & Entregas', icon: Bike, badge: 'F3', cargos: ['super_admin', 'admin_restaurante', 'caixa', 'entregador'] },
   { path: '/kds', label: 'Cozinha (KDS)', icon: ChefHat, badge: 'F4', cargos: ['super_admin', 'admin_restaurante', 'cozinha'] },
   { path: '/caixa', label: 'Controle de Caixa', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante', 'caixa'] },
-  { path: '/financeiro', label: 'Financeiro & Notas Fiscais', icon: BarChart3, badge: 'NF-e', highlight: true, cargos: ['super_admin', 'admin_restaurante', 'caixa'] },
 ];
 
 const menuItemsConfiguracoes: MenuItemDef[] = [
@@ -158,7 +156,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
               return [
                 { id: 'restaurantes', label: 'Restaurantes Assinantes', icon: Store, badge: 'Clientes' },
-                { id: 'dossie_mensal', label: 'Dossiê Mensal & Consultoria', icon: FileSpreadsheet, badge: 'DRE', highlight: true },
+                { id: 'dossie_mensal', label: 'Dossiê Mensal & Consultoria', icon: FileSpreadsheet, badge: 'DRE' },
+                { id: 'financeiro_lojas', label: 'Financeiro, Notas & DRE Lojas', icon: DollarSign, badge: 'DRE & NF', highlight: true },
                 { id: 'editor_loja', label: 'Ambiente de Edição das Lojas', icon: Sliders, badge: 'Editar' },
                 { id: 'dre_saas', label: 'DRE Executivo & Gráficos', icon: BarChart3, badge: 'DRE' },
                 { id: 'financeiro', label: 'Métricas Financeiras & MRR', icon: TrendingUp },
@@ -213,76 +212,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 );
               });
             })()}
-
-            {/* Atalhos Rápidos da Operação da Loja (Acessíveis para o Super Admin em Qualquer Modo) */}
-            <div className="pt-3 mt-3 border-t border-slate-800/80">
-              <p className={`px-3 text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center justify-between ${
-                isWhite ? 'text-slate-500' : 'text-slate-400'
-              }`}>
-                <span>Acesso Direto Restaurante</span>
-                <span className="text-[9px] text-[#FF6B00] font-bold">LOJA</span>
-              </p>
-
-              <NavLink
-                to="/financeiro"
-                onClick={() => {
-                  if (window.innerWidth < 1024) onClose();
-                }}
-                className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 ${
-                  location.pathname === '/financeiro' || location.pathname === '/notas-fiscais'
-                    ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-black'
-                    : isWhite
-                    ? 'text-slate-800 bg-orange-50 hover:bg-orange-100 border border-orange-200'
-                    : 'text-orange-300 bg-[#FF6B00]/15 hover:bg-[#FF6B00]/25 border border-[#FF6B00]/30'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <DollarSign className="w-4 h-4 text-[#FF6B00]" />
-                  <span>Financeiro, Notas & DRE</span>
-                </div>
-                <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase bg-[#FF6B00] !text-white">
-                  NF-e
-                </span>
-              </NavLink>
-
-              <NavLink
-                to="/pdv"
-                onClick={() => {
-                  if (window.innerWidth < 1024) onClose();
-                }}
-                className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 mt-1 ${
-                  location.pathname === '/pdv'
-                    ? 'bg-[#FF6B00] !text-white font-bold'
-                    : isWhite
-                    ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
-                    : 'text-slate-400 hover:text-white hover:bg-[#1E293B]'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Store className="w-4 h-4" />
-                  <span>Frente de Caixa (PDV)</span>
-                </div>
-              </NavLink>
-
-              <NavLink
-                to="/painel-dono"
-                onClick={() => {
-                  if (window.innerWidth < 1024) onClose();
-                }}
-                className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 mt-0.5 ${
-                  location.pathname === '/painel-dono'
-                    ? 'bg-[#FF6B00] !text-white font-bold'
-                    : isWhite
-                    ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
-                    : 'text-slate-400 hover:text-white hover:bg-[#1E293B]'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <LayoutDashboard className="w-4 h-4" />
-                  <span>Painel do Dono</span>
-                </div>
-              </NavLink>
-            </div>
           </div>
         ) : usuarioLogado?.cargo === 'admin_restaurante' || (usuarioLogado?.cargo === 'super_admin' && !isModoGlobal) ? (
           /* MENU PRINCIPAL DO DONO / GERENTE (EXATAMENTE COMO NO BENCHMARK DO PRINT OU MODO INSPEÇÃO) */

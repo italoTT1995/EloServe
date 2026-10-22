@@ -342,29 +342,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </button>
         )}
 
-        {/* Botão Rápido Direto no Topo: Financeiro, Notas Fiscais & DRE */}
-        {(usuarioLogado?.cargo === 'super_admin' || usuarioLogado?.cargo === 'admin_restaurante') && (
-          <Link
-            to="/financeiro"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black transition-all shadow-sm ${
-              location.pathname === '/financeiro' || location.pathname === '/notas-fiscais'
-                ? 'bg-[#FF6B00] !text-white border-[#FF6B00] shadow-md shadow-[#FF6B00]/25'
-                : isWhite
-                ? 'bg-orange-50 text-[#FF6B00] border-orange-200 hover:bg-orange-100 hover:border-orange-300'
-                : 'bg-[#FF6B00]/15 text-orange-300 border-[#FF6B00]/40 hover:bg-[#FF6B00]/25'
-            }`}
-            title="Acessar Módulo Financeiro, Lançamentos de Notas Fiscais e DRE"
-          >
-            <DollarSign className="w-3.5 h-3.5 text-[#FF6B00]" />
-            <span>Financeiro & DRE</span>
-            <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
-              location.pathname === '/financeiro' ? 'bg-white/20 !text-white' : 'bg-[#FF6B00] !text-white'
-            }`}>
-              NF-e
-            </span>
-          </Link>
-        )}
-
         {/* Alternador Rápido de Visão: Painel do Dono vs Frente de Caixa */}
         {usuarioLogado?.cargo === 'admin_restaurante' && (
           <div className={`hidden md:flex items-center ${isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'} p-1 rounded-xl border text-xs`}>

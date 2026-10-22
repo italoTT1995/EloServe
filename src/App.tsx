@@ -160,11 +160,11 @@ export default function App() {
                     }
                   />
 
-                  {/* Financeiro, Notas Fiscais, DRE do Restaurante & Relatórios */}
+                  {/* Financeiro, Notas Fiscais & DRE exclusivo do Super Admin (Central Master) */}
                   <Route
                     path="/financeiro"
                     element={
-                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                      <RotaProtegida cargosPermitidos={['super_admin']}>
                         <Financeiro />
                       </RotaProtegida>
                     }
@@ -172,7 +172,7 @@ export default function App() {
                   <Route
                     path="/notas-fiscais"
                     element={
-                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                      <RotaProtegida cargosPermitidos={['super_admin']}>
                         <Financeiro />
                       </RotaProtegida>
                     }
@@ -180,7 +180,7 @@ export default function App() {
                   <Route
                     path="/dre"
                     element={
-                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                      <RotaProtegida cargosPermitidos={['super_admin']}>
                         <Financeiro />
                       </RotaProtegida>
                     }
@@ -188,7 +188,7 @@ export default function App() {
                   <Route
                     path="/relatorios"
                     element={
-                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                      <RotaProtegida cargosPermitidos={['super_admin']}>
                         <Financeiro />
                       </RotaProtegida>
                     }

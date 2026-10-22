@@ -66,6 +66,7 @@ import { useEloBotStore } from '../store/useEloBotStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { TipoPlanoSaaS, StatusAssinatura, Produto, PlanoAssinatura, TenantRestaurante } from '../types';
+import Financeiro from './Financeiro';
 
 export default function SaaSMaster() {
   const navigate = useNavigate();
@@ -1594,14 +1595,18 @@ export default function SaaSMaster() {
         </button>
 
         <button
-          onClick={() => navigate('/financeiro')}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer whitespace-nowrap bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 text-white shadow-lg shadow-[#FF6B00]/30"
-          title="Abrir Central Financeira, Notas Fiscais e DRE da Loja"
+          onClick={() => handleMudarAba('financeiro_lojas')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            abaAtiva === 'financeiro_lojas'
+              ? 'bg-[#FF6B00] text-white shadow-lg shadow-[#FF6B00]/30 ring-2 ring-orange-400'
+              : 'bg-slate-900 text-orange-400 hover:text-white border border-orange-500/30'
+          }`}
+          title="Central Financeira, Notas Fiscais e DRE das Lojas"
         >
-          <DollarSign className="w-4 h-4 text-white" />
-          <span>Financeiro, Notas & DRE</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/20 text-white uppercase font-black">
-            NF-e Loja
+          <DollarSign className="w-4 h-4 text-orange-400" />
+          <span>Financeiro, Notas & DRE Lojas</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-950 text-orange-300 border border-orange-500/30 uppercase font-black">
+            Exclusivo Master
           </span>
         </button>
 
@@ -2599,7 +2604,7 @@ export default function SaaSMaster() {
                   type="button"
                   onClick={() => {
                     selecionarTenant(dossieTenantId);
-                    navigate('/financeiro');
+                    handleMudarAba('financeiro_lojas');
                   }}
                   className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 text-white font-bold text-xs shadow-lg shadow-[#FF6B00]/30 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
                   title="Abrir Central Financeira, Notas Fiscais e DRE deste Restaurante"
@@ -3124,6 +3129,13 @@ export default function SaaSMaster() {
           </div>
         );
       })()}
+
+      {/* CONTEÚDO DA ABA: FINANCEIRO, NOTAS FISCAIS & DRE DAS LOJAS (EXCLUSIVO MASTER) */}
+      {abaAtiva === 'financeiro_lojas' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <Financeiro isEmbedded tenantIdInicial={tenantEmEdicaoId || (tenantAtivoId !== 'global' ? tenantAtivoId : undefined)} />
+        </div>
+      )}
 
       {/* CONTEÚDO DA ABA: AMBIENTE DE EDIÇÃO DAS LOJAS */}
       {abaAtiva === 'editor_loja' && (
