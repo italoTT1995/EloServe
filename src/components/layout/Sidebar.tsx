@@ -31,6 +31,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useSaaSStore } from '../../store/useSaaSStore';
 import { CargoUsuario } from '../../types';
+import { EloGastroLogo } from '../common/EloGastroLogo';
 
 interface MenuItemDef {
   path: string;
@@ -111,37 +112,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               ? '/saas'
               : '/painel-dono'
           }
-          className="flex items-center gap-3 group cursor-pointer"
+          className="flex items-center gap-2 group cursor-pointer"
         >
-          <div
-            className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-lg transition-transform group-hover:scale-105 ${
+          <EloGastroLogo
+            variant="horizontal"
+            size="sm"
+            theme={isWhite ? 'light' : 'dark'}
+          />
+          <span
+            className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
               usuarioLogado?.cargo === 'super_admin' && isModoGlobal
-                ? 'bg-gradient-to-tr from-purple-600 to-indigo-500 shadow-purple-500/25'
-                : 'bg-gradient-to-tr from-orange-500 to-amber-500 shadow-orange-500/20'
+                ? isWhite ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-purple-950 text-purple-300 border border-purple-500/30'
+                : isWhite ? 'bg-orange-100 text-[#FF6B00] border border-orange-200' : 'bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/40'
             }`}
           >
-            <Zap className="w-5 h-5 fill-white" />
-          </div>
-          <div>
-            <h1 className={`text-base font-extrabold tracking-tight ${
-              isWhite
-                ? 'text-slate-900'
-                : 'bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent'
-            }`}>
-              EloServe
-            </h1>
-            <p
-              className={`text-[10px] font-bold tracking-wider uppercase ${
-                usuarioLogado?.cargo === 'super_admin' && isModoGlobal
-                  ? isWhite ? 'text-purple-700' : 'text-purple-400'
-                  : isWhite ? 'text-orange-600' : 'text-orange-400'
-              }`}
-            >
-              {usuarioLogado?.cargo === 'super_admin' && isModoGlobal
-                ? 'Gestão SaaS Master'
-                : 'Sistema PDV'}
-            </p>
-          </div>
+            {usuarioLogado?.cargo === 'super_admin' && isModoGlobal ? 'Master' : 'PDV'}
+          </span>
         </Link>
 
         {/* Botão fechar apenas no mobile */}

@@ -8,6 +8,18 @@ export default {
   theme: {
     extend: {
       colors: {
+        elogastro: {
+          orange: '#FF6B00',
+          'orange-hover': '#E66000',
+          'orange-light': '#FFF0E5',
+          green: '#10B981',
+          'green-hover': '#059669',
+          'green-light': '#ECFDF5',
+          navy: '#1E293B',
+          'navy-dark': '#0F172A',
+          'navy-light': '#334155',
+          offwhite: '#F8FAFC',
+        },
         brand: {
           50: '#f0fdf4',
           100: '#dcfce7',
