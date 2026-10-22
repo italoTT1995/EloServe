@@ -1594,6 +1594,18 @@ export default function SaaSMaster() {
         </button>
 
         <button
+          onClick={() => navigate('/financeiro')}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer whitespace-nowrap bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 text-white shadow-lg shadow-[#FF6B00]/30"
+          title="Abrir Central Financeira, Notas Fiscais e DRE da Loja"
+        >
+          <DollarSign className="w-4 h-4 text-white" />
+          <span>Financeiro, Notas & DRE</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/20 text-white uppercase font-black">
+            NF-e Loja
+          </span>
+        </button>
+
+        <button
           onClick={() => handleMudarAba('editor_loja')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             abaAtiva === 'editor_loja'
@@ -2583,6 +2595,18 @@ export default function SaaSMaster() {
 
               {/* Botões de Exportação Rápida */}
               <div className="flex items-center gap-2 flex-wrap shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    selecionarTenant(dossieTenantId);
+                    navigate('/financeiro');
+                  }}
+                  className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 text-white font-bold text-xs shadow-lg shadow-[#FF6B00]/30 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+                  title="Abrir Central Financeira, Notas Fiscais e DRE deste Restaurante"
+                >
+                  <DollarSign className="w-4 h-4 text-white" />
+                  <span>Abrir Financeiro & NF-e da Loja</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => handleBaixarDossieCSV(dossieTenantId, dossieMes, dossieAno)}
