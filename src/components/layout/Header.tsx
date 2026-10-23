@@ -111,7 +111,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   <Globe className="w-4 h-4 text-[#FF6B00] shrink-0" />
                   <div className="flex flex-col text-left">
                     <span className={`truncate max-w-[130px] sm:max-w-[220px] font-extrabold ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                      ELOserve
+                      <span className="text-[#FF6B00] font-black italic">elo</span>Gastrô
                     </span>
                     <span className={`text-[9px] font-medium ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
                       {tenants.length === 0 ? '0 Restaurantes Assinantes' : `${tenants.length} Restaurantes Assinantes`}
@@ -218,7 +218,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                       <Globe className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="font-bold">ELOserve</p>
+                      <p className="font-bold"><span className="text-[#FF6B00] font-black italic">elo</span>Gastrô</p>
                       <p className={`text-[10px] ${isModoGlobal ? '!text-white/80' : isWhite ? 'text-slate-600' : 'opacity-80'}`}>
                         Administração de todos os restaurantes
                       </p>
