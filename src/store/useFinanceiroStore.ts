@@ -171,6 +171,9 @@ interface FinanceiroState {
   ) => CategoriaFinanceira;
   removerCategoriaCustom: (id: string) => void;
 
+  // Limpeza de dados de demonstração/testes
+  limparDadosDemonstracao: () => void;
+
   // Consultas
   getCategorias: (tenantId?: string) => CategoriaFinanceira[];
   getLancamentosPorTenant: (tenantId?: string) => LancamentoFinanceiro[];
@@ -609,9 +612,64 @@ export const useFinanceiroStore = create<FinanceiroState>()(
           categoriasCustomizadas: (state.categoriasCustomizadas || []).filter((c) => c.id !== id),
         }));
       },
+
+      limparDadosDemonstracao: () => {
+        set((state) => ({
+          lancamentos: (state.lancamentos || []).filter((l) => {
+            const desc = (l.descricao || '').toLowerCase();
+            const cad = (l.cadastradoPor || '').toLowerCase();
+            return (
+              !desc.includes('feira semanal') &&
+              !desc.includes('locação salão') &&
+              !desc.includes('link dedicado') &&
+              !desc.includes('aluguel comercial do imóvel') &&
+              !desc.includes('teste financeiro') &&
+              !cad.includes('audit')
+            );
+          }),
+          recorrencias: (state.recorrencias || []).filter((r) => {
+            const desc = (r.descricao || '').toLowerCase();
+            return (
+              !desc.includes('feira semanal') &&
+              !desc.includes('locação salão') &&
+              !desc.includes('link dedicado') &&
+              !desc.includes('aluguel comercial do imóvel')
+            );
+          }),
+        }));
+      },
     }),
     {
       name: 'eloserve_financeiro_store_v1',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          if (Array.isArray(state.lancamentos)) {
+            state.lancamentos = state.lancamentos.filter((l) => {
+              const desc = (l.descricao || '').toLowerCase();
+              const cad = (l.cadastradoPor || '').toLowerCase();
+              return (
+                !desc.includes('feira semanal') &&
+                !desc.includes('locação salão') &&
+                !desc.includes('link dedicado') &&
+                !desc.includes('aluguel comercial do imóvel') &&
+                !desc.includes('teste financeiro') &&
+                !cad.includes('audit')
+              );
+            });
+          }
+          if (Array.isArray(state.recorrencias)) {
+            state.recorrencias = state.recorrencias.filter((r) => {
+              const desc = (r.descricao || '').toLowerCase();
+              return (
+                !desc.includes('feira semanal') &&
+                !desc.includes('locação salão') &&
+                !desc.includes('link dedicado') &&
+                !desc.includes('aluguel comercial do imóvel')
+              );
+            });
+          }
+        }
+      },
     }
   )
 );

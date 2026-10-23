@@ -231,6 +231,9 @@ async function runFinanceiroFullAudit() {
   const lancsConsolidado = useFinanceiroStore.getState().getLancamentosPorTenant('todos');
   assert(lancsConsolidado.length >= lancamentosGerados.length, 'SUPER ADMIN: Visualização consolidada acessa todas as lojas');
 
+  // Limpeza final para não deixar dados de teste na loja
+  useFinanceiroStore.getState().limparDadosDemonstracao();
+
   console.log('\n====================================================');
   console.log(`📊 RESULTADO DA AUDITORIA FINANCEIRA:`);
   console.log(`Testes Aprovados: ${testesPassados} ✅`);

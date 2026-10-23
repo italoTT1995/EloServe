@@ -62,7 +62,7 @@ import {
 import { extrairDadosXmlNFe } from '../utils/nfeXmlParser';
 
 // Componentes Modulares da Central Financeira
-import { DashboardFinanceiro, FiltroPeriodoDashboard } from '../components/financeiro/DashboardFinanceiro';
+import { DashboardFinanceiro } from '../components/financeiro/DashboardFinanceiro';
 import { LancamentosSection } from '../components/financeiro/LancamentosSection';
 import { RecorrenciasSection } from '../components/financeiro/RecorrenciasSection';
 import { DRESection } from '../components/financeiro/DRESection';
@@ -253,7 +253,92 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
     observacoes: '',
   });
 
-  // Handlers: Lançamentos
+  // Handlers: Lançamentos Simplificados
+  function handleSalvarLancamentoModal(dados: {
+    tipo: TipoLancamentoFinanceiro;
+    descricao: string;
+    categoriaId: string;
+    categoriaNome: string;
+    valor: number;
+    data: string;
+    recorrencia: 'nao_se_repete' | any;
+    fornecedorBeneficiario?: string;
+    dataVencimento?: string;
+    formaPagamento?: any;
+    status?: any;
+    observacoes?: string;
+  }) {
+    if (lancamentoEmEdicao) {
+      editarLancamento(
+        lancamentoEmEdicao.id,
+        {
+          tipo: dados.tipo,
+          descricao: dados.descricao,
+          categoriaId: dados.categoriaId,
+          categoriaNome: dados.categoriaNome,
+          valor: dados.valor,
+          dataCompetencia: dados.data,
+          dataVencimento: dados.dataVencimento || dados.data,
+          formaPagamento: dados.formaPagamento || 'pix',
+          status: dados.status || 'pago',
+          dataPagamento: (dados.status === 'pago' || dados.status === 'recebido') ? dados.data : undefined,
+          fornecedorBeneficiario: dados.fornecedorBeneficiario,
+          observacoes: dados.observacoes,
+        },
+        usuarioLogado?.nome || (isRestauranteUser ? 'Gestor da Loja' : 'Admin Master'),
+        'Atualização rápida pelo formulário'
+      );
+      exibirToast(`Lançamento "${dados.descricao}" atualizado com sucesso!`);
+    } else {
+      // 1. Cria o lançamento principal
+      adicionarLancamento({
+        tenantId: tenantParaSalvar,
+        tipo: dados.tipo,
+        descricao: dados.descricao,
+        categoriaId: dados.categoriaId,
+        categoriaNome: dados.categoriaNome,
+        valor: dados.valor,
+        dataCompetencia: dados.data,
+        dataVencimento: dados.dataVencimento || dados.data,
+        dataPagamento: (dados.status === 'pago' || dados.status === 'recebido') ? dados.data : undefined,
+        formaPagamento: dados.formaPagamento || 'pix',
+        status: dados.status || 'pendente',
+        fornecedorBeneficiario: dados.fornecedorBeneficiario,
+        observacoes: dados.observacoes,
+        origem: dados.recorrencia !== 'nao_se_repete' ? 'recorrente' : 'manual',
+        cadastradoPor: usuarioLogado?.nome || (isRestauranteUser ? 'Gestor da Loja' : 'Admin Master'),
+      });
+
+      // 2. Se marcado como recorrente, registra regra e gera futuras parcelas como pendentes
+      if (dados.recorrencia && dados.recorrencia !== 'nao_se_repete') {
+        const diaVenc = parseInt(dados.data.split('-')[2]) || 10;
+        adicionarRecorrencia({
+          tenantId: tenantParaSalvar,
+          tipo: dados.tipo,
+          descricao: dados.descricao,
+          categoriaId: dados.categoriaId,
+          categoriaNome: dados.categoriaNome,
+          valorEstimado: dados.valor,
+          tipoValor: 'fixo',
+          frequencia: dados.recorrencia,
+          diaVencimento: diaVenc,
+          dataInicio: dados.data,
+          formaPagamento: dados.formaPagamento || 'pix',
+          fornecedorBeneficiario: dados.fornecedorBeneficiario,
+          observacoes: dados.observacoes,
+          ativo: true,
+          cadastradoPor: usuarioLogado?.nome || (isRestauranteUser ? 'Gestor da Loja' : 'Admin Master'),
+        });
+        processarRecorrencias(tenantParaSalvar);
+        exibirToast(`Lançamento registrado e configurado como recorrente (${dados.recorrencia})!`);
+      } else {
+        exibirToast(`Novo lançamento "${dados.descricao}" registrado no financeiro!`);
+      }
+    }
+    setModalLancamentoAberto(false);
+    setLancamentoEmEdicao(null);
+  }
+
   function handleSalvarLancamento(dados: Omit<LancamentoFinanceiro, 'id' | 'criadoEm' | 'atualizadoEm' | 'historicoAlteracoes'>) {
     if (lancamentoEmEdicao) {
       editarLancamento(
@@ -442,10 +527,10 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
         </div>
       </div>
 
-      {/* Barra de 5 Sub-Abas do Módulo Financeiro */}
+      {/* Barra de Sub-Abas do Módulo Financeiro */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Sub-Aba 1: Dashboard */}
+          {/* Sub-Aba 1: Visão Geral & Lançamentos */}
           <button
             type="button"
             onClick={() => setSubAba('dashboard')}
@@ -456,31 +541,17 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             }`}
           >
             <LayoutDashboard className="w-4 h-4" />
-            <span>1. Dashboard</span>
-          </button>
-
-          {/* Sub-Aba 2: Lançamentos & Livro Caixa */}
-          <button
-            type="button"
-            onClick={() => setSubAba('lancamentos')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              subAba === 'lancamentos'
-                ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-black'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Receipt className="w-4 h-4" />
-            <span>2. Lançamentos & Movimentações</span>
+            <span>1. Visão Geral & Lançamentos</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                subAba === 'lancamentos' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
+                subAba === 'dashboard' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
               }`}
             >
               {todosLancamentos.length}
             </span>
           </button>
 
-          {/* Sub-Aba 3: Despesas & Receitas Recorrentes */}
+          {/* Sub-Aba 2: Despesas & Receitas Recorrentes */}
           <button
             type="button"
             onClick={() => setSubAba('recorrencias')}
@@ -491,7 +562,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             }`}
           >
             <Repeat className="w-4 h-4" />
-            <span>3. Lançamentos Recorrentes</span>
+            <span>2. Despesas Recorrentes</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
                 subAba === 'recorrencias' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
@@ -501,7 +572,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             </span>
           </button>
 
-          {/* Sub-Aba 4: DRE Automático & Fluxo */}
+          {/* Sub-Aba 3: DRE Automático */}
           <button
             type="button"
             onClick={() => setSubAba('dre')}
@@ -512,13 +583,13 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             }`}
           >
             <FileSpreadsheet className="w-4 h-4" />
-            <span>4. DRE Automático & Fluxo</span>
+            <span>3. DRE Automático</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-[#10B981] font-bold">
               Ao Vivo
             </span>
           </button>
 
-          {/* Sub-Aba 5: Notas Fiscais & XML SEFAZ */}
+          {/* Sub-Aba 4: Notas Fiscais & XML SEFAZ */}
           <button
             type="button"
             onClick={() => setSubAba('notas_fiscais')}
@@ -529,7 +600,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             }`}
           >
             <QrCode className="w-4 h-4" />
-            <span>5. Notas Fiscais & XML</span>
+            <span>4. Notas Fiscais & XML</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
                 subAba === 'notas_fiscais' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
@@ -548,24 +619,29 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
         <DashboardFinanceiro
           lancamentos={todosLancamentos}
           vendas={todasVendas}
-          notasFiscais={todasNotasFiscais}
-          despesasLegado={todasDespesasLegado}
           categorias={categoriasAtivas}
           isWhite={isWhite}
           onNovoLancamento={(tipo) => {
             setLancamentoEmEdicao(null);
             setModalLancamentoAberto(true);
           }}
+          onEditarLancamento={(item) => {
+            setLancamentoEmEdicao(item);
+            setModalLancamentoAberto(true);
+          }}
+          onExcluirLancamento={(id) => {
+            excluirLancamento(id);
+            exibirToast('Lançamento excluído com sucesso.');
+          }}
+          onAlternarStatus={(id) => {
+            alternarStatusLancamento(id, usuarioLogado?.nome);
+            exibirToast('Status do lançamento atualizado com sucesso!');
+          }}
           onNovaRecorrencia={() => {
             setRecorrenciaEmEdicao(null);
             setModalRecorrenciaAberto(true);
           }}
-          onIrParaLancamentos={() => setSubAba('lancamentos')}
           onIrParaDRE={() => setSubAba('dre')}
-          onMarcarComoPago={(id) => {
-            alternarStatusLancamento(id, usuarioLogado?.nome);
-            exibirToast('Status do lançamento atualizado com sucesso!');
-          }}
         />
       )}
 
@@ -831,18 +907,16 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       {/* MODAIS DO MÓDULO FINANCEIRO                                              */}
       {/* ========================================================================= */}
 
-      {/* Modal Lançamento Financeiro (Receita / Despesa Manual com Anexo e Auditoria) */}
+      {/* Modal Lançamento Financeiro (Receita / Despesa Simplificada) */}
       <ModalLancamento
         isOpen={modalLancamentoAberto}
         onClose={() => {
           setModalLancamentoAberto(false);
           setLancamentoEmEdicao(null);
         }}
-        onSalvar={handleSalvarLancamento}
+        onSalvar={handleSalvarLancamentoModal}
         lancamentoEmEdicao={lancamentoEmEdicao}
-        categorias={categoriasAtivas}
         tenantId={tenantParaSalvar}
-        usuarioNome={usuarioLogado?.nome || (isRestauranteUser ? 'Gestor da Loja' : 'Admin Master')}
         isWhite={isWhite}
       />
 
