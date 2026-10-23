@@ -910,9 +910,6 @@ export default function SaaSMaster() {
 
     const totalCancelamentos = vendasCanceladas.reduce((acc, v) => acc + (v.total || 0), 0);
     const receitaLiquida = Math.max(0, receitaBruta - totalDescontos - totalCancelamentos);
-    const margemBruta = Math.max(0, receitaLiquida - cmvTotal);
-    const margemBrutaPct = receitaLiquida > 0 ? (margemBruta / receitaLiquida) * 100 : 0;
-    const cmvPct = receitaLiquida > 0 ? (cmvTotal / receitaLiquida) * 100 : 0;
 
     const despesasPeriodo = (todasDespesasApp || []).filter((d) => {
       const matchTenant = isTodos || (!d.tenantId && tenantAlvoId === 'tenant-01') || d.tenantId === tenantAlvoId;
@@ -922,10 +919,22 @@ export default function SaaSMaster() {
       return dataD.mes === mes && dataD.ano === ano;
     });
 
-    const totalDespesasCadastradas = despesasPeriodo.reduce((acc, d) => acc + (d.valor || 0), 0);
+    const despesasInsumos = despesasPeriodo.filter((d) => d.categoria === 'insumos').reduce((acc, d) => acc + (d.valor || 0), 0);
+    const despesasPessoal = despesasPeriodo.filter((d) => d.categoria === 'pessoal').reduce((acc, d) => acc + (d.valor || 0), 0);
+    const despesasOcupacao = despesasPeriodo.filter((d) => d.categoria === 'ocupacao').reduce((acc, d) => acc + (d.valor || 0), 0);
+    const despesasComerciais = despesasPeriodo.filter((d) => d.categoria === 'financeiro').reduce((acc, d) => acc + (d.valor || 0), 0);
+    const despesasServicos = despesasPeriodo.filter((d) => d.categoria === 'servicos').reduce((acc, d) => acc + (d.valor || 0), 0);
+    const outrasDespesas = despesasPeriodo.filter((d) => d.categoria === 'outros').reduce((acc, d) => acc + (d.valor || 0), 0);
+
+    const cmvFinal = cmvTotal + despesasInsumos;
+    const margemBruta = Math.max(0, receitaLiquida - cmvFinal);
+    const margemBrutaPct = receitaLiquida > 0 ? (margemBruta / receitaLiquida) * 100 : 0;
+    const cmvPct = receitaLiquida > 0 ? (cmvFinal / receitaLiquida) * 100 : 0;
+
+    const totalDespesasOperacionais = despesasPessoal + despesasOcupacao + despesasComerciais + despesasServicos + outrasDespesas;
     const sangriasPeriodo = (movimentosCaixa || []).filter((m) => m.tipo === 'sangria');
     const totalSangrias = isTodos ? sangriasPeriodo.reduce((acc, s) => acc + (s.valor || 0), 0) : (sangriasPeriodo.reduce((acc, s) => acc + (s.valor || 0), 0));
-    const totalDespesasEOperacoes = totalDespesasCadastradas + totalSangrias;
+    const totalDespesasEOperacoes = totalDespesasOperacionais + totalSangrias;
 
     const resultadoOperacional = margemBruta - totalDespesasEOperacoes;
     const margemOperacionalPct = receitaLiquida > 0 ? (resultadoOperacional / receitaLiquida) * 100 : 0;
@@ -948,11 +957,17 @@ export default function SaaSMaster() {
       totalDescontos,
       totalCancelamentos,
       receitaLiquida,
-      cmvTotal,
+      cmvTotal: cmvFinal,
       cmvPct,
       margemBruta,
       margemBrutaPct,
-      totalDespesasCadastradas,
+      despesasInsumos,
+      despesasPessoal,
+      despesasOcupacao,
+      despesasComerciais,
+      despesasServicos,
+      outrasDespesas,
+      totalDespesasCadastradas: totalDespesasOperacionais,
       totalSangrias,
       totalDespesasEOperacoes,
       resultadoOperacional,
@@ -983,7 +998,7 @@ export default function SaaSMaster() {
 
     let csv = '\uFEFF';
     csv += '=========================================================================\n';
-    csv += `DOSSIÊ FINANCEIRO MENSAL & DRE CONTÁBIL - PLATAFORMA ELOSERVE\n`;
+    csv += `DOSSIÊ FINANCEIRO MENSAL & DRE CONTÁBIL - PLATAFORMA eloGastrô (PADRÃO ABRASEL)\n`;
     csv += `Restaurante:;${tenantInfo.nomeFantasia}\n`;
     csv += `Documento (CNPJ/CPF):;${tenantInfo.documento || '-'}\n`;
     csv += `Cidade / UF:;${tenantInfo.cidadeUf || '-'}\n`;
@@ -993,20 +1008,26 @@ export default function SaaSMaster() {
 
     csv += '--- 1. DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE) ---\n';
     csv += 'Linha Contábil;Valor (R$);% sobre Receita Líquida\n';
-    csv += `(+) Receita Bruta Total;R$ ${dados.receitaBruta.toFixed(2)};-\n`;
+    csv += `1. (+) Receita Bruta Total;R$ ${dados.receitaBruta.toFixed(2)};-\n`;
     csv += `    - Vendas no Salão (Mesas);R$ ${dados.vendasSalao.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.vendasSalao / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
     csv += `    - Vendas no Balcão;R$ ${dados.vendasBalcao.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.vendasBalcao / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
     csv += `    - Vendas no Delivery;R$ ${dados.vendasDelivery.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.vendasDelivery / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
     csv += `    - Taxa de Serviço 10% (Garçom);R$ ${dados.totalTaxaServico.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.totalTaxaServico / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
     csv += `    - Couvert Artístico;R$ ${dados.totalCouvert.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.totalCouvert / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
-    csv += `(-) Descontos Concedidos;R$ ${dados.totalDescontos.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.totalDescontos / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
-    csv += `(-) Cancelamentos e Estornos;R$ ${dados.totalCancelamentos.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.totalCancelamentos / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
-    csv += `(=) RECEITA OPERACIONAL LÍQUIDA;R$ ${dados.receitaLiquida.toFixed(2)};100.0%\n`;
-    csv += `(-) Custo da Mercadoria Vendida (CMV / Insumos);R$ ${dados.cmvTotal.toFixed(2)};${dados.cmvPct.toFixed(1)}%\n`;
-    csv += `(=) MARGEM BRUTA / LUCRO BRUTO;R$ ${dados.margemBruta.toFixed(2)};${dados.margemBrutaPct.toFixed(1)}%\n`;
-    csv += `(-) Despesas Operacionais Fixas e Variáveis;R$ ${dados.totalDespesasCadastradas.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.totalDespesasCadastradas / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
-    csv += `(-) Sangrias e Retiradas de Caixa;R$ ${dados.totalSangrias.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.totalSangrias / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
-    csv += `(=) RESULTADO OPERACIONAL DO MÊS (LUCRO/PREJUÍZO);R$ ${dados.resultadoOperacional.toFixed(2)};${dados.margemOperacionalPct.toFixed(1)}%\n\n`;
+    csv += `2. (-) Deduções da Receita Bruta;R$ ${(dados.totalDescontos + dados.totalCancelamentos).toFixed(2)};${dados.receitaLiquida > 0 ? (((dados.totalDescontos + dados.totalCancelamentos) / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
+    csv += `    - Descontos Concedidos;R$ ${dados.totalDescontos.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.totalDescontos / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
+    csv += `    - Cancelamentos e Estornos;R$ ${dados.totalCancelamentos.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.totalCancelamentos / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
+    csv += `3. (=) RECEITA OPERACIONAL LÍQUIDA (ROL);R$ ${dados.receitaLiquida.toFixed(2)};100.0%\n`;
+    csv += `4. (-) Custo da Mercadoria Vendida (CMV / Insumos);R$ ${dados.cmvTotal.toFixed(2)};${dados.cmvPct.toFixed(1)}%\n`;
+    csv += `5. (=) MARGEM BRUTA / LUCRO BRUTO;R$ ${dados.margemBruta.toFixed(2)};${dados.margemBrutaPct.toFixed(1)}%\n`;
+    csv += `6. (-) Despesas Operacionais Totais;R$ ${dados.totalDespesasCadastradas.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.totalDespesasCadastradas / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
+    csv += `    - 6.1 Pessoal & Equipe;R$ ${dados.despesasPessoal.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.despesasPessoal / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
+    csv += `    - 6.2 Ocupação & Utilidades;R$ ${dados.despesasOcupacao.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.despesasOcupacao / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
+    csv += `    - 6.3 Comercial & Embalagens;R$ ${dados.despesasComerciais.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.despesasComerciais / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
+    csv += `    - 6.4 Serviços, TI & Manutenção;R$ ${dados.despesasServicos.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.despesasServicos / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
+    csv += `    - 6.5 Outras Despesas Gerais;R$ ${dados.outrasDespesas.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.outrasDespesas / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
+    csv += `    - Sangrias e Retiradas de Caixa;R$ ${dados.totalSangrias.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.totalSangrias / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
+    csv += `7. (=) RESULTADO OPERACIONAL DO MÊS (LUCRO/PREJUÍZO);R$ ${dados.resultadoOperacional.toFixed(2)};${dados.margemOperacionalPct.toFixed(1)}%\n\n`;
 
     csv += '--- 2. RECEBIMENTOS POR MEIO DE PAGAMENTO ---\n';
     csv += 'Forma de Pagamento;Total Recebido (R$);Participação %\n';
@@ -2908,11 +2929,41 @@ export default function SaaSMaster() {
                         <td className="py-3 px-4 text-right font-mono">{dadosDossie.margemBrutaPct.toFixed(1)}%</td>
                         <td className="py-3 px-4 text-center"><span className="text-[10px] px-2 py-0.5 rounded bg-purple-950 text-purple-300 font-bold">Margem</span></td>
                       </tr>
-                      <tr className="text-rose-400">
-                        <td className="py-2.5 px-4 pl-8">(-) Despesas Operacionais (Fixas e Variáveis)</td>
+                      <tr className="text-rose-400 font-semibold bg-rose-950/20">
+                        <td className="py-2.5 px-4 pl-8">(-) Despesas Operacionais Totais (Padrão Abrasel)</td>
                         <td className="py-2.5 px-4 text-right font-mono">- R$ {dadosDossie.totalDespesasCadastradas.toFixed(2)}</td>
                         <td className="py-2.5 px-4 text-right font-mono">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.totalDespesasCadastradas / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2.5 px-4 text-center"><span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-bold">Estrutura</span></td>
+                        <td className="py-2.5 px-4 text-center"><span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-bold">Despesas</span></td>
+                      </tr>
+                      <tr className="text-slate-300">
+                        <td className="py-2 px-4 pl-12 text-[11px]">↳ 6.1 Pessoal & Equipe (Salários, Diárias Extras)</td>
+                        <td className="py-2 px-4 text-right font-mono text-[11px]">- R$ {dadosDossie.despesasPessoal.toFixed(2)}</td>
+                        <td className="py-2 px-4 text-right font-mono text-slate-400 text-[11px]">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.despesasPessoal / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
+                        <td className="py-2 px-4 text-center text-slate-500 text-[10px]">Pessoal</td>
+                      </tr>
+                      <tr className="text-slate-300">
+                        <td className="py-2 px-4 pl-12 text-[11px]">↳ 6.2 Ocupação & Utilidades (Aluguel, Luz, Água, Gás)</td>
+                        <td className="py-2 px-4 text-right font-mono text-[11px]">- R$ {dadosDossie.despesasOcupacao.toFixed(2)}</td>
+                        <td className="py-2 px-4 text-right font-mono text-slate-400 text-[11px]">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.despesasOcupacao / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
+                        <td className="py-2 px-4 text-center text-slate-500 text-[10px]">Ocupação</td>
+                      </tr>
+                      <tr className="text-slate-300">
+                        <td className="py-2 px-4 pl-12 text-[11px]">↳ 6.3 Comercial & Embalagens Delivery</td>
+                        <td className="py-2 px-4 text-right font-mono text-[11px]">- R$ {dadosDossie.despesasComerciais.toFixed(2)}</td>
+                        <td className="py-2 px-4 text-right font-mono text-slate-400 text-[11px]">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.despesasComerciais / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
+                        <td className="py-2 px-4 text-center text-slate-500 text-[10px]">Comercial</td>
+                      </tr>
+                      <tr className="text-slate-300">
+                        <td className="py-2 px-4 pl-12 text-[11px]">↳ 6.4 Serviços, TI & Manutenção (eloGastrô)</td>
+                        <td className="py-2 px-4 text-right font-mono text-[11px]">- R$ {dadosDossie.despesasServicos.toFixed(2)}</td>
+                        <td className="py-2 px-4 text-right font-mono text-slate-400 text-[11px]">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.despesasServicos / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
+                        <td className="py-2 px-4 text-center text-slate-500 text-[10px]">Serviços / TI</td>
+                      </tr>
+                      <tr className="text-slate-300">
+                        <td className="py-2 px-4 pl-12 text-[11px]">↳ 6.5 Outras Despesas Gerais & Administrativas</td>
+                        <td className="py-2 px-4 text-right font-mono text-[11px]">- R$ {dadosDossie.outrasDespesas.toFixed(2)}</td>
+                        <td className="py-2 px-4 text-right font-mono text-slate-400 text-[11px]">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.outrasDespesas / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
+                        <td className="py-2 px-4 text-center text-slate-500 text-[10px]">Gerais</td>
                       </tr>
                       <tr className="text-rose-400">
                         <td className="py-2.5 px-4 pl-8">(-) Sangrias e Retiradas Físicas de Caixa</td>

@@ -192,14 +192,20 @@ export const useAppStore = create<AppState>()(
 
       getVendasPorTenant: (tenantId?: string) => {
         const state = get();
+        if (tenantId === 'todos') {
+          return state.vendas || [];
+        }
         const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         return (state.vendas || []).filter((v) => !v.tenantId || v.tenantId === idAlvo);
       },
 
       getDespesasPorTenant: (tenantId?: string) => {
         const state = get();
+        if (tenantId === 'todos') {
+          return state.despesasRestaurante || [];
+        }
         const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
-        return (state.despesasRestaurante || []).filter((d) => d.tenantId === idAlvo);
+        return (state.despesasRestaurante || []).filter((d) => !d.tenantId || d.tenantId === idAlvo);
       },
 
       adicionarDespesaRestaurante: (despesa) => {
@@ -238,8 +244,11 @@ export const useAppStore = create<AppState>()(
 
       getNotasFiscaisPorTenant: (tenantId?: string) => {
         const state = get();
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         const lista = state.notasFiscais && state.notasFiscais.length > 0 ? state.notasFiscais : NOTAS_FISCAIS_INICIAIS;
+        if (tenantId === 'todos') {
+          return lista;
+        }
+        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         return lista.filter((n) => !n.tenantId || n.tenantId === idAlvo);
       },
 

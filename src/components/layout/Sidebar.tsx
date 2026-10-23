@@ -50,6 +50,7 @@ const menuItemsDonoSimples: MenuItemDef[] = [
   { path: '/mesas', label: 'Mesas', icon: LayoutGrid, cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
   { path: '/estoque', label: 'Estoque', icon: Package, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/caixa', label: 'Caixa', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante', 'caixa'] },
+  { path: '/financeiro', label: 'Financeiro & DRE', icon: FileSpreadsheet, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/elobot', label: 'Marketing', icon: Megaphone, highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/funcionarios', label: 'Funcionários', icon: Users, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/delivery', label: 'Entregas/Entregadores', icon: Bike, cargos: ['super_admin', 'admin_restaurante', 'caixa', 'entregador'] },
@@ -247,7 +248,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               MENU PRINCIPAL
             </p>
 
-            {menuItemsDonoSimples.map((item) => {
+            {menuItemsDonoSimples
+              .filter((item) => temPermissao(item.cargos))
+              .map((item) => {
               const Icon = item.icon;
               return (
                 <NavLink

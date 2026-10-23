@@ -17,6 +17,7 @@ import {
   Layers,
   Sparkles,
   ChevronDown,
+  ChevronRight,
   Download,
   X,
   QrCode,
@@ -178,6 +179,7 @@ const ATALHOS_LANCAMENTO_RAPIDO = [
   { rotulo: 'Embalagens Delivery', descricao: 'Embalagens térmicas e sacolas', categoria: 'financeiro' as const, tipo: 'variavel' as const, icone: Bike, cor: 'text-purple-400' },
   { rotulo: 'Feira & Hortifrúti', descricao: 'Legumes, Verduras e Temperos', categoria: 'insumos' as const, tipo: 'variavel' as const, icone: Apple, cor: 'text-emerald-400' },
   { rotulo: 'Limpeza & Higiene', descricao: 'Produtos de Limpeza e Sanitização', categoria: 'servicos' as const, tipo: 'variavel' as const, icone: Sparkles, cor: 'text-[#FF6B00]' },
+  { rotulo: 'Mensalidade eloGastrô', descricao: 'Sistema de Gestão & PDV eloGastrô', categoria: 'servicos' as const, tipo: 'fixa' as const, icone: Receipt, cor: 'text-[#FF6B00]' },
 ];
 
 interface FinanceiroProps {
@@ -190,20 +192,39 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
   const isWhite = tema === 'light';
   const { usuarioLogado } = useAuthStore();
   const { tenants } = useSaaSStore();
+  const location = useLocation();
 
-  // O Admin Master pode escolher qualquer restaurante
-  const [tenantSelecionadoId, setTenantSelecionadoId] = useState<string>(
-    tenantIdInicial || (tenants.length > 0 ? tenants[0].id : 'tenant-01')
-  );
+  const isMasterUser = usuarioLogado?.cargo === 'super_admin';
+  const isRestauranteUser = usuarioLogado?.cargo === 'admin_restaurante';
+
+  // Garante que o restaurante logado acesse exclusivamente sua loja
+  const defaultTenant = isRestauranteUser
+    ? (usuarioLogado?.tenantId || 'tenant-01')
+    : (tenantIdInicial || (tenants.length > 0 ? tenants[0].id : 'tenant-01'));
+
+  const [tenantSelecionadoId, setTenantSelecionadoId] = useState<string>(defaultTenant);
+
+  // Tenant efetivo garantido por regra de segurança
+  const tenantEfetivoId = isRestauranteUser
+    ? (usuarioLogado?.tenantId || 'tenant-01')
+    : tenantSelecionadoId;
 
   const restauranteAtual = useMemo(() => {
-    return tenants.find((t) => t.id === tenantSelecionadoId) || {
-      id: tenantSelecionadoId,
+    if (tenantEfetivoId === 'todos') {
+      return {
+        id: 'todos',
+        nomeFantasia: 'Todas as Lojas (Consolidado Multi-Tenant)',
+        documento: 'Consolidado Rede',
+        cidadeUf: 'Brasil',
+      };
+    }
+    return tenants.find((t) => t.id === tenantEfetivoId) || {
+      id: tenantEfetivoId,
       nomeFantasia: 'Restaurante Selecionado',
       documento: '11.222.333/0001-44',
       cidadeUf: 'Brasil',
     };
-  }, [tenants, tenantSelecionadoId]);
+  }, [tenants, tenantEfetivoId]);
 
   // Stores
   const {
@@ -221,13 +242,32 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
 
   const { fichasTecnicas, itens: itensEstoque } = useEstoqueStore();
 
-  // Estados locais
-  const [subAba, setSubAba] = useState<SubAbaFinanceiro>('notas_fiscais');
+  // Sub-Aba inicial
+  const searchParams = new URLSearchParams(location.search);
+  const paramAba = searchParams.get('aba');
+  const [subAba, setSubAba] = useState<SubAbaFinanceiro>(
+    paramAba === 'gastos' || paramAba === 'notas_fiscais' || paramAba === 'dre'
+      ? (paramAba as SubAbaFinanceiro)
+      : (location.pathname === '/notas-fiscais' ? 'notas_fiscais' : location.pathname === '/gastos' ? 'gastos' : 'dre')
+  );
+
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('mes_atual');
   const [buscaTexto, setBuscaTexto] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pago' | 'pendente'>('todos');
   const [filtroTipoNF, setFiltroTipoNF] = useState<string>('todas');
+
+  // Controle de linhas expandidas do DRE
+  const [expandido, setExpandido] = useState<Record<string, boolean>>({
+    receita: true,
+    deducoes: true,
+    cmv: true,
+    despesas: true,
+  });
+
+  function alternarExpansao(chave: string) {
+    setExpandido((prev) => ({ ...prev, [chave]: !prev[chave] }));
+  }
 
   // Modais
   const [modalGastoAberto, setModalGastoAberto] = useState(false);
@@ -307,9 +347,14 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
   });
 
   // Carrega vendas, despesas e notas fiscais reais do restaurante selecionado
-  const todasVendasLoja = getVendasPorTenant(tenantSelecionadoId);
-  const todasDespesasLoja = getDespesasPorTenant(tenantSelecionadoId);
-  const todasNotasFiscaisLoja = getNotasFiscaisPorTenant(tenantSelecionadoId);
+  const todasVendasLoja = getVendasPorTenant(tenantEfetivoId);
+  const todasDespesasLoja = getDespesasPorTenant(tenantEfetivoId);
+  const todasNotasFiscaisLoja = getNotasFiscaisPorTenant(tenantEfetivoId);
+
+  // Tenant padrão para gravação de novos lançamentos
+  const tenantParaSalvar = isRestauranteUser
+    ? (usuarioLogado?.tenantId || 'tenant-01')
+    : (tenantSelecionadoId === 'todos' ? (tenants[0]?.id || 'tenant-01') : tenantSelecionadoId);
 
   function dataPertenceAoPeriodo(dataHoraStr: string, filtro: PeriodoFiltro): boolean {
     if (filtro === 'todos') return true;
@@ -395,11 +440,19 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
     });
   }, [notasFiscaisFiltradas, buscaTexto, filtroTipoNF]);
 
-  // CÁLCULO DIRETO E LIMPO DO DRE OFICIAL
+  // CÁLCULO DIRETO E LIMPO DO DRE OFICIAL (Padrão Abrasel)
   const dadosDRE = useMemo(() => {
     let receitaBrutaVendas = 0;
+    let vendasSalao = 0;
+    let vendasBalcao = 0;
+    let vendasDelivery = 0;
+    let taxaServicoGarcom = 0;
+    let couvertArtistico = 0;
+
     let totalDescontos = 0;
     let totalCancelamentos = 0;
+    let totalTaxasCartao = 0;
+
     let cmvFichaTecnica = 0;
 
     vendasFiltradas.forEach((venda) => {
@@ -412,8 +465,29 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       }
 
       totalDescontos += venda.desconto || 0;
+      taxaServicoGarcom += venda.taxaServico || 0;
+      couvertArtistico += venda.couvertArtistico || 0;
 
-      venda.itens.forEach((item) => {
+      if (venda.tipoOrigem === 'mesa' || venda.mesaNumero) {
+        vendasSalao += valorBruto;
+      } else if (venda.tipoOrigem === 'delivery') {
+        vendasDelivery += valorBruto;
+      } else {
+        vendasBalcao += valorBruto;
+      }
+
+      // Adquirência / Taxas de maquininha de cartão
+      const fp = (venda.formaPagamento || '').toLowerCase();
+      const totalLiqVenda = venda.total || 0;
+      if (fp.includes('credito') || fp.includes('crédito')) {
+        totalTaxasCartao += totalLiqVenda * 0.0299; // 2.99% taxa crédito
+      } else if (fp.includes('debito') || fp.includes('débito')) {
+        totalTaxasCartao += totalLiqVenda * 0.0139; // 1.39% taxa débito
+      } else if (fp.includes('pix')) {
+        totalTaxasCartao += totalLiqVenda * 0.0079; // 0.79% taxa pix
+      }
+
+      (venda.itens || []).forEach((item) => {
         const ficha = fichasTecnicas.find(
           (f) => f.produtoId === item.produtoId || f.nomePrato.toLowerCase() === item.nome.toLowerCase()
         );
@@ -459,10 +533,25 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
     // Insumos Avulsos do Livro de Gastos
     const despesasInsumosLivro = despesasFiltradas.filter((d) => d.categoria === 'insumos').reduce((acc, d) => acc + d.valor, 0);
 
-    // CMV Total
-    const cmvFinal = Math.max(cmvFichaTecnica, totalComprasInsumosNF) + despesasInsumosLivro;
+    // 1.0 Receita Bruta Total
+    const receitaBrutaTotal = Math.max(receitaBrutaVendas, totalVendasFiscaisNF);
 
-    // Despesas Operacionais
+    // 2.0 Deduções
+    const impostosFiscais = totalImpostosNF > 0 ? totalImpostosNF : receitaBrutaTotal * 0.045;
+    const totalDeducoes = totalDescontos + totalCancelamentos + totalTaxasCartao + impostosFiscais;
+
+    // 3.0 Receita Líquida (ROL)
+    const receitaLiquida = Math.max(0, receitaBrutaTotal - totalDeducoes);
+
+    // 4.0 CMV Final
+    const cmvFinal = Math.max(cmvFichaTecnica, totalComprasInsumosNF) + despesasInsumosLivro;
+    const cmvPct = receitaLiquida > 0 ? (cmvFinal / receitaLiquida) * 100 : 0;
+
+    // 5.0 Lucro Bruto / Margem de Contribuição
+    const lucroBruto = receitaLiquida - cmvFinal;
+    const margemBrutaPct = receitaLiquida > 0 ? (lucroBruto / receitaLiquida) * 100 : 0;
+
+    // 6.0 Despesas Operacionais (Padrão Abrasel)
     const despesasPessoal = despesasFiltradas.filter((d) => d.categoria === 'pessoal').reduce((acc, d) => acc + d.valor, 0);
     const despesasOcupacao = despesasFiltradas.filter((d) => d.categoria === 'ocupacao').reduce((acc, d) => acc + d.valor, 0) + totalUtilidadesNF;
     const despesasComerciais = despesasFiltradas.filter((d) => d.categoria === 'financeiro').reduce((acc, d) => acc + d.valor, 0) + totalEmbalagensNF;
@@ -470,22 +559,9 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
     const outrasDespesas = despesasFiltradas.filter((d) => d.categoria === 'outros').reduce((acc, d) => acc + d.valor, 0);
 
     const totalDespesasOperacionais = despesasPessoal + despesasOcupacao + despesasComerciais + despesasServicos + outrasDespesas;
+    const despesasOperacionaisPct = receitaLiquida > 0 ? (totalDespesasOperacionais / receitaLiquida) * 100 : 0;
 
-    // Receita Bruta Total
-    const receitaBrutaTotal = Math.max(receitaBrutaVendas, totalVendasFiscaisNF);
-
-    // Deduções
-    const impostosTotais = totalImpostosNF > 0 ? totalImpostosNF : receitaBrutaTotal * 0.045;
-    const totalDeducoes = totalDescontos + totalCancelamentos + impostosTotais;
-
-    // Receita Líquida
-    const receitaLiquida = Math.max(0, receitaBrutaTotal - totalDeducoes);
-
-    // Lucro Bruto
-    const lucroBruto = receitaLiquida - cmvFinal;
-    const margemBrutaPct = receitaLiquida > 0 ? (lucroBruto / receitaLiquida) * 100 : 0;
-
-    // Resultado Líquido Real
+    // 7.0 Resultado Líquido Real
     const resultadoLiquidoReal = lucroBruto - totalDespesasOperacionais;
     const margemLiquidaPct = receitaLiquida > 0 ? (resultadoLiquidoReal / receitaLiquida) * 100 : 0;
 
@@ -493,12 +569,22 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       receitaBrutaTotal,
       receitaBrutaVendas,
       totalVendasFiscaisNF,
+      vendasSalao,
+      vendasBalcao,
+      vendasDelivery,
+      taxaServicoGarcom,
+      couvertArtistico,
       totalDeducoes,
       totalDescontos,
-      impostosTotais,
+      totalCancelamentos,
+      totalTaxasCartao,
+      impostosFiscais,
       receitaLiquida,
       cmvFinal,
+      cmvFichaTecnica,
       totalComprasInsumosNF,
+      despesasInsumosLivro,
+      cmvPct,
       lucroBruto,
       margemBrutaPct,
       despesasPessoal,
@@ -507,6 +593,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       despesasServicos,
       outrasDespesas,
       totalDespesasOperacionais,
+      despesasOperacionaisPct,
       resultadoLiquidoReal,
       margemLiquidaPct,
       qtdNotas: notasFiscaisFiltradas.length,
@@ -537,7 +624,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       exibirToast(`Gasto "${formDespesa.descricao}" atualizado.`);
     } else {
       adicionarDespesaRestaurante({
-        tenantId: tenantSelecionadoId,
+        tenantId: tenantParaSalvar,
         descricao: formDespesa.descricao,
         categoria: formDespesa.categoria,
         valor: vNum,
@@ -546,7 +633,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
         formaPagamento: formDespesa.formaPagamento,
         statusPagamento: formDespesa.statusPagamento,
         observacoes: formDespesa.observacoes,
-        cadastradoPor: usuarioLogado?.nome || 'Admin Master',
+        cadastradoPor: usuarioLogado?.nome || (isRestauranteUser ? 'Gestor da Loja' : 'Admin Master'),
       });
       exibirToast(`Gasto adicionado ao restaurante e integrado ao DRE!`);
     }
@@ -571,7 +658,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
     else if (formNF.tipo === 'saida_venda') linhaDRE = 'receita_bruta';
 
     adicionarNotaFiscal({
-      tenantId: tenantSelecionadoId,
+      tenantId: tenantParaSalvar,
       numero: formNF.numero,
       serie: formNF.serie,
       chaveAcesso: formNF.chaveAcesso || undefined,
@@ -589,7 +676,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       status: formNF.status,
       linhaDRE,
       observacoes: formNF.observacoes,
-      cadastradoPor: usuarioLogado?.nome || 'Admin Master',
+      cadastradoPor: usuarioLogado?.nome || (isRestauranteUser ? 'Gestor da Loja' : 'Admin Master'),
     });
 
     exibirToast(`Nota Fiscal #${formNF.numero} cadastrada e integrada ao DRE!`);
@@ -605,7 +692,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
     reader.onload = (ev) => {
       const conteudo = ev.target?.result as string;
       setXmlInputTexto(conteudo);
-      const res = extrairDadosXmlNFe(conteudo, tenantSelecionadoId);
+      const res = extrairDadosXmlNFe(conteudo, tenantParaSalvar);
       if (!res.sucesso || !res.nota) {
         setErroXml(res.erro || 'Falha ao ler XML.');
         setXmlPrevia(null);
@@ -620,8 +707,8 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
     if (!xmlPrevia) return;
     adicionarNotaFiscal({
       ...xmlPrevia,
-      tenantId: tenantSelecionadoId,
-      cadastradoPor: usuarioLogado?.nome || 'Admin Master',
+      tenantId: tenantParaSalvar,
+      cadastradoPor: usuarioLogado?.nome || (isRestauranteUser ? 'Gestor da Loja' : 'Admin Master'),
     });
     exibirToast(`XML NF-e #${xmlPrevia.numero} importado e integrado ao DRE!`);
     setModalImportarXmlAberto(false);
@@ -631,23 +718,38 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
 
   function exportarDRECSV() {
     const linhas = [
-      ['Demonstrativo do Resultado do Exercício (DRE)'],
-      ['Restaurante:', restauranteAtual.nomeFantasia],
-      ['CNPJ:', restauranteAtual.documento],
-      ['Período:', periodo],
+      ['Demonstrativo do Resultado do Exercício (DRE) - Padrão Abrasel'],
+      ['Plataforma:', 'eloGastrô'],
+      ['Restaurante / Unidade:', restauranteAtual.nomeFantasia],
+      ['CNPJ:', restauranteAtual.documento || '-'],
+      ['Período Selecionado:', periodo],
+      ['Data de Emissão:', new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR')],
       [''],
-      ['Linha do DRE', 'Valor (R$)', '% ROL'],
-      ['1. (+) RECEITA OPERACIONAL BRUTA', dadosDRE.receitaBrutaTotal.toFixed(2), '-'],
-      ['2. (-) DEDUÇÕES E TRIBUTOS', (-dadosDRE.totalDeducoes).toFixed(2), ((dadosDRE.totalDeducoes / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
-      ['3. (=) RECEITA OPERACIONAL LÍQUIDA (ROL)', dadosDRE.receitaLiquida.toFixed(2), '100.0%'],
-      ['4. (-) CMV (CUSTO DAS MERCADORIAS)', (-dadosDRE.cmvFinal).toFixed(2), ((dadosDRE.cmvFinal / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
-      ['5. (=) LUCRO BRUTO', dadosDRE.lucroBruto.toFixed(2), dadosDRE.margemBrutaPct.toFixed(1) + '%'],
-      ['6.1 Pessoal & Equipe', (-dadosDRE.despesasPessoal).toFixed(2), ((dadosDRE.despesasPessoal / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
-      ['6.2 Ocupação & Utilidades', (-dadosDRE.despesasOcupacao).toFixed(2), ((dadosDRE.despesasOcupacao / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
-      ['6.3 Comercial & Embalagens', (-dadosDRE.despesasComerciais).toFixed(2), ((dadosDRE.despesasComerciais / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
-      ['6.4 Serviços & TI', (-dadosDRE.despesasServicos).toFixed(2), ((dadosDRE.despesasServicos / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
-      ['6.5 Outras Despesas', (-dadosDRE.outrasDespesas).toFixed(2), ((dadosDRE.outrasDespesas / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
-      ['7. (=) RESULTADO LÍQUIDO REAL', dadosDRE.resultadoLiquidoReal.toFixed(2), dadosDRE.margemLiquidaPct.toFixed(1) + '%'],
+      ['Linha Contábil do DRE', 'Origem / Detalhamento', 'Valor (R$)', '% ROL'],
+      ['1. (+) RECEITA OPERACIONAL BRUTA DE VENDAS', 'Salão + Balcão + Delivery', dadosDRE.receitaBrutaTotal.toFixed(2), '-'],
+      ['   ↳ Salão (Mesas & Comandas)', 'Consumo presencial salão', dadosDRE.vendasSalao.toFixed(2), ((dadosDRE.vendasSalao / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ Balcão (Takeaway / PDV)', 'Vendas diretas balcão', dadosDRE.vendasBalcao.toFixed(2), ((dadosDRE.vendasBalcao / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ Delivery (Entregas Online)', 'Pedidos para entrega', dadosDRE.vendasDelivery.toFixed(2), ((dadosDRE.vendasDelivery / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ Taxa de Serviço 10% (Garçom)', 'Taxa de serviço garçom', dadosDRE.taxaServicoGarcom.toFixed(2), ((dadosDRE.taxaServicoGarcom / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ Couvert Artístico', 'Música / Apresentação', dadosDRE.couvertArtistico.toFixed(2), ((dadosDRE.couvertArtistico / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['2. (-) DEDUÇÕES DA RECEITA BRUTA', 'Taxas maquininha + descontos + tributos', (-dadosDRE.totalDeducoes).toFixed(2), ((dadosDRE.totalDeducoes / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ Taxas de Cartão & Adquirência', 'Débito, crédito e transação', (-dadosDRE.totalTaxasCartao).toFixed(2), ((dadosDRE.totalTaxasCartao / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ Descontos Concedidos', 'Descontos concedidos aos clientes', (-dadosDRE.totalDescontos).toFixed(2), ((dadosDRE.totalDescontos / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ Cancelamentos de Pedidos', 'Vendas canceladas ou estornadas', (-dadosDRE.totalCancelamentos).toFixed(2), ((dadosDRE.totalCancelamentos / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ Tributos Fiscais (Simples Nacional / DAS)', 'Impostos em notas fiscais ou DAS estimado', (-dadosDRE.impostosFiscais).toFixed(2), ((dadosDRE.impostosFiscais / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['3. (=) RECEITA OPERACIONAL LÍQUIDA (ROL)', 'Base 100% contábil da operação', dadosDRE.receitaLiquida.toFixed(2), '100.0%'],
+      ['4. (-) CUSTO DAS MERCADORIAS VENDIDAS (CMV)', 'Insumos de cozinha + compras NF + feira', (-dadosDRE.cmvFinal).toFixed(2), dadosDRE.cmvPct.toFixed(1) + '%'],
+      ['   ↳ Consumo Ficha Técnica (Cozinha)', 'Ingredientes dos pratos e bebidas vendidos', (-dadosDRE.cmvFichaTecnica).toFixed(2), ((dadosDRE.cmvFichaTecnica / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ Compras em Notas Fiscais (XML)', 'Notas de fornecedores de alimentos', (-dadosDRE.totalComprasInsumosNF).toFixed(2), ((dadosDRE.totalComprasInsumosNF / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ Feira & Hortifrúti (Livro Caixa)', 'Compras avulsas de legumes, verduras, gelo', (-dadosDRE.despesasInsumosLivro).toFixed(2), ((dadosDRE.despesasInsumosLivro / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['5. (=) LUCRO BRUTO / MARGEM DE CONTRIBUIÇÃO', 'Receita Líquida menos Custos Diretos de Insumos', dadosDRE.lucroBruto.toFixed(2), dadosDRE.margemBrutaPct.toFixed(1) + '%'],
+      ['6. (-) DESPESAS OPERACIONAIS TOTAIS', 'Estrutura, folha, utilidades e sistemas', (-dadosDRE.totalDespesasOperacionais).toFixed(2), dadosDRE.despesasOperacionaisPct.toFixed(1) + '%'],
+      ['   ↳ 6.1 Pessoal & Equipe', 'Salários, diárias extras de garçom/cozinha e vales', (-dadosDRE.despesasPessoal).toFixed(2), ((dadosDRE.despesasPessoal / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ 6.2 Ocupação & Utilidades', 'Aluguel do imóvel, Energia/Luz, Água e Gás', (-dadosDRE.despesasOcupacao).toFixed(2), ((dadosDRE.despesasOcupacao / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ 6.3 Comercial & Embalagens', 'Embalagens térmicas/delivery, sacolas, marketing', (-dadosDRE.despesasComerciais).toFixed(2), ((dadosDRE.despesasComerciais / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ 6.4 Serviços, TI & Manutenção', 'Mensalidade eloGastrô, internet, limpeza e reparos', (-dadosDRE.despesasServicos).toFixed(2), ((dadosDRE.despesasServicos / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['   ↳ 6.5 Outras Despesas Gerais', 'Despesas bancárias, contabilidade e imprevistos', (-dadosDRE.outrasDespesas).toFixed(2), ((dadosDRE.outrasDespesas / (dadosDRE.receitaLiquida || 1)) * 100).toFixed(1) + '%'],
+      ['7. (=) RESULTADO LÍQUIDO FINAL DO PERÍODO', dadosDRE.resultadoLiquidoReal >= 0 ? 'Lucro Líquido Real Apurado' : 'Prejuízo Operacional', dadosDRE.resultadoLiquidoReal.toFixed(2), dadosDRE.margemLiquidaPct.toFixed(1) + '%'],
     ];
 
     const csvContent = '\uFEFF' + linhas.map((l) => l.join(';')).join('\n');
@@ -655,11 +757,11 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `dre_${restauranteAtual.nomeFantasia.toLowerCase().replace(/\s+/g, '_')}_${periodo}.csv`);
+    link.setAttribute('download', `dre_${restauranteAtual.nomeFantasia.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${periodo}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    exibirToast('DRE exportado com sucesso para CSV!');
+    exibirToast('DRE oficial exportado com sucesso para CSV!');
   }
 
   return (
@@ -672,44 +774,64 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
         </div>
       )}
 
-      {/* Header da Central Financeira Exclusiva Admin Master */}
+      {/* Header da Central Financeira (Nível 1 Master vs Nível 2 Restaurante) */}
       <div className={`p-4 sm:p-5 rounded-2xl border flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${
         isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800 shadow-xl'
       }`}>
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider bg-[#FF6B00]/15 text-[#FF6B00] border border-[#FF6B00]/30">
-              Exclusivo Admin Master & Consultoria
+              {isRestauranteUser ? '🍽️ Nível 2 • Gestão da Unidade' : '👑 Nível 1 • Franqueador & Admin Master'}
+            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              Padrão Abrasel
             </span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+          <h1 className={`text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2 ${
+            isWhite ? 'text-slate-900' : 'text-white'
+          }`}>
             <DollarSign className="w-6 h-6 text-[#FF6B00]" />
-            <span>Financeiro, Notas Fiscais & DRE dos Restaurantes</span>
+            <span>{isRestauranteUser ? 'Financeiro & DRE Contábil' : 'Central Financeira & DRE Multi-Lojas'}</span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Adicione todos os gastos e notas fiscais de cada restaurante para gerar o DRE contábil oficial em tempo real.
+            {isRestauranteUser
+              ? `Demonstrativo contábil em tempo real, lançamento de despesas e notas fiscais da sua loja.`
+              : 'Auditoria contábil completa de faturamento, custos (CMV), despesas operacionais e DRE das unidades da rede.'}
           </p>
         </div>
 
         {/* Seletores: Restaurante + Período */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Seletor de Restaurante */}
-          <div className="flex items-center gap-1.5">
-            <Store className="w-4 h-4 text-[#FF6B00] shrink-0" />
-            <select
-              value={tenantSelecionadoId}
-              onChange={(e) => setTenantSelecionadoId(e.target.value)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-[#0F172A] border-slate-700 text-white'
-              }`}
-            >
-              {tenants.map((t) => (
-                <option key={t.id} value={t.id}>
-                  🍽️ {t.nomeFantasia} ({t.documento})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Seletor de Restaurante: Super Admin pode trocar; Admin de restaurante vê loja travada */}
+          {isMasterUser ? (
+            <div className="flex items-center gap-1.5">
+              <Store className="w-4 h-4 text-[#FF6B00] shrink-0" />
+              <select
+                value={tenantSelecionadoId}
+                onChange={(e) => setTenantSelecionadoId(e.target.value)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                  isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-[#0F172A] border-slate-700 text-white'
+                }`}
+              >
+                <option value="todos">🌐 Todas as Lojas (Consolidado Multi-Tenant)</option>
+                {tenants.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    🍽️ {t.nomeFantasia} ({t.documento || 'Sem CNPJ'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold ${
+              isWhite ? 'bg-orange-50 border-orange-200 text-slate-800' : 'bg-[#0F172A] border-slate-700 text-slate-200'
+            }`}>
+              <Store className="w-4 h-4 text-[#FF6B00] shrink-0" />
+              <span>{restauranteAtual.nomeFantasia}</span>
+              {restauranteAtual.documento && (
+                <span className="text-[10px] text-slate-400 font-mono">({restauranteAtual.documento})</span>
+              )}
+            </div>
+          )}
 
           {/* Seletor de Período */}
           <select
@@ -728,24 +850,22 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
         </div>
       </div>
 
-      {/* 3 Sub-Abas: Notas Fiscais vs Gastos vs DRE */}
+      {/* 3 Sub-Abas: DRE vs Gastos vs Notas Fiscais */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            onClick={() => setSubAba('notas_fiscais')}
+            onClick={() => setSubAba('dre')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              subAba === 'notas_fiscais'
+              subAba === 'dre'
                 ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-black'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
-            <QrCode className="w-4 h-4" />
-            <span>1. Notas Fiscais & XML SEFAZ</span>
-            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-              subAba === 'notas_fiscais' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
-            }`}>
-              {dadosDRE.qtdNotas}
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>1. DRE Contábil (Abrasel)</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-[#10B981] font-bold">
+              Ao Vivo
             </span>
           </button>
 
@@ -759,7 +879,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             }`}
           >
             <Receipt className="w-4 h-4" />
-            <span>2. Gastos & Despesas Operacionais</span>
+            <span>2. Despesas & Livro Caixa</span>
             <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
               subAba === 'gastos' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
             }`}>
@@ -769,17 +889,19 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
 
           <button
             type="button"
-            onClick={() => setSubAba('dre')}
+            onClick={() => setSubAba('notas_fiscais')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              subAba === 'dre'
+              subAba === 'notas_fiscais'
                 ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-black'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>3. DRE Demonstrativo Gerado</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-[#10B981] font-bold">
-              Ao Vivo
+            <QrCode className="w-4 h-4" />
+            <span>3. Notas Fiscais & XML SEFAZ</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+              subAba === 'notas_fiscais' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
+            }`}>
+              {dadosDRE.qtdNotas}
             </span>
           </button>
         </div>
@@ -790,7 +912,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             <button
               type="button"
               onClick={exportarDRECSV}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 border border-slate-700 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 border border-slate-700 cursor-pointer shadow-sm transition-all"
             >
               <Download className="w-3.5 h-3.5 text-[#10B981]" />
               <span>Baixar DRE (CSV/Excel)</span>
@@ -798,7 +920,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 border border-slate-700 cursor-pointer"
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 border border-slate-700 cursor-pointer shadow-sm transition-all"
             >
               <Printer className="w-3.5 h-3.5 text-slate-400" />
               <span>Imprimir</span>
@@ -1085,24 +1207,34 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       )}
 
       {/* ========================================================================= */}
-      {/* 3. DRE DEMONSTRATIVO OFICIAL GERADO EM TEMPO REAL                         */}
+      {/* 1. DRE DEMONSTRATIVO OFICIAL GERADO EM TEMPO REAL (PADRÃO ABRASEL)        */}
       {/* ========================================================================= */}
       {subAba === 'dre' && (
-        <div className="space-y-4">
-          <div className={`p-4 rounded-2xl border flex items-center justify-between ${
+        <div className="space-y-5">
+          {/* Header do DRE */}
+          <div className={`p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
             isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
           }`}>
             <div>
-              <h3 className="text-sm font-extrabold text-white">
-                DRE Oficial — {restauranteAtual.nomeFantasia}
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase bg-emerald-500/20 text-[#10B981] border border-emerald-500/30">
+                  Apuração Contábil Oficial
+                </span>
+                <span className="text-[10px] font-bold text-slate-400">
+                  {periodo === 'mes_atual' ? 'Mês Vigente' : periodo === 'mes_anterior' ? 'Mês Anterior' : periodo.toUpperCase()}
+                </span>
+              </div>
+              <h3 className={`text-base font-extrabold flex items-center gap-2 ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                <FileSpreadsheet className="w-5 h-5 text-[#FF6B00]" />
+                <span>Demonstração do Resultado do Exercício — {restauranteAtual.nomeFantasia}</span>
               </h3>
-              <p className="text-xs text-slate-400">
-                Apuração 100% real baseada nas vendas registradas no sistema, compras faturadas em notas fiscais e gastos operacionais.
+              <p className="text-xs text-slate-400 mt-0.5">
+                Padrão contábil Abrasel apurado com vendas de caixa, custos de insumos e despesas operacionais reais.
               </p>
             </div>
             <div className="text-right">
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">Margem Líquida</span>
-              <span className={`text-base font-black font-mono ${
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">Margem Líquida da Operação</span>
+              <span className={`text-lg font-black font-mono ${
                 dadosDRE.resultadoLiquidoReal >= 0 ? 'text-[#10B981]' : 'text-rose-400'
               }`}>
                 {dadosDRE.margemLiquidaPct.toFixed(1)}% ROL
@@ -1110,7 +1242,68 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             </div>
           </div>
 
-          {/* Tabela do DRE */}
+          {/* 6 Cards com KPIs do DRE */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className={`p-3.5 rounded-2xl border ${isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800'}`}>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">1.0 Receita Bruta</span>
+              <p className={`text-base font-black font-mono mt-1 ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                R$ {dadosDRE.receitaBrutaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] text-slate-400">Vendas no Salão e Delivery</span>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border ${isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800'}`}>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">3.0 Receita Líquida</span>
+              <p className="text-base font-black font-mono text-[#10B981] mt-1">
+                R$ {dadosDRE.receitaLiquida.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] text-[#10B981] font-bold">Base Contábil 100%</span>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border ${isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800'}`}>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">4.0 CMV Insumos</span>
+              <p className="text-base font-black font-mono text-rose-400 mt-1">
+                R$ {dadosDRE.cmvFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] font-mono text-rose-400 font-bold">{dadosDRE.cmvPct.toFixed(1)}% ROL</span>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border ${isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800'}`}>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">5.0 Lucro Bruto</span>
+              <p className="text-base font-black font-mono text-purple-400 mt-1">
+                R$ {dadosDRE.lucroBruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] font-mono text-purple-400 font-bold">{dadosDRE.margemBrutaPct.toFixed(1)}% Margem</span>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border ${isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800'}`}>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">6.0 Despesas Fix/Var</span>
+              <p className="text-base font-black font-mono text-amber-400 mt-1">
+                R$ {dadosDRE.totalDespesasOperacionais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <span className="text-[10px] font-mono text-amber-400 font-bold">{dadosDRE.despesasOperacionaisPct.toFixed(1)}% ROL</span>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border ${
+              dadosDRE.resultadoLiquidoReal >= 0
+                ? (isWhite ? 'bg-emerald-50 border-emerald-200' : 'bg-emerald-950/30 border-emerald-500/30')
+                : (isWhite ? 'bg-rose-50 border-rose-200' : 'bg-rose-950/30 border-rose-500/30')
+            }`}>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">7.0 Resultado Final</span>
+              <p className={`text-base font-black font-mono mt-1 ${
+                dadosDRE.resultadoLiquidoReal >= 0 ? 'text-[#10B981]' : 'text-rose-400'
+              }`}>
+                R$ {dadosDRE.resultadoLiquidoReal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <span className={`text-[9px] px-1.5 py-0.2 rounded font-black uppercase ${
+                dadosDRE.resultadoLiquidoReal >= 0 ? 'bg-[#10B981]/20 text-[#10B981]' : 'bg-rose-500/20 text-rose-400'
+              }`}>
+                {dadosDRE.resultadoLiquidoReal >= 0 ? 'Lucro Líquido' : 'Prejuízo'}
+              </span>
+            </div>
+          </div>
+
+          {/* Tabela Interativa do DRE Padrão Abrasel */}
           <div className={`rounded-2xl border overflow-hidden shadow-2xl ${
             isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
           }`}>
@@ -1122,33 +1315,86 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
                   <th className="py-3 px-4">Linha Contábil do DRE</th>
                   <th className="py-3 px-4">Origem / Composição</th>
                   <th className="py-3 px-4 text-right">Valor Acumulado</th>
-                  <th className="py-3 px-4 text-right">% Receita Líquida</th>
+                  <th className="py-3 px-4 text-right">% Receita Líquida (AV)</th>
                 </tr>
               </thead>
               <tbody className={`divide-y font-mono ${isWhite ? 'divide-slate-100' : 'divide-slate-800/70'}`}>
-                {/* 1. Receita Bruta */}
-                <tr className="bg-slate-900/40">
-                  <td className="py-3 px-4 font-sans font-black text-white text-xs">
-                    1. (+) RECEITA OPERACIONAL BRUTA
+                {/* 1.0 RECEITA OPERACIONAL BRUTA DE VENDAS */}
+                <tr className={isWhite ? 'bg-slate-50 font-bold' : 'bg-slate-900/60 font-bold'}>
+                  <td className="py-3 px-4 font-sans text-xs flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => alternarExpansao('receita')}
+                      className="p-1 rounded hover:bg-slate-700/30 text-slate-400 transition-colors"
+                      title="Expandir/Recolher sublinhas"
+                    >
+                      {expandido.receita ? <ChevronDown className="w-3.5 h-3.5 text-[#FF6B00]" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    </button>
+                    <span className={isWhite ? 'text-slate-900 font-black' : 'text-white font-black'}>
+                      1.0 (+) RECEITA OPERACIONAL BRUTA DE VENDAS
+                    </span>
                   </td>
                   <td className="py-3 px-4 font-sans text-slate-400 text-[11px]">
-                    Vendas registradas no PDV + Notas Fiscais NFC-e emitidas
+                    Salão, Balcão, Delivery e Taxas
                   </td>
-                  <td className="py-3 px-4 text-right font-black text-white text-xs">
+                  <td className={`py-3 px-4 text-right font-black text-xs ${isWhite ? 'text-slate-900' : 'text-white'}`}>
                     R$ {dadosDRE.receitaBrutaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-3 px-4 text-right text-slate-400">-</td>
                 </tr>
 
-                {/* 2. Deduções */}
-                <tr>
-                  <td className="py-2.5 px-4 font-sans font-semibold text-slate-300 pl-8">
-                    2. (-) Deduções da Receita & Tributos
+                {expandido.receita && (
+                  <>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Vendas no Salão (Mesas & Comandas)</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Consumo presencial salão</td>
+                      <td className="py-2 px-4 text-right text-slate-300">R$ {dadosDRE.vendasSalao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.vendasSalao / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Vendas no Balcão (Takeaway / PDV)</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Vendas diretas no balcão</td>
+                      <td className="py-2 px-4 text-right text-slate-300">R$ {dadosDRE.vendasBalcao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.vendasBalcao / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Vendas no Delivery (Entregas Online)</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Pedidos delivery</td>
+                      <td className="py-2 px-4 text-right text-slate-300">R$ {dadosDRE.vendasDelivery.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.vendasDelivery / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Taxa de Serviço 10% (Garçom)</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Gorjeta / Taxa de serviço da brigada</td>
+                      <td className="py-2 px-4 text-right text-slate-300">R$ {dadosDRE.taxaServicoGarcom.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.taxaServicoGarcom / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Couvert Artístico</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Música e apresentações ao vivo</td>
+                      <td className="py-2 px-4 text-right text-slate-300">R$ {dadosDRE.couvertArtistico.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.couvertArtistico / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                  </>
+                )}
+
+                {/* 2.0 DEDUÇÕES DA RECEITA BRUTA */}
+                <tr className={isWhite ? 'bg-slate-50/50' : 'bg-slate-900/30'}>
+                  <td className="py-2.5 px-4 font-sans font-semibold text-rose-400 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => alternarExpansao('deducoes')}
+                      className="p-1 rounded hover:bg-slate-700/30 text-slate-400 transition-colors"
+                      title="Expandir/Recolher sublinhas"
+                    >
+                      {expandido.deducoes ? <ChevronDown className="w-3.5 h-3.5 text-rose-400" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    </button>
+                    <span>2.0 (-) DEDUÇÕES DA RECEITA BRUTA</span>
                   </td>
                   <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
-                    Descontos concedidos + Impostos em Notas Fiscais
+                    Taxas de maquininha, descontos, cancelamentos e tributos
                   </td>
-                  <td className="py-2.5 px-4 text-right text-rose-400">
+                  <td className="py-2.5 px-4 text-right font-bold text-rose-400">
                     - R$ {dadosDRE.totalDeducoes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-2.5 px-4 text-right text-slate-400">
@@ -1156,13 +1402,42 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
                   </td>
                 </tr>
 
-                {/* 3. Receita Líquida */}
-                <tr className="bg-[#10B981]/10 border-y border-[#10B981]/20">
+                {expandido.deducoes && (
+                  <>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Taxas de Cartão & Adquirência</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Taxas cobradas por operadoras de cartão</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.totalTaxasCartao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.totalTaxasCartao / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Descontos Concedidos & Cortesias</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Descontos aplicados no caixa e promoções</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.totalDescontos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.totalDescontos / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Cancelamentos de Pedidos & Estornos</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Vendas canceladas no sistema</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.totalCancelamentos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.totalCancelamentos / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Tributos Fiscais (Simples Nacional / DAS / NF-e)</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Impostos apurados em notas fiscais ou alíquota DAS</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.impostosFiscais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.impostosFiscais / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                  </>
+                )}
+
+                {/* 3.0 RECEITA OPERACIONAL LÍQUIDA (ROL) */}
+                <tr className="bg-[#10B981]/15 border-y border-[#10B981]/30">
                   <td className="py-3 px-4 font-sans font-black text-[#10B981] text-xs">
-                    3. (=) RECEITA OPERACIONAL LÍQUIDA (ROL)
+                    3.0 (=) RECEITA OPERACIONAL LÍQUIDA (ROL)
                   </td>
                   <td className="py-3 px-4 font-sans text-slate-400 text-[11px]">
-                    Base contábil líquida da operação do restaurante
+                    Base contábil líquida da operação (Base 100% da Análise Vertical)
                   </td>
                   <td className="py-3 px-4 text-right font-black text-[#10B981] text-sm">
                     R$ {dadosDRE.receitaLiquida.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -1170,31 +1445,62 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
                   <td className="py-3 px-4 text-right font-black text-[#10B981]">100.0%</td>
                 </tr>
 
-                {/* 4. CMV */}
+                {/* 4.0 CMV (CUSTO DAS MERCADORIAS VENDIDAS) */}
                 <tr>
-                  <td className="py-3 px-4 font-sans font-semibold text-rose-400 pl-8">
-                    4. (-) CMV (Custo das Mercadorias Vendidas)
+                  <td className="py-3 px-4 font-sans font-semibold text-rose-400 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => alternarExpansao('cmv')}
+                      className="p-1 rounded hover:bg-slate-700/30 text-slate-400 transition-colors"
+                      title="Expandir/Recolher sublinhas"
+                    >
+                      {expandido.cmv ? <ChevronDown className="w-3.5 h-3.5 text-rose-400" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    </button>
+                    <span>4.0 (-) CUSTO DAS MERCADORIAS VENDIDAS (CMV)</span>
                   </td>
                   <td className="py-3 px-4 font-sans text-slate-400 text-[11px]">
-                    Notas Fiscais de Fornecedores de Insumos (R$ {dadosDRE.totalComprasInsumosNF.toFixed(2)}) + Ficha Técnica
+                    Consumo da cozinha, compras em NF-e e compras de feira/hortifrúti
                   </td>
-                  <td className="py-3 px-4 text-right text-rose-400 font-bold">
+                  <td className="py-3 px-4 text-right text-rose-400 font-black">
                     - R$ {dadosDRE.cmvFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
-                  <td className="py-3 px-4 text-right text-slate-400">
-                    {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.cmvFinal / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
+                  <td className="py-3 px-4 text-right text-rose-400 font-bold">
+                    {dadosDRE.cmvPct.toFixed(1)}%
                   </td>
                 </tr>
 
-                {/* 5. Lucro Bruto */}
-                <tr className="bg-slate-900/50">
-                  <td className="py-3 px-4 font-sans font-black text-white text-xs">
-                    5. (=) LUCRO BRUTO (MARGEM DE CONTRIBUIÇÃO)
+                {expandido.cmv && (
+                  <>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Consumo Insumos de Cozinha (Ficha Técnica)</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Custo direto dos ingredientes consumidos nas receitas dos pedidos</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.cmvFichaTecnica.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.cmvFichaTecnica / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Compras em Notas Fiscais de Entrada (XML SEFAZ)</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Notas fiscais de fornecedores de carne, laticínios e bebidas</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.totalComprasInsumosNF.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.totalComprasInsumosNF / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">↳ Feira, Hortifrúti & Insumos Avulsos (Livro Caixa)</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Compras de feira, gelo, hortifrúti lançados no livro</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.despesasInsumosLivro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasInsumosLivro / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                  </>
+                )}
+
+                {/* 5.0 LUCRO BRUTO / MARGEM DE CONTRIBUIÇÃO */}
+                <tr className={isWhite ? 'bg-slate-100 font-black' : 'bg-slate-900/70 font-black'}>
+                  <td className={`py-3 px-4 font-sans text-xs ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                    5.0 (=) LUCRO BRUTO / MARGEM DE CONTRIBUIÇÃO
                   </td>
                   <td className="py-3 px-4 font-sans text-slate-400 text-[11px]">
-                    Receita Líquida menos Custos Diretos de Mercadorias
+                    Receita Líquida menos Custo das Mercadorias Vendidas (ROL - CMV)
                   </td>
-                  <td className="py-3 px-4 text-right font-black text-white text-sm">
+                  <td className={`py-3 px-4 text-right text-sm font-black ${isWhite ? 'text-slate-900' : 'text-white'}`}>
                     R$ {dadosDRE.lucroBruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-3 px-4 text-right font-black text-[#10B981]">
@@ -1202,93 +1508,76 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
                   </td>
                 </tr>
 
-                {/* 6. Despesas Operacionais */}
+                {/* 6.0 DESPESAS OPERACIONAIS TOTAIS */}
                 <tr>
-                  <td className="py-2.5 px-4 font-sans text-slate-300 pl-8">
-                    6.1 Despesas com Pessoal & Equipe
+                  <td className="py-3 px-4 font-sans font-semibold text-rose-400 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => alternarExpansao('despesas')}
+                      className="p-1 rounded hover:bg-slate-700/30 text-slate-400 transition-colors"
+                      title="Expandir/Recolher sublinhas"
+                    >
+                      {expandido.despesas ? <ChevronDown className="w-3.5 h-3.5 text-rose-400" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    </button>
+                    <span>6.0 (-) DESPESAS OPERACIONAIS TOTAIS (Padrão Abrasel)</span>
                   </td>
-                  <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
-                    Salários e diárias de garçons/extras
+                  <td className="py-3 px-4 font-sans text-slate-400 text-[11px]">
+                    Estrutura, pessoal, ocupação, embalagens e serviços
                   </td>
-                  <td className="py-2.5 px-4 text-right text-rose-400">
-                    - R$ {dadosDRE.despesasPessoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  <td className="py-3 px-4 text-right text-rose-400 font-black">
+                    - R$ {dadosDRE.totalDespesasOperacionais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
-                  <td className="py-2.5 px-4 text-right text-slate-400">
-                    {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasPessoal / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
+                  <td className="py-3 px-4 text-right text-rose-400 font-bold">
+                    {dadosDRE.despesasOperacionaisPct.toFixed(1)}%
                   </td>
                 </tr>
 
-                <tr>
-                  <td className="py-2.5 px-4 font-sans text-slate-300 pl-8">
-                    6.2 Ocupação & Utilidades
-                  </td>
-                  <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
-                    Aluguel, Luz, Água e Gás de Cozinha
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-rose-400">
-                    - R$ {dadosDRE.despesasOcupacao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-400">
-                    {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasOcupacao / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
-                  </td>
-                </tr>
+                {expandido.despesas && (
+                  <>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">6.1 Pessoal & Equipe Operacional</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Salários, diárias extras de garçom/cozinha e vales</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.despesasPessoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasPessoal / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">6.2 Ocupação & Utilidades</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Aluguel comercial, Energia elétrica (luz), Água e Gás de cozinha</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.despesasOcupacao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasOcupacao / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">6.3 Comercial & Embalagens Delivery</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Embalagens térmicas, sacolas, caixas e ações comerciais de vendas</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.despesasComerciais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasComerciais / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">6.4 Serviços, Softwares & Manutenção</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Mensalidade sistema eloGastrô, internet, limpeza e reparos</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.despesasServicos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasServicos / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                    <tr className="text-slate-400">
+                      <td className="py-2 px-4 font-sans pl-10 text-[11px]">6.5 Outras Despesas Gerais & Administrativas</td>
+                      <td className="py-2 px-4 font-sans text-[11px] text-slate-500">Honorários contábeis, tarifas bancárias e imprevistos diversos</td>
+                      <td className="py-2 px-4 text-right text-rose-400/80">- R$ {dadosDRE.outrasDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-right text-slate-400">{dadosDRE.receitaLiquida > 0 ? ((dadosDRE.outrasDespesas / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%</td>
+                    </tr>
+                  </>
+                )}
 
-                <tr>
-                  <td className="py-2.5 px-4 font-sans text-slate-300 pl-8">
-                    6.3 Comercial & Embalagens
-                  </td>
-                  <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
-                    Embalagens térmicas e despesas comerciais
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-rose-400">
-                    - R$ {dadosDRE.despesasComerciais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-400">
-                    {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasComerciais / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
-                  </td>
-                </tr>
-
-                <tr>
-                  <td className="py-2.5 px-4 font-sans text-slate-300 pl-8">
-                    6.4 Serviços & TI
-                  </td>
-                  <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
-                    NFS-e de Serviços Tomados, limpeza e sistema
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-rose-400">
-                    - R$ {dadosDRE.despesasServicos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-400">
-                    {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.despesasServicos / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
-                  </td>
-                </tr>
-
-                <tr>
-                  <td className="py-2.5 px-4 font-sans text-slate-300 pl-8">
-                    6.5 Outras Despesas Gerais
-                  </td>
-                  <td className="py-2.5 px-4 font-sans text-slate-400 text-[11px]">
-                    Despesas administrativas diversas
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-rose-400">
-                    - R$ {dadosDRE.outrasDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-400">
-                    {dadosDRE.receitaLiquida > 0 ? ((dadosDRE.outrasDespesas / dadosDRE.receitaLiquida) * 100).toFixed(1) : '0'}%
-                  </td>
-                </tr>
-
-                {/* 7. Resultado Líquido Final */}
+                {/* 7.0 RESULTADO LÍQUIDO FINAL DO PERÍODO */}
                 <tr className={`border-t-2 font-black ${
                   dadosDRE.resultadoLiquidoReal >= 0
-                    ? 'bg-[#10B981]/15 text-[#10B981]'
-                    : 'bg-rose-500/15 text-rose-400'
+                    ? 'bg-[#10B981]/20 text-[#10B981]'
+                    : 'bg-rose-500/20 text-rose-400'
                 }`}>
-                  <td className="py-4 px-4 font-sans text-sm">
-                    7. (=) RESULTADO LÍQUIDO REAL DO RESTAURANTE
+                  <td className="py-4 px-4 font-sans text-sm font-black">
+                    7.0 (=) RESULTADO LÍQUIDO FINAL DO PERÍODO
                   </td>
                   <td className="py-4 px-4 font-sans text-[11px]">
-                    {dadosDRE.resultadoLiquidoReal >= 0 ? '🎉 Lucro Líquido Real Apurado' : '⚠️ Prejuízo Operacional Verificado'}
+                    {dadosDRE.resultadoLiquidoReal >= 0 ? '🎉 Lucro Líquido Real Apurado na Operação' : '⚠️ Prejuízo Operacional Verificado'}
                   </td>
                   <td className="py-4 px-4 text-right text-base font-black">
                     R$ {dadosDRE.resultadoLiquidoReal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
