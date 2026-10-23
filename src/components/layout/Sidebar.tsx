@@ -157,7 +157,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               return [
                 { id: 'restaurantes', label: 'Restaurantes Assinantes', icon: Store, badge: 'Clientes' },
                 { id: 'dossie_mensal', label: 'Dossiê Mensal & Consultoria', icon: FileSpreadsheet, badge: 'DRE' },
-                { id: 'financeiro_lojas', label: 'Financeiro, Notas & DRE Lojas', icon: DollarSign, badge: 'DRE & NF', highlight: true },
                 { id: 'editor_loja', label: 'Ambiente de Edição das Lojas', icon: Sliders, badge: 'Editar' },
                 { id: 'dre_saas', label: 'DRE Executivo & Gráficos', icon: BarChart3, badge: 'DRE' },
                 { id: 'financeiro', label: 'Métricas Financeiras & MRR', icon: TrendingUp },
@@ -178,10 +177,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
                       isTabActive
                         ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-bold'
-                        : item.highlight
-                        ? isWhite
-                          ? 'text-[#FF6B00] bg-orange-50 border border-orange-200 hover:bg-orange-100 font-bold'
-                          : 'text-orange-400 bg-orange-950/30 border border-[#FF6B00]/30 hover:bg-orange-900/40'
+                        
                         : isWhite
                         ? 'text-slate-700 hover:text-[#FF6B00] hover:bg-orange-50/70 font-semibold'
                         : 'text-slate-300 hover:text-white hover:bg-[#1E293B]'
