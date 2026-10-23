@@ -264,6 +264,15 @@ export default function PainelDono() {
             <span>Frente de Caixa (PDV)</span>
           </Link>
 
+          {/* Botão Ir para Financeiro */}
+          <Link
+            to="/financeiro"
+            className="px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+          >
+            <DollarSign className="w-3.5 h-3.5" />
+            <span>Financeiro & DRE</span>
+          </Link>
+
           {/* Imprimir Resumo */}
           <button
             type="button"

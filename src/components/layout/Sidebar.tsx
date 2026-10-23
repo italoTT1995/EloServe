@@ -50,7 +50,7 @@ const menuItemsDonoSimples: MenuItemDef[] = [
   { path: '/mesas', label: 'Mesas', icon: LayoutGrid, cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
   { path: '/estoque', label: 'Estoque', icon: Package, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/caixa', label: 'Caixa', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante', 'caixa'] },
-  { path: '/financeiro', label: 'Financeiro', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/financeiro', label: 'Financeiro', icon: DollarSign, badge: 'NOVO', highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/elobot', label: 'Marketing', icon: Megaphone, highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/funcionarios', label: 'Funcionários', icon: Users, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/delivery', label: 'Entregas/Entregadores', icon: Bike, cargos: ['super_admin', 'admin_restaurante', 'caixa', 'entregador'] },
@@ -209,6 +209,40 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 );
               });
             })()}
+
+            {/* ATALHO DIRETO: CENTRAL FINANCEIRA & DRE DAS LOJAS */}
+            <div className={`pt-3 pb-1 mt-3 border-t ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
+              <p className={`px-3 text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5 ${
+                isWhite ? 'text-[#10B981]' : 'text-emerald-400'
+              }`}>
+                <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Gestão das Lojas & DRE</span>
+              </p>
+
+              <NavLink
+                to="/financeiro"
+                onClick={() => {
+                  if (window.innerWidth < 1024) onClose();
+                }}
+                className={({ isActive }) =>
+                  `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 ${
+                    isActive
+                      ? 'bg-emerald-600 !text-white shadow-lg shadow-emerald-600/30'
+                      : isWhite
+                      ? 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-200'
+                      : 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30'
+                  }`
+                }
+              >
+                <div className="flex items-center gap-3">
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                  <span>Financeiro & DRE (Lojas)</span>
+                </div>
+                <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                  NOVO
+                </span>
+              </NavLink>
+            </div>
           </div>
         ) : usuarioLogado?.cargo === 'admin_restaurante' || (usuarioLogado?.cargo === 'super_admin' && !isModoGlobal) ? (
           /* MENU PRINCIPAL DO DONO / GERENTE (EXATAMENTE COMO NO BENCHMARK DO PRINT OU MODO INSPEÇÃO) */

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   Building2,
   Activity,
@@ -1657,6 +1657,18 @@ export default function SaaSMaster() {
           <TrendingUp className="w-4 h-4" />
           <span>Métricas Financeiras & MRR</span>
         </button>
+
+        <Link
+          to="/financeiro"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 active:scale-95"
+          title="Abrir Central Financeira Completa das Lojas com DRE Padrão Abrasel"
+        >
+          <DollarSign className="w-4 h-4 text-white" />
+          <span>Financeiro & DRE das Lojas</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 uppercase font-black">
+            NOVA ABA
+          </span>
+        </Link>
 
         <button
           onClick={() => handleMudarAba('planos')}
@@ -4508,6 +4520,31 @@ export default function SaaSMaster() {
       {/* CONTEÚDO DA ABA 2: MÉTRICAS FINANCEIRAS & MRR */}
       {abaAtiva === 'financeiro' && (
         <div className="space-y-4">
+          {/* BANNER DE ACESSO DIRETO À NOVA CENTRAL FINANCEIRA & DRE DAS LOJAS */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-[#FF6B00]/25 via-emerald-600/20 to-purple-600/20 border border-[#FF6B00]/40 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-[#FF6B00] text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-[#FF6B00]/30 shrink-0">
+                💰
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                  <h4 className="text-sm font-black text-white">Central Financeira Completa & DRE Oficial das Lojas</h4>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-400 font-bold border border-emerald-500/40">
+                    NOVA ABA
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  Cadastros de receitas, despesas manuais, regras recorrentes, fluxo de caixa e DRE contábil automatizado de cada restaurante ou de toda a rede consolidada.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/financeiro"
+              className="px-5 py-2.5 rounded-2xl bg-[#FF6B00] hover:bg-[#E66000] text-white font-black text-xs shadow-lg shadow-[#FF6B00]/30 flex items-center justify-center gap-2 transition-all shrink-0 active:scale-95"
+            >
+              <span>Abrir Central Financeira ➔</span>
+            </Link>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
               <span className="text-xs text-slate-400 font-medium">Ticket Médio por Assinante</span>

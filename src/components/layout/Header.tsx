@@ -325,6 +325,24 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
       {/* Right Indicators */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Botão Rápido de Acesso Direto ao Financeiro no Topo do Header */}
+        <Link
+          to="/financeiro"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black transition-all cursor-pointer shadow-sm ${
+            location.pathname === '/financeiro'
+              ? 'bg-[#FF6B00] !text-white border-[#FF6B00] shadow-md shadow-[#FF6B00]/30'
+              : isWhite
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+          }`}
+          title="Abrir Nova Aba de Gestão Financeira Completa & DRE"
+        >
+          <DollarSign className="w-3.5 h-3.5" />
+          <span>Financeiro</span>
+          <span className="text-[9px] px-1 py-0.2 rounded font-black uppercase bg-emerald-500/20 text-emerald-400">
+            NOVO
+          </span>
+        </Link>
         {/* Botão de Solicitar Suporte ao Admin Master para Restaurantes */}
         {usuarioLogado?.cargo !== 'super_admin' && (
           <button
