@@ -418,6 +418,109 @@ export interface DespesaOperacionalRestaurante {
 }
 
 // -------------------------------------------------------------
+// GESTÃO FINANCEIRA COMPLETA (RECEITAS, DESPESAS, RECORRÊNCIAS, DRE)
+// -------------------------------------------------------------
+export type TipoLancamentoFinanceiro = 'receita' | 'despesa';
+
+export type StatusLancamentoFinanceiro = 'pendente' | 'pago' | 'recebido' | 'cancelado';
+
+export type FormaPagamentoFinanceiro =
+  | 'dinheiro'
+  | 'pix'
+  | 'boleto'
+  | 'transferencia'
+  | 'cartao_credito'
+  | 'cartao_debito'
+  | 'outros';
+
+export type OrigemLancamentoFinanceiro = 'manual' | 'recorrente' | 'pdv' | 'estoque' | 'nfe';
+
+export type LinhaDREContabil =
+  | 'receita_bruta'
+  | 'deducoes'
+  | 'cmv'
+  | 'pessoal'
+  | 'ocupacao'
+  | 'comercial'
+  | 'servicos'
+  | 'resultado_financeiro'
+  | 'outros';
+
+export interface CategoriaFinanceira {
+  id: string;
+  tenantId?: string; // Se omitido, é uma categoria global padrão
+  nome: string;
+  tipo: TipoLancamentoFinanceiro;
+  linhaDRE: LinhaDREContabil;
+  descricao?: string;
+  corBadge?: string;
+  icone?: string;
+  sistema?: boolean; // Se true, categoria padrão do sistema
+}
+
+export interface HistoricoAlteracaoFinanceira {
+  id: string;
+  dataHora: string;
+  usuarioNome: string;
+  campoAlterado: string;
+  valorAntigo?: string | number;
+  valorNovo?: string | number;
+  motivo?: string;
+}
+
+export interface LancamentoFinanceiro {
+  id: string;
+  tenantId: string;
+  descricao: string;
+  tipo: TipoLancamentoFinanceiro;
+  categoriaId: string;
+  categoriaNome: string;
+  valor: number;
+  dataCompetencia: string; // YYYY-MM-DD (para regime de competência no DRE)
+  dataVencimento?: string; // YYYY-MM-DD (para controle de contas a pagar/receber)
+  dataPagamento?: string;  // YYYY-MM-DD (quando efetivamente pago/recebido para fluxo de caixa)
+  formaPagamento: FormaPagamentoFinanceiro;
+  status: StatusLancamentoFinanceiro;
+  fornecedorBeneficiario?: string;
+  observacoes?: string;
+  comprovanteNome?: string;
+  comprovanteUrl?: string; // Base64 ou URL do arquivo anexado
+  origem: OrigemLancamentoFinanceiro;
+  origemId?: string; // ID do pedido PDV, nota fiscal ou compra de estoque
+  recorrenciaId?: string; // ID da regra de recorrência que gerou
+  parcelaInfo?: string; // Ex: "1/12"
+  historicoAlteracoes?: HistoricoAlteracaoFinanceira[];
+  cadastradoPor: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export type FrequenciaRecorrencia = 'semanal' | 'mensal' | 'anual';
+export type TipoValorRecorrente = 'fixo' | 'variavel';
+
+export interface LancamentoRecorrente {
+  id: string;
+  tenantId: string;
+  descricao: string;
+  tipo: TipoLancamentoFinanceiro;
+  categoriaId: string;
+  categoriaNome: string;
+  valorEstimado: number;
+  tipoValor: TipoValorRecorrente;
+  frequencia: FrequenciaRecorrencia;
+  dataInicio: string;    // YYYY-MM-DD
+  dataTermino?: string;  // YYYY-MM-DD (opcional)
+  diaVencimento: number; // Dia do mês (1 a 31) ou dia da semana (0 a 6)
+  formaPagamento: FormaPagamentoFinanceiro;
+  fornecedorBeneficiario?: string;
+  ativo: boolean;
+  observacoes?: string;
+  cadastradoPor: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+// -------------------------------------------------------------
 // NOTAS FISCAIS & DOCUMENTOS FISCAIS (NF-e, NFC-e, NFS-e)
 // -------------------------------------------------------------
 export type TipoNotaFiscal =
