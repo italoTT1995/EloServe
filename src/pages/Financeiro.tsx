@@ -528,7 +528,9 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       </div>
 
       {/* Barra de Sub-Abas do Módulo Financeiro */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+      <div className={`flex flex-wrap items-center justify-between gap-2 border-b pb-2 ${
+        isWhite ? 'border-slate-200' : 'border-slate-800'
+      }`}>
         <div className="flex items-center gap-1.5 flex-wrap">
           {/* Sub-Aba 1: Visão Geral & Lançamentos */}
           <button
@@ -537,6 +539,8 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               subAba === 'dashboard'
                 ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-black'
+                : isWhite
+                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
@@ -544,7 +548,11 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             <span>1. Visão Geral & Lançamentos</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                subAba === 'dashboard' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
+                subAba === 'dashboard'
+                  ? 'bg-white/20 !text-white'
+                  : isWhite
+                  ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                  : 'bg-slate-800 text-slate-400'
               }`}
             >
               {todosLancamentos.length}
@@ -558,6 +566,8 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               subAba === 'recorrencias'
                 ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-black'
+                : isWhite
+                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
@@ -565,7 +575,11 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             <span>2. Despesas Recorrentes</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                subAba === 'recorrencias' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
+                subAba === 'recorrencias'
+                  ? 'bg-white/20 !text-white'
+                  : isWhite
+                  ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                  : 'bg-slate-800 text-slate-400'
               }`}
             >
               {todasRecorrencias.length}
@@ -579,6 +593,8 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               subAba === 'dre'
                 ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-black'
+                : isWhite
+                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
@@ -596,6 +612,8 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               subAba === 'notas_fiscais'
                 ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-black'
+                : isWhite
+                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
@@ -603,7 +621,11 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             <span>4. Notas Fiscais & XML</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                subAba === 'notas_fiscais' ? 'bg-white/20 !text-white' : 'bg-slate-800 text-slate-400'
+                subAba === 'notas_fiscais'
+                  ? 'bg-white/20 !text-white'
+                  : isWhite
+                  ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                  : 'bg-slate-800 text-slate-400'
               }`}
             >
               {todasNotasFiscais.length}
@@ -957,25 +979,40 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
 
       {/* Modal Importar XML SEFAZ */}
       {modalImportarXmlAberto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1E293B] border border-slate-700 w-full max-w-xl rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
-              <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className={`border w-full max-w-xl rounded-3xl p-6 shadow-2xl space-y-4 ${
+            isWhite ? 'bg-white border-slate-200 text-slate-800' : 'bg-[#1E293B] border-slate-700 text-white'
+          }`}>
+            <div className={`flex items-center justify-between border-b pb-3 ${
+              isWhite ? 'border-slate-200' : 'border-slate-700'
+            }`}>
+              <h3 className={`text-sm font-extrabold flex items-center gap-2 ${
+                isWhite ? 'text-slate-900' : 'text-white'
+              }`}>
                 <Upload className="w-4 h-4 text-[#FF6B00]" />
                 <span>Importar Arquivo XML da SEFAZ</span>
               </h3>
-              <button onClick={() => setModalImportarXmlAberto(false)} className="text-slate-400 hover:text-white">
+              <button
+                onClick={() => setModalImportarXmlAberto(false)}
+                className={`transition-colors ${
+                  isWhite ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'
+                }`}
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-700 hover:border-[#FF6B00] bg-[#0F172A] rounded-2xl p-6 text-center cursor-pointer"
+              className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-colors ${
+                isWhite
+                  ? 'border-slate-300 hover:border-[#FF6B00] bg-slate-50'
+                  : 'border-slate-700 hover:border-[#FF6B00] bg-[#0F172A]'
+              }`}
             >
               <input ref={fileInputRef} type="file" accept=".xml" onChange={handleUploadXml} className="hidden" />
-              <Upload className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-              <p className="text-xs font-bold text-white">
+              <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p className={`text-xs font-bold ${isWhite ? 'text-slate-800' : 'text-white'}`}>
                 {nomeArquivoXmlSelecionado ? (
                   <span className="text-[#10B981]">{nomeArquivoXmlSelecionado}</span>
                 ) : (
@@ -985,7 +1022,11 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-400 block mb-1">Ou cole o texto XML abaixo:</label>
+              <label className={`text-[11px] font-bold block mb-1 ${
+                isWhite ? 'text-slate-600' : 'text-slate-400'
+              }`}>
+                Ou cole o texto XML abaixo:
+              </label>
               <textarea
                 value={xmlInputTexto}
                 onChange={(e) => {
@@ -997,25 +1038,35 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
                 }}
                 rows={3}
                 placeholder="<nfeProc>...</nfeProc>"
-                className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono text-white"
+                className={`w-full px-3 py-2 rounded-xl text-xs font-mono border focus:outline-none focus:border-[#FF6B00] ${
+                  isWhite
+                    ? 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400'
+                    : 'bg-[#0F172A] border-slate-700 text-white placeholder:text-slate-500'
+                }`}
               />
             </div>
 
-            {erroXml && <p className="text-xs text-rose-400">{erroXml}</p>}
+            {erroXml && <p className="text-xs text-rose-500">{erroXml}</p>}
 
             {xmlPrevia && (
-              <div className="p-3 rounded-xl bg-[#0F172A] border border-[#10B981]/30 text-xs space-y-1">
+              <div className={`p-3 rounded-xl border text-xs space-y-1 ${
+                isWhite
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  : 'bg-[#0F172A] border-[#10B981]/30 text-white'
+              }`}>
                 <p className="text-[#10B981] font-bold">✓ NF-e #{xmlPrevia.numero} identificada</p>
-                <p className="text-slate-300">Fornecedor: {xmlPrevia.emitenteRazaoSocial}</p>
-                <p className="text-white font-mono font-bold">Valor: R$ {xmlPrevia.valorTotalNota.toFixed(2)}</p>
+                <p className={isWhite ? 'text-slate-600' : 'text-slate-300'}>Fornecedor: {xmlPrevia.emitenteRazaoSocial}</p>
+                <p className="font-mono font-bold">Valor: R$ {xmlPrevia.valorTotalNota.toFixed(2)}</p>
               </div>
             )}
 
-            <div className="flex gap-2 pt-2 border-t border-slate-700">
+            <div className={`flex gap-2 pt-2 border-t ${isWhite ? 'border-slate-200' : 'border-slate-700'}`}>
               <button
                 type="button"
                 onClick={() => setModalImportarXmlAberto(false)}
-                className="flex-1 py-2 rounded-xl border border-slate-700 text-xs text-slate-300"
+                className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-colors ${
+                  isWhite ? 'border-slate-300 text-slate-700 hover:bg-slate-100' : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                }`}
               >
                 Cancelar
               </button>
@@ -1023,7 +1074,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
                 type="button"
                 disabled={!xmlPrevia}
                 onClick={confirmarXml}
-                className="flex-1 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#E66000] text-white font-black text-xs disabled:opacity-50"
+                className="flex-1 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#E66000] text-white font-black text-xs disabled:opacity-50 transition-all cursor-pointer"
               >
                 Confirmar & Lançar no DRE
               </button>
@@ -1034,22 +1085,39 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
 
       {/* Modal Lançar Nota Fiscal Manual */}
       {modalNFAberto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1E293B] border border-slate-700 w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-3.5">
-            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
-              <h3 className="text-sm font-extrabold text-white">Lançar Nota Fiscal Manualmente</h3>
-              <button onClick={() => setModalNFAberto(false)} className="text-slate-400 hover:text-white">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className={`border w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-3.5 ${
+            isWhite ? 'bg-white border-slate-200 text-slate-800' : 'bg-[#1E293B] border-slate-700 text-white'
+          }`}>
+            <div className={`flex items-center justify-between border-b pb-3 ${
+              isWhite ? 'border-slate-200' : 'border-slate-700'
+            }`}>
+              <h3 className={`text-sm font-extrabold ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                Lançar Nota Fiscal Manualmente
+              </h3>
+              <button
+                onClick={() => setModalNFAberto(false)}
+                className={`transition-colors ${
+                  isWhite ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'
+                }`}
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSalvarNF} className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Tipo da Nota (Linha DRE) *</label>
+                <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                  Tipo da Nota (Linha DRE) *
+                </label>
                 <select
                   value={formNF.tipo}
                   onChange={(e) => setFormNF({ ...formNF, tipo: e.target.value as any })}
-                  className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white"
+                  className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-[#FF6B00] cursor-pointer ${
+                    isWhite
+                      ? 'bg-slate-50 border-slate-300 text-slate-900'
+                      : 'bg-[#0F172A] border-slate-700 text-white'
+                  }`}
                 >
                   <option value="entrada_insumos">🥩 Entrada: Insumos & Compras (CMV 4.0)</option>
                   <option value="entrada_embalagens">📦 Entrada: Embalagens Delivery (Comercial 6.3)</option>
@@ -1061,75 +1129,109 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Número da NF *</label>
+                  <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                    Número da NF *
+                  </label>
                   <input
                     type="text"
                     required
                     value={formNF.numero}
                     onChange={(e) => setFormNF({ ...formNF, numero: e.target.value })}
                     placeholder="Ex: 000185"
-                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono text-white"
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-mono border focus:outline-none focus:border-[#FF6B00] ${
+                      isWhite
+                        ? 'bg-slate-50 border-slate-300 text-slate-900'
+                        : 'bg-[#0F172A] border-slate-700 text-white'
+                    }`}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Data Emissão *</label>
+                  <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                    Data Emissão *
+                  </label>
                   <input
                     type="date"
                     required
                     value={formNF.dataEmissao}
                     onChange={(e) => setFormNF({ ...formNF, dataEmissao: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white"
+                    className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-[#FF6B00] ${
+                      isWhite
+                        ? 'bg-slate-50 border-slate-300 text-slate-900'
+                        : 'bg-[#0F172A] border-slate-700 text-white'
+                    }`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Razão Social do Fornecedor *</label>
+                <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                  Razão Social do Fornecedor *
+                </label>
                 <input
                   type="text"
                   required
                   value={formNF.emitenteRazaoSocial}
                   onChange={(e) => setFormNF({ ...formNF, emitenteRazaoSocial: e.target.value })}
                   placeholder="Nome da empresa fornecedora"
-                  className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs text-white"
+                  className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-[#FF6B00] ${
+                    isWhite
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400'
+                      : 'bg-[#0F172A] border-slate-700 text-white placeholder:text-slate-500'
+                  }`}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Valor Total da NF *</label>
+                  <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                    Valor Total da NF *
+                  </label>
                   <input
                     type="text"
                     required
                     value={formNF.valorTotalNota}
                     onChange={(e) => setFormNF({ ...formNF, valorTotalNota: e.target.value })}
                     placeholder="0,00"
-                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono font-bold text-white"
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-mono font-bold border focus:outline-none focus:border-[#FF6B00] ${
+                      isWhite
+                        ? 'bg-slate-50 border-slate-300 text-slate-900'
+                        : 'bg-[#0F172A] border-slate-700 text-white'
+                    }`}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">ICMS Destacado</label>
+                  <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                    ICMS Destacado
+                  </label>
                   <input
                     type="text"
                     value={formNF.valorIcms}
                     onChange={(e) => setFormNF({ ...formNF, valorIcms: e.target.value })}
                     placeholder="0,00"
-                    className="w-full px-3 py-2 bg-[#0F172A] border border-slate-700 rounded-xl text-xs font-mono text-white"
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-mono border focus:outline-none focus:border-[#FF6B00] ${
+                      isWhite
+                        ? 'bg-slate-50 border-slate-300 text-slate-900'
+                        : 'bg-[#0F172A] border-slate-700 text-white'
+                    }`}
                   />
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2 border-t border-slate-700">
+              <div className={`flex gap-2 pt-2 border-t ${isWhite ? 'border-slate-200' : 'border-slate-700'}`}>
                 <button
                   type="button"
                   onClick={() => setModalNFAberto(false)}
-                  className="flex-1 py-2 rounded-xl border border-slate-700 text-xs text-slate-300"
+                  className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-colors ${
+                    isWhite
+                      ? 'border-slate-300 text-slate-600 hover:bg-slate-100'
+                      : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                  }`}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#E66000] text-white font-black text-xs uppercase"
+                  className="flex-1 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#E66000] text-white font-black text-xs uppercase shadow-md transition-all cursor-pointer"
                 >
                   Salvar & Lançar no DRE
                 </button>
@@ -1141,44 +1243,55 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
 
       {/* Modal Visualizar DANFE */}
       {modalDanfeAberto && nfVisualizando && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1E293B] border border-slate-700 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className={`border w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-4 ${
+            isWhite ? 'bg-white border-slate-200 text-slate-800' : 'bg-[#1E293B] border-slate-700 text-white'
+          }`}>
+            <div className={`flex items-center justify-between border-b pb-3 ${
+              isWhite ? 'border-slate-200' : 'border-slate-700'
+            }`}>
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-[#FF6B00]" />
-                <h3 className="text-sm font-extrabold text-white">
+                <h3 className={`text-sm font-extrabold ${isWhite ? 'text-slate-900' : 'text-white'}`}>
                   DANFE Simplificado — NF-e #{nfVisualizando.numero}
                 </h3>
               </div>
-              <button onClick={() => setModalDanfeAberto(false)} className="text-slate-400 hover:text-white">
+              <button
+                onClick={() => setModalDanfeAberto(false)}
+                className={`transition-colors ${
+                  isWhite ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'
+                }`}
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="bg-[#0F172A] p-4 rounded-2xl border border-slate-800 space-y-3 text-xs font-mono">
-              <div className="flex justify-between border-b border-slate-800 pb-2">
+            <div className={`p-4 rounded-2xl border space-y-3 text-xs font-mono ${
+              isWhite ? 'bg-slate-50 border-slate-200' : 'bg-[#0F172A] border-slate-800'
+            }`}>
+              <div className={`flex justify-between border-b pb-2 ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
                 <div>
-                  <span className="text-slate-500 block text-[10px]">EMITENTE</span>
-                  <span className="text-white font-bold">{nfVisualizando.emitenteRazaoSocial}</span>
-                  <span className="text-slate-400 block text-[10px]">{nfVisualizando.emitenteCnpjCpf}</span>
+                  <span className={`block text-[10px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>EMITENTE</span>
+                  <span className={`font-bold ${isWhite ? 'text-slate-900' : 'text-white'}`}>{nfVisualizando.emitenteRazaoSocial}</span>
+                  <span className={`block text-[10px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>{nfVisualizando.emitenteCnpjCpf}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-slate-500 block text-[10px]">DATA DE EMISSÃO</span>
-                  <span className="text-white font-bold">{nfVisualizando.dataEmissao}</span>
-                  <span className="text-emerald-400 block text-[10px] uppercase font-bold">
+                  <span className={`block text-[10px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>DATA DE EMISSÃO</span>
+                  <span className={`font-bold ${isWhite ? 'text-slate-900' : 'text-white'}`}>{nfVisualizando.dataEmissao}</span>
+                  <span className="text-emerald-500 block text-[10px] uppercase font-bold">
                     ✓ {nfVisualizando.status}
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-2">
+              <div className={`grid grid-cols-2 gap-2 border-b pb-2 ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
                 <div>
-                  <span className="text-slate-500 block text-[10px]">VALOR DOS PRODUTOS</span>
-                  <span className="text-white font-bold">R$ {nfVisualizando.valorTotalProdutos.toFixed(2)}</span>
+                  <span className={`block text-[10px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>VALOR DOS PRODUTOS</span>
+                  <span className={`font-bold ${isWhite ? 'text-slate-900' : 'text-white'}`}>R$ {nfVisualizando.valorTotalProdutos.toFixed(2)}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-slate-500 block text-[10px]">VALOR TOTAL DA NOTA</span>
-                  <span className="text-emerald-400 font-bold text-sm">
+                  <span className={`block text-[10px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>VALOR TOTAL DA NOTA</span>
+                  <span className="text-emerald-500 font-bold text-sm">
                     R$ {nfVisualizando.valorTotalNota.toFixed(2)}
                   </span>
                 </div>
@@ -1186,17 +1299,19 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
 
               {nfVisualizando.chaveAcesso && (
                 <div>
-                  <span className="text-slate-500 block text-[10px]">CHAVE DE ACESSO (SEFAZ)</span>
-                  <span className="text-slate-300 text-[10px] break-all">{nfVisualizando.chaveAcesso}</span>
+                  <span className={`block text-[10px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>CHAVE DE ACESSO (SEFAZ)</span>
+                  <span className={`text-[10px] break-all ${isWhite ? 'text-slate-600' : 'text-slate-300'}`}>{nfVisualizando.chaveAcesso}</span>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-slate-700">
+            <div className={`flex justify-end pt-2 border-t ${isWhite ? 'border-slate-200' : 'border-slate-700'}`}>
               <button
                 type="button"
                 onClick={() => setModalDanfeAberto(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs"
+                className={`px-4 py-2 rounded-xl font-bold text-xs transition-colors ${
+                  isWhite ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-slate-800 hover:bg-slate-700 text-white'
+                }`}
               >
                 Fechar
               </button>

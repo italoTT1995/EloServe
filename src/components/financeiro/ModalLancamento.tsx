@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   TrendingUp,
   TrendingDown,
-  Sparkles,
 } from 'lucide-react';
 import {
   LancamentoFinanceiro,
@@ -152,25 +151,31 @@ export function ModalLancamento({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
       <div
         className={`w-full max-w-lg rounded-3xl shadow-2xl border flex flex-col max-h-[92vh] overflow-hidden ${
           isWhite ? 'bg-white border-slate-200 text-slate-800' : 'bg-[#1E293B] border-slate-700 text-white'
         }`}
       >
         {/* Header Simples */}
-        <div className="p-5 border-b border-slate-700/50 flex items-center justify-between">
+        <div
+          className={`p-5 border-b flex items-center justify-between ${
+            isWhite ? 'border-slate-200 bg-slate-50/80' : 'border-slate-700/50 bg-[#1E293B]'
+          }`}
+        >
           <div className="flex items-center gap-2.5">
-            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center ${
-              tipo === 'despesa' ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
-            }`}>
+            <div
+              className={`w-9 h-9 rounded-2xl flex items-center justify-center ${
+                tipo === 'despesa' ? 'bg-rose-500/15 text-rose-500' : 'bg-emerald-500/15 text-emerald-500'
+              }`}
+            >
               {tipo === 'despesa' ? <TrendingDown className="w-5 h-5" /> : <TrendingUp className="w-5 h-5" />}
             </div>
             <div>
-              <h2 className="text-base font-black">
+              <h2 className={`text-base font-black ${isWhite ? 'text-slate-900' : 'text-white'}`}>
                 {lancamentoEmEdicao ? 'Editar Lançamento' : '+ Adicionar Lançamento'}
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                 {tipo === 'despesa' ? 'Registre um gasto ou custo do restaurante' : 'Registre uma receita ou entrada'}
               </p>
             </div>
@@ -178,7 +183,11 @@ export function ModalLancamento({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className={`p-2 rounded-xl transition-colors ${
+              isWhite
+                ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
           >
             <X className="w-5 h-5" />
           </button>
@@ -187,7 +196,11 @@ export function ModalLancamento({
         {/* Formulário Rápido e Descomplicado */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
           {/* 1. Tipo: Despesa ou Receita */}
-          <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-900/60 border border-slate-800">
+          <div
+            className={`grid grid-cols-2 gap-2 p-1 rounded-2xl border ${
+              isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-900/60 border-slate-800'
+            }`}
+          >
             <button
               type="button"
               onClick={() => {
@@ -197,6 +210,8 @@ export function ModalLancamento({
               className={`py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 tipo === 'despesa'
                   ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
+                  : isWhite
+                  ? 'text-slate-600 hover:text-slate-900'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -213,6 +228,8 @@ export function ModalLancamento({
               className={`py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 tipo === 'receita'
                   ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                  : isWhite
+                  ? 'text-slate-600 hover:text-slate-900'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -223,7 +240,7 @@ export function ModalLancamento({
 
           {/* 2. Descrição */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1">
+            <label className={`block text-xs font-bold mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
               Descrição *
             </label>
             <input
@@ -234,7 +251,9 @@ export function ModalLancamento({
               onChange={(e) => setDescricao(e.target.value)}
               placeholder={tipo === 'despesa' ? 'Ex: Compra de carnes, Pagamento de garçom, Conta de luz...' : 'Ex: Vendas de eventos, Locação do espaço...'}
               className={`w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold border focus:outline-none focus:border-[#FF6B00] ${
-                isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-[#0F172A] border-slate-700 text-white'
+                isWhite
+                  ? 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400'
+                  : 'bg-[#0F172A] border-slate-700 text-white placeholder:text-slate-500'
               }`}
             />
           </div>
@@ -242,11 +261,13 @@ export function ModalLancamento({
           {/* 3. Valor & Data (Lado a Lado) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
+              <label className={`block text-xs font-bold mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
                 Valor (R$) *
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-2.5 text-sm font-bold text-slate-400">R$</span>
+                <span className={`absolute left-3.5 top-2.5 text-sm font-bold ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                  R$
+                </span>
                 <input
                   type="text"
                   required
@@ -254,14 +275,16 @@ export function ModalLancamento({
                   onChange={(e) => setValor(e.target.value)}
                   placeholder="0,00"
                   className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-base font-black font-mono border focus:outline-none focus:border-[#FF6B00] ${
-                    isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-[#0F172A] border-slate-700 text-white'
+                    isWhite
+                      ? 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400'
+                      : 'bg-[#0F172A] border-slate-700 text-white placeholder:text-slate-500'
                   }`}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
+              <label className={`block text-xs font-bold mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
                 Data *
               </label>
               <div className="relative">
@@ -271,7 +294,9 @@ export function ModalLancamento({
                   value={data}
                   onChange={(e) => setData(e.target.value)}
                   className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold border focus:outline-none focus:border-[#FF6B00] ${
-                    isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-[#0F172A] border-slate-700 text-white'
+                    isWhite
+                      ? 'bg-slate-50 border-slate-300 text-slate-900'
+                      : 'bg-[#0F172A] border-slate-700 text-white'
                   }`}
                 />
               </div>
@@ -280,7 +305,7 @@ export function ModalLancamento({
 
           {/* 4. Categoria (6 opções simplificadas) */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5">
+            <label className={`block text-xs font-bold mb-1.5 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
               Categoria *
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -293,7 +318,7 @@ export function ModalLancamento({
                     categoriaId === cat.id
                       ? 'bg-[#FF6B00] !text-white border-[#FF6B00] shadow-md shadow-[#FF6B00]/30 font-black scale-[1.02]'
                       : isWhite
-                      ? 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-400'
+                      ? 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-400 hover:bg-slate-100'
                       : 'bg-[#0F172A] border-slate-700 text-slate-300 hover:border-slate-500'
                   }`}
                 >
@@ -306,13 +331,13 @@ export function ModalLancamento({
 
           {/* 5. Recorrência (Não se repete, Semanal, Mensal, Anual) */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+            <label className={`block text-xs font-bold mb-1.5 flex items-center justify-between ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
               <span className="flex items-center gap-1.5">
                 <Repeat className="w-3.5 h-3.5 text-[#FF6B00]" />
                 <span>Essa despesa é recorrente?</span>
               </span>
               {recorrencia !== 'nao_se_repete' && (
-                <span className="text-[10px] text-amber-400 font-bold">
+                <span className="text-[10px] text-amber-500 font-bold">
                   ⚡ O sistema gerará os próximos meses automaticamente
                 </span>
               )}
@@ -332,7 +357,7 @@ export function ModalLancamento({
                     recorrencia === rec.id
                       ? 'bg-purple-600 !text-white border-purple-500 shadow-md font-black'
                       : isWhite
-                      ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                       : 'bg-[#0F172A] border-slate-700 text-slate-400 hover:text-white'
                   }`}
                 >
@@ -354,12 +379,14 @@ export function ModalLancamento({
             </button>
 
             {mostrarMaisOpcoes && (
-              <div className={`mt-3 p-3.5 rounded-2xl border space-y-3 animate-fadeIn text-xs ${
-                isWhite ? 'bg-slate-50 border-slate-200' : 'bg-[#0F172A] border-slate-800'
-              }`}>
+              <div
+                className={`mt-3 p-3.5 rounded-2xl border space-y-3 animate-fadeIn text-xs ${
+                  isWhite ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#0F172A] border-slate-800 text-white'
+                }`}
+              >
                 {/* Fornecedor / Beneficiário */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                  <label className={`block text-[11px] font-bold mb-1 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
                     Fornecedor ou Beneficiário (Opcional)
                   </label>
                   <input
@@ -367,8 +394,10 @@ export function ModalLancamento({
                     value={fornecedor}
                     onChange={(e) => setFornecedor(e.target.value)}
                     placeholder="Ex: Frigorífico Boi Gordo, Imobiliária, CPFL..."
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      isWhite ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
+                    className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-[#FF6B00] ${
+                      isWhite
+                        ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'
+                        : 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500'
                     }`}
                   />
                 </div>
@@ -376,14 +405,16 @@ export function ModalLancamento({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Forma de Pagamento */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                    <label className={`block text-[11px] font-bold mb-1 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
                       Forma de Pagamento
                     </label>
                     <select
                       value={formaPagamento}
                       onChange={(e) => setFormaPagamento(e.target.value as any)}
-                      className={`w-full px-3 py-2 rounded-xl border font-semibold ${
-                        isWhite ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
+                      className={`w-full px-3 py-2 rounded-xl border font-semibold focus:outline-none focus:border-[#FF6B00] cursor-pointer ${
+                        isWhite
+                          ? 'bg-white border-slate-300 text-slate-900'
+                          : 'bg-slate-900 border-slate-700 text-white'
                       }`}
                     >
                       <option value="pix">PIX</option>
@@ -405,7 +436,7 @@ export function ModalLancamento({
                         onChange={(e) => setJaEstaPago(e.target.checked)}
                         className="w-4 h-4 rounded text-[#FF6B00] focus:ring-0 cursor-pointer"
                       />
-                      <span className="text-xs font-bold text-slate-300">
+                      <span className={`text-xs font-bold ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
                         {tipo === 'despesa' ? 'Já foi pago (Quitado)' : 'Já foi recebido'}
                       </span>
                     </label>
@@ -414,7 +445,7 @@ export function ModalLancamento({
 
                 {/* Observações */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                  <label className={`block text-[11px] font-bold mb-1 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
                     Observações
                   </label>
                   <input
@@ -422,8 +453,10 @@ export function ModalLancamento({
                     value={observacoes}
                     onChange={(e) => setObservacoes(e.target.value)}
                     placeholder="Informações adicionais se desejar..."
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      isWhite ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
+                    className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-[#FF6B00] ${
+                      isWhite
+                        ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'
+                        : 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500'
                     }`}
                   />
                 </div>
@@ -432,11 +465,19 @@ export function ModalLancamento({
           </div>
 
           {/* Botões de Ação */}
-          <div className="pt-3 border-t border-slate-700/50 flex items-center justify-end gap-2.5">
+          <div
+            className={`pt-3 border-t flex items-center justify-end gap-2.5 ${
+              isWhite ? 'border-slate-200' : 'border-slate-700/50'
+            }`}
+          >
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white font-bold text-xs transition-colors"
+              className={`px-4 py-2.5 rounded-xl border font-bold text-xs transition-colors ${
+                isWhite
+                  ? 'border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  : 'border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
             >
               Cancelar
             </button>

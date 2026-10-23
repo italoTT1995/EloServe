@@ -787,17 +787,19 @@ export function DRESection({
             </div>
 
             {/* LINHA 9: RESULTADO FINANCEIRO */}
-            <div className="p-4 bg-slate-800/40 border-l-4 border-l-slate-500 flex items-center justify-between font-sans">
+            <div className={`p-4 border-l-4 border-l-slate-400 flex items-center justify-between font-sans ${
+              isWhite ? 'bg-slate-50' : 'bg-slate-800/40'
+            }`}>
               <div>
-                <span className="font-black text-sm text-slate-300 block">
+                <span className={`font-black text-sm block ${isWhite ? 'text-slate-800' : 'text-slate-300'}`}>
                   9. (+/-) RESULTADO FINANCEIRO LÍQUIDO
                 </span>
-                <span className="text-[11px] text-slate-400">
+                <span className={`text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                   Juros auferidos (-) Taxas de adquirência bancária e antecipação
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-sm font-black text-slate-200 font-mono">
+                <span className={`text-sm font-black font-mono ${isWhite ? 'text-slate-900' : 'text-slate-200'}`}>
                   {dadosDRE.resultadoFinanceiro >= 0 ? '+ ' : ''}
                   R$ {dadosDRE.resultadoFinanceiro.toFixed(2)}
                 </span>
@@ -864,10 +866,10 @@ export function DRESection({
                   <th className="py-3 px-4 text-right">Variação (Mês Atual vs Anterior)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
+              <tbody className={`divide-y ${isWhite ? 'divide-slate-200' : 'divide-slate-800/50'}`}>
                 {/* 1. Receita Bruta */}
                 <tr>
-                  <td className="py-3 px-4 font-bold text-slate-200 font-sans">
+                  <td className={`py-3 px-4 font-bold font-sans ${isWhite ? 'text-slate-900' : 'text-slate-200'}`}>
                     1. Receita Operacional Bruta
                   </td>
                   {comparativoMeses.map((m, idx) => (
@@ -875,7 +877,7 @@ export function DRESection({
                       R$ {m.receitaBrutaTotal.toFixed(2)}
                     </td>
                   ))}
-                  <td className="py-3 px-4 text-right font-bold text-slate-300">
+                  <td className={`py-3 px-4 text-right font-bold ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
                     {(() => {
                       const m0 = comparativoMeses[1]?.receitaBrutaTotal || 1;
                       const m1 = comparativoMeses[2]?.receitaBrutaTotal || 0;
@@ -892,13 +894,13 @@ export function DRESection({
 
                 {/* 2. Deduções */}
                 <tr>
-                  <td className="py-3 px-4 text-slate-400 font-sans">2. (-) Deduções da Receita</td>
+                  <td className={`py-3 px-4 font-sans ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>2. (-) Deduções da Receita</td>
                   {comparativoMeses.map((m, idx) => (
                     <td key={idx} className="py-3 px-4 text-right text-rose-400">
                       - R$ {m.totalDeducoes.toFixed(2)}
                     </td>
                   ))}
-                  <td className="py-3 px-4 text-right text-slate-400">-</td>
+                  <td className={`py-3 px-4 text-right ${isWhite ? 'text-slate-400' : 'text-slate-500'}`}>-</td>
                 </tr>
 
                 {/* 3. Receita Líquida */}
@@ -911,79 +913,79 @@ export function DRESection({
                       R$ {m.receitaLiquida.toFixed(2)}
                     </td>
                   ))}
-                  <td className="py-3 px-4 text-right font-black text-blue-300">100%</td>
+                  <td className={`py-3 px-4 text-right font-black ${isWhite ? 'text-blue-600' : 'text-blue-300'}`}>100%</td>
                 </tr>
 
                 {/* 4. CMV */}
                 <tr>
-                  <td className="py-3 px-4 text-amber-400 font-sans">4. (-) CMV (Insumos)</td>
+                  <td className="py-3 px-4 text-amber-500 font-sans font-bold">4. (-) CMV (Insumos)</td>
                   {comparativoMeses.map((m, idx) => (
-                    <td key={idx} className="py-3 px-4 text-right text-amber-400 font-bold">
+                    <td key={idx} className="py-3 px-4 text-right text-amber-500 font-bold">
                       - R$ {m.cmvFinal.toFixed(2)} ({m.cmvPct.toFixed(0)}%)
                     </td>
                   ))}
-                  <td className="py-3 px-4 text-right text-slate-400">-</td>
+                  <td className={`py-3 px-4 text-right ${isWhite ? 'text-slate-400' : 'text-slate-500'}`}>-</td>
                 </tr>
 
                 {/* 5. Lucro Bruto */}
                 <tr className="bg-emerald-500/10">
-                  <td className="py-3 px-4 font-black text-emerald-400 font-sans">
+                  <td className="py-3 px-4 font-black text-emerald-500 font-sans">
                     5. (=) Lucro Bruto
                   </td>
                   {comparativoMeses.map((m, idx) => (
-                    <td key={idx} className="py-3 px-4 text-right text-emerald-400 font-black">
+                    <td key={idx} className="py-3 px-4 text-right text-emerald-500 font-black">
                       R$ {m.lucroBruto.toFixed(2)} ({m.margemBrutaPct.toFixed(0)}%)
                     </td>
                   ))}
-                  <td className="py-3 px-4 text-right text-slate-400">-</td>
+                  <td className={`py-3 px-4 text-right ${isWhite ? 'text-slate-400' : 'text-slate-500'}`}>-</td>
                 </tr>
 
                 {/* 6. Pessoal */}
                 <tr>
-                  <td className="py-3 px-4 text-slate-300 font-sans">6. (-) Pessoal & Salários</td>
+                  <td className={`py-3 px-4 font-sans ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>6. (-) Pessoal & Salários</td>
                   {comparativoMeses.map((m, idx) => (
-                    <td key={idx} className="py-3 px-4 text-right text-slate-300">
+                    <td key={idx} className={`py-3 px-4 text-right ${isWhite ? 'text-slate-800' : 'text-slate-300'}`}>
                       - R$ {m.despesasPessoal.toFixed(2)}
                     </td>
                   ))}
-                  <td className="py-3 px-4 text-right text-slate-400">-</td>
+                  <td className={`py-3 px-4 text-right ${isWhite ? 'text-slate-400' : 'text-slate-500'}`}>-</td>
                 </tr>
 
                 {/* 7. Despesas Operacionais */}
                 <tr>
-                  <td className="py-3 px-4 text-slate-300 font-sans">
+                  <td className={`py-3 px-4 font-sans ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
                     7. (-) Despesas Operacionais
                   </td>
                   {comparativoMeses.map((m, idx) => (
-                    <td key={idx} className="py-3 px-4 text-right text-slate-300">
+                    <td key={idx} className={`py-3 px-4 text-right ${isWhite ? 'text-slate-800' : 'text-slate-300'}`}>
                       - R$ {(m.totalDespesasOperacionais - m.despesasPessoal).toFixed(2)}
                     </td>
                   ))}
-                  <td className="py-3 px-4 text-right text-slate-400">-</td>
+                  <td className={`py-3 px-4 text-right ${isWhite ? 'text-slate-400' : 'text-slate-500'}`}>-</td>
                 </tr>
 
                 {/* 10. Lucro Líquido */}
-                <tr className="bg-slate-800/80">
-                  <td className="py-3.5 px-4 font-black text-sm text-slate-100 font-sans">
+                <tr className={isWhite ? 'bg-slate-100/90' : 'bg-slate-800/80'}>
+                  <td className={`py-3.5 px-4 font-black text-sm font-sans ${isWhite ? 'text-slate-900' : 'text-slate-100'}`}>
                     10. (=) Resultado Líquido Final
                   </td>
                   {comparativoMeses.map((m, idx) => (
                     <td
                       key={idx}
                       className={`py-3.5 px-4 text-right font-black text-sm ${
-                        m.lucroLiquidoFinal >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                        m.lucroLiquidoFinal >= 0 ? 'text-emerald-500' : 'text-rose-500'
                       }`}
                     >
                       R$ {m.lucroLiquidoFinal.toFixed(2)}
                     </td>
                   ))}
-                  <td className="py-3.5 px-4 text-right font-bold text-slate-200">
+                  <td className={`py-3.5 px-4 text-right font-bold ${isWhite ? 'text-slate-900' : 'text-slate-200'}`}>
                     {(() => {
                       const m0 = comparativoMeses[1]?.lucroLiquidoFinal || 1;
                       const m1 = comparativoMeses[2]?.lucroLiquidoFinal || 0;
                       const varPct = ((m1 - m0) / Math.abs(m0)) * 100;
                       return (
-                        <span className={varPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                        <span className={varPct >= 0 ? 'text-emerald-500' : 'text-rose-500'}>
                           {varPct >= 0 ? '+' : ''}
                           {varPct.toFixed(1)}%
                         </span>

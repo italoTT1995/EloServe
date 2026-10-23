@@ -235,7 +235,7 @@ export function DashboardFinanceiro({
         }`}
       >
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 text-slate-400">
+          <div className={`flex items-center gap-2 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
             <Calendar className="w-4 h-4 text-[#FF6B00]" />
             <span className="text-xs font-bold uppercase tracking-wider">Período:</span>
           </div>
@@ -292,16 +292,16 @@ export function DashboardFinanceiro({
       {!dados.temDados ? (
         <div
           className={`p-12 rounded-3xl border text-center ${
-            isWhite ? 'bg-white border-slate-200' : 'bg-[#1E293B] border-slate-800'
+            isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800 shadow-lg'
           }`}
         >
           <div className="w-16 h-16 rounded-3xl bg-amber-500/15 text-amber-500 flex items-center justify-center mx-auto mb-4">
             <DollarSign className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-black text-slate-100">
+          <h3 className={`text-lg font-black ${isWhite ? 'text-slate-900' : 'text-slate-100'}`}>
             Nenhum lançamento encontrado em {nomePeriodoExibicao}
           </h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto mt-2 leading-relaxed">
+          <p className={`text-xs max-w-md mx-auto mt-2 leading-relaxed ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
             Seus indicadores começam zerados. Cadastre os gastos do seu restaurante (alimentos, contas, salários, aluguel) ou novas receitas para acompanhar os resultados automaticamente.
           </p>
           <div className="mt-6 flex items-center justify-center gap-3">
@@ -326,18 +326,22 @@ export function DashboardFinanceiro({
               }`}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Receitas</span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-400">
+                <span className={`text-xs font-bold uppercase tracking-wider ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Receitas
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-500">
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-emerald-400 tracking-tight">
+              <div className="text-2xl font-black text-emerald-500 tracking-tight">
                 R$ {dados.totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between text-[11px] text-slate-400">
+              <div className={`mt-3 pt-3 border-t flex items-center justify-between text-[11px] ${
+                isWhite ? 'border-slate-100 text-slate-500' : 'border-slate-700/50 text-slate-400'
+              }`}>
                 <span>Recebidas: R$ {dados.totalReceitasRecebidas.toFixed(2)}</span>
                 {dados.totalReceitasPendentes > 0 && (
-                  <span className="text-amber-400 font-bold">
+                  <span className="text-amber-500 font-bold">
                     Pendente: R$ {dados.totalReceitasPendentes.toFixed(2)}
                   </span>
                 )}
@@ -351,18 +355,22 @@ export function DashboardFinanceiro({
               }`}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Despesas</span>
-                <div className="w-8 h-8 rounded-xl bg-rose-500/15 flex items-center justify-center text-rose-400">
+                <span className={`text-xs font-bold uppercase tracking-wider ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Despesas
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-rose-500/15 flex items-center justify-center text-rose-500">
                   <TrendingDown className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-rose-400 tracking-tight">
+              <div className="text-2xl font-black text-rose-500 tracking-tight">
                 R$ {dados.totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between text-[11px] text-slate-400">
+              <div className={`mt-3 pt-3 border-t flex items-center justify-between text-[11px] ${
+                isWhite ? 'border-slate-100 text-slate-500' : 'border-slate-700/50 text-slate-400'
+              }`}>
                 <span>Pagas: R$ {dados.totalDespesasPagas.toFixed(2)}</span>
                 {dados.totalDespesasPendentes > 0 && (
-                  <span className="text-rose-400 font-bold">
+                  <span className="text-rose-500 font-bold">
                     A pagar: R$ {dados.totalDespesasPendentes.toFixed(2)}
                   </span>
                 )}
@@ -376,10 +384,12 @@ export function DashboardFinanceiro({
               }`}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Resultado Estimado</span>
+                <span className={`text-xs font-bold uppercase tracking-wider ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Resultado Estimado
+                </span>
                 <div
                   className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                    dados.resultadoEstimado >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'
+                    dados.resultadoEstimado >= 0 ? 'bg-emerald-500/15 text-emerald-500' : 'bg-rose-500/15 text-rose-500'
                   }`}
                 >
                   <DollarSign className="w-4 h-4" />
@@ -387,17 +397,19 @@ export function DashboardFinanceiro({
               </div>
               <div
                 className={`text-2xl font-black tracking-tight ${
-                  dados.resultadoEstimado >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  dados.resultadoEstimado >= 0 ? 'text-emerald-500' : 'text-rose-500'
                 }`}
               >
                 R$ {dados.resultadoEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between text-[11px] text-slate-400">
+              <div className={`mt-3 pt-3 border-t flex items-center justify-between text-[11px] ${
+                isWhite ? 'border-slate-100 text-slate-500' : 'border-slate-700/50 text-slate-400'
+              }`}>
                 <span>{dados.resultadoEstimado >= 0 ? 'Lucro estimado' : 'Déficit no período'}</span>
                 <button
                   type="button"
                   onClick={onIrParaDRE}
-                  className="text-[#FF6B00] font-bold hover:underline flex items-center gap-0.5"
+                  className="text-[#FF6B00] font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
                 >
                   <span>Ver DRE</span>
                   <ChevronRight className="w-3 h-3" />
@@ -412,17 +424,21 @@ export function DashboardFinanceiro({
               }`}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Contas Pendentes</span>
-                <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-400">
+                <span className={`text-xs font-bold uppercase tracking-wider ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Contas Pendentes
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-500">
                   <Clock className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-amber-400 tracking-tight">
+              <div className="text-2xl font-black text-amber-500 tracking-tight">
                 R$ {dados.totalDespesasPendentes.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between text-[11px] text-slate-400">
+              <div className={`mt-3 pt-3 border-t flex items-center justify-between text-[11px] ${
+                isWhite ? 'border-slate-100 text-slate-500' : 'border-slate-700/50 text-slate-400'
+              }`}>
                 <span>{dados.contasPendentes.length} conta(s) a pagar</span>
-                <span className="text-slate-500 font-mono">Aguardando baixa</span>
+                <span className={`font-mono ${isWhite ? 'text-slate-400' : 'text-slate-500'}`}>Aguardando baixa</span>
               </div>
             </div>
           </div>
@@ -437,13 +453,15 @@ export function DashboardFinanceiro({
             >
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h3 className="text-sm font-black text-slate-100 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  <h3 className={`text-sm font-black flex items-center gap-2 ${isWhite ? 'text-slate-900' : 'text-slate-100'}`}>
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
                     <span>Comparativo: Receitas vs Despesas</span>
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Visão consolidada do período selecionado</p>
+                  <p className={`text-xs mt-0.5 ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>Visão consolidada do período selecionado</p>
                 </div>
-                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                  isWhite ? 'bg-slate-100 text-slate-700 border border-slate-200' : 'bg-slate-800 text-slate-300'
+                }`}>
                   {nomePeriodoExibicao}
                 </span>
               </div>
@@ -452,11 +470,11 @@ export function DashboardFinanceiro({
               <div className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-emerald-400 flex items-center gap-1.5">
+                    <span className="text-emerald-500 flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
                       Receitas (R$ {dados.totalReceitas.toFixed(2)})
                     </span>
-                    <span className="text-rose-400 flex items-center gap-1.5">
+                    <span className="text-rose-500 flex items-center gap-1.5">
                       Despesas (R$ {dados.totalDespesas.toFixed(2)})
                       <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
                     </span>
@@ -469,7 +487,9 @@ export function DashboardFinanceiro({
                     const pctDespesa = totalGeral > 0 ? (dados.totalDespesas / totalGeral) * 100 : 50;
 
                     return (
-                      <div className="w-full h-4 rounded-full bg-slate-800 overflow-hidden flex shadow-inner">
+                      <div className={`w-full h-4 rounded-full overflow-hidden flex shadow-inner ${
+                        isWhite ? 'bg-slate-100' : 'bg-slate-800'
+                      }`}>
                         <div
                           className="h-full bg-emerald-500 transition-all duration-500"
                           style={{ width: `${pctReceita}%` }}
@@ -486,16 +506,20 @@ export function DashboardFinanceiro({
                 </div>
 
                 {/* Resumo Numérico Limpo */}
-                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 grid grid-cols-2 gap-3 text-xs">
+                <div
+                  className={`p-4 rounded-2xl border grid grid-cols-2 gap-3 text-xs ${
+                    isWhite ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'
+                  }`}
+                >
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Vendas no PDV</span>
-                    <span className="text-sm font-black text-emerald-400">
+                    <span className={`text-[11px] block ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>Vendas no PDV</span>
+                    <span className="text-sm font-black text-emerald-500">
                       R$ {dados.totalVendasPDV.toFixed(2)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Saldo Real em Caixa</span>
-                    <span className={`text-sm font-black ${dados.saldoEfetivoCaixa >= 0 ? 'text-[#10B981]' : 'text-rose-400'}`}>
+                    <span className={`text-[11px] block ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>Saldo Real em Caixa</span>
+                    <span className={`text-sm font-black ${dados.saldoEfetivoCaixa >= 0 ? 'text-[#10B981]' : 'text-rose-500'}`}>
                       R$ {dados.saldoEfetivoCaixa.toFixed(2)}
                     </span>
                   </div>
@@ -511,19 +535,19 @@ export function DashboardFinanceiro({
             >
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-sm font-black text-slate-100 flex items-center gap-2">
+                  <h3 className={`text-sm font-black flex items-center gap-2 ${isWhite ? 'text-slate-900' : 'text-slate-100'}`}>
                     <PieChart className="w-4 h-4 text-[#FF6B00]" />
                     <span>Gastos por Categoria</span>
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Onde o dinheiro está sendo gasto</p>
+                  <p className={`text-xs mt-0.5 ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>Onde o dinheiro está sendo gasto</p>
                 </div>
-                <span className="text-xs text-slate-400 font-bold">
+                <span className={`text-xs font-bold ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
                   {dados.categoriasOrdenadas.length} categorias
                 </span>
               </div>
 
               {dados.categoriasOrdenadas.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs">
+                <div className={`py-8 text-center text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                   Nenhuma despesa lançada neste período.
                 </div>
               ) : (
@@ -533,15 +557,17 @@ export function DashboardFinanceiro({
                     return (
                       <div key={cat.nome + idx} className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-slate-300 truncate max-w-[200px]">{cat.nome}</span>
+                          <span className={`font-bold truncate max-w-[200px] ${isWhite ? 'text-slate-800' : 'text-slate-300'}`}>
+                            {cat.nome}
+                          </span>
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-slate-400 font-mono">{pct.toFixed(1)}%</span>
-                            <span className="font-black text-slate-100">
+                            <span className={`text-[11px] font-mono ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>{pct.toFixed(1)}%</span>
+                            <span className={`font-black ${isWhite ? 'text-slate-900' : 'text-slate-100'}`}>
                               R$ {cat.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>
-                        <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                        <div className={`w-full h-2 rounded-full overflow-hidden ${isWhite ? 'bg-slate-100' : 'bg-slate-800'}`}>
                           <div
                             className="h-full bg-gradient-to-r from-[#FF6B00] to-amber-500 rounded-full transition-all duration-500"
                             style={{ width: `${Math.min(pct, 100)}%` }}
@@ -564,13 +590,15 @@ export function DashboardFinanceiro({
             {/* Header da Tabela com Filtros Rápidos & Busca */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
               <div>
-                <h3 className="text-sm font-black text-slate-100 flex items-center gap-2">
+                <h3 className={`text-sm font-black flex items-center gap-2 ${isWhite ? 'text-slate-900' : 'text-slate-100'}`}>
                   <span>Lançamentos de {nomePeriodoExibicao}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-mono ${
+                    isWhite ? 'bg-slate-100 text-slate-700 border border-slate-200' : 'bg-slate-800 text-slate-300'
+                  }`}>
                     {lancamentosTabela.length}
                   </span>
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className={`text-xs mt-0.5 ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                   Clique no status para alternar rapidamente entre Pago e Pendente
                 </p>
               </div>
@@ -578,20 +606,26 @@ export function DashboardFinanceiro({
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Campo de Busca */}
                 <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                  <Search className={`w-4 h-4 absolute left-3 top-2.5 ${isWhite ? 'text-slate-400' : 'text-slate-500'}`} />
                   <input
                     type="text"
                     placeholder="Buscar lançamento..."
                     value={buscaTexto}
                     onChange={(e) => setBuscaTexto(e.target.value)}
                     className={`pl-9 pr-3 py-1.5 rounded-xl text-xs font-semibold border focus:outline-none focus:border-[#FF6B00] ${
-                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-[#0F172A] border-slate-700 text-white'
+                      isWhite
+                        ? 'bg-slate-50 border-slate-300 text-slate-800 placeholder:text-slate-400'
+                        : 'bg-[#0F172A] border-slate-700 text-white placeholder:text-slate-500'
                     }`}
                   />
                 </div>
 
                 {/* Filtros de Tipo */}
-                <div className="flex items-center p-0.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+                <div
+                  className={`flex items-center p-0.5 rounded-xl border text-xs ${
+                    isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-900 border-slate-800'
+                  }`}
+                >
                   {(
                     [
                       { id: 'todos', label: 'Todos' },
@@ -607,6 +641,8 @@ export function DashboardFinanceiro({
                       className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                         filtroTipo === item.id
                           ? 'bg-[#FF6B00] text-white shadow-sm'
+                          : isWhite
+                          ? 'text-slate-600 hover:text-slate-900'
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
@@ -619,14 +655,16 @@ export function DashboardFinanceiro({
 
             {/* Listagem em Tabela */}
             {lancamentosTabela.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">
+              <div className={`py-8 text-center text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                 Nenhum lançamento correspondente ao filtro aplicado.
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-700/50 text-[11px] font-black uppercase text-slate-400">
+                    <tr className={`border-b text-[11px] font-black uppercase ${
+                      isWhite ? 'border-slate-200 text-slate-500' : 'border-slate-700/50 text-slate-400'
+                    }`}>
                       <th className="py-2.5 px-3">Data</th>
                       <th className="py-2.5 px-3">Descrição</th>
                       <th className="py-2.5 px-3">Categoria</th>
@@ -636,7 +674,7 @@ export function DashboardFinanceiro({
                       <th className="py-2.5 px-3 text-right">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-medium">
+                  <tbody className={`divide-y font-medium ${isWhite ? 'divide-slate-100' : 'divide-slate-800/60'}`}>
                     {lancamentosTabela.map((item) => {
                       const isDespesa = item.tipo === 'despesa';
                       const isPago = item.status === 'pago' || item.status === 'recebido';
@@ -644,18 +682,22 @@ export function DashboardFinanceiro({
                       return (
                         <tr
                           key={item.id}
-                          className="hover:bg-slate-800/40 transition-colors group"
+                          className={`transition-colors group ${
+                            isWhite ? 'hover:bg-slate-50/80' : 'hover:bg-slate-800/40'
+                          }`}
                         >
                           {/* Data */}
-                          <td className="py-3 px-3 font-mono text-slate-400 whitespace-nowrap">
+                          <td className={`py-3 px-3 font-mono whitespace-nowrap ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                             {item.dataCompetencia || item.dataVencimento || '-'}
                           </td>
 
                           {/* Descrição */}
                           <td className="py-3 px-3">
-                            <div className="font-bold text-slate-200">{item.descricao}</div>
+                            <div className={`font-bold ${isWhite ? 'text-slate-800' : 'text-slate-200'}`}>
+                              {item.descricao}
+                            </div>
                             {item.fornecedorBeneficiario && (
-                              <div className="text-[11px] text-slate-400">
+                              <div className={`text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                                 {item.fornecedorBeneficiario}
                               </div>
                             )}
@@ -663,7 +705,9 @@ export function DashboardFinanceiro({
 
                           {/* Categoria */}
                           <td className="py-3 px-3">
-                            <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 text-[11px] font-bold">
+                            <span className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                              isWhite ? 'bg-slate-100 text-slate-700 border border-slate-200' : 'bg-slate-800 text-slate-300'
+                            }`}>
                               {item.categoriaNome || 'Geral'}
                             </span>
                           </td>
@@ -672,7 +716,7 @@ export function DashboardFinanceiro({
                           <td className="py-3 px-3">
                             <span
                               className={`text-[11px] font-bold ${
-                                isDespesa ? 'text-rose-400' : 'text-emerald-400'
+                                isDespesa ? 'text-rose-500' : 'text-emerald-500'
                               }`}
                             >
                               {isDespesa ? 'Despesa' : 'Receita'}
@@ -681,7 +725,7 @@ export function DashboardFinanceiro({
 
                           {/* Valor */}
                           <td className="py-3 px-3 text-right font-black font-mono">
-                            <span className={isDespesa ? 'text-rose-400' : 'text-emerald-400'}>
+                            <span className={isDespesa ? 'text-rose-500' : 'text-emerald-500'}>
                               {isDespesa ? '-' : '+'} R$ {item.valor.toFixed(2)}
                             </span>
                           </td>
@@ -694,8 +738,8 @@ export function DashboardFinanceiro({
                               title="Clique para alternar o status"
                               className={`px-3 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 mx-auto ${
                                 isPago
-                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
-                                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30'
+                                  ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/25'
+                                  : 'bg-amber-500/15 text-amber-500 border border-amber-500/30 hover:bg-amber-500/25'
                               }`}
                             >
                               {isPago ? (
@@ -720,7 +764,9 @@ export function DashboardFinanceiro({
                                   type="button"
                                   onClick={() => onEditarLancamento(item)}
                                   title="Editar"
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                                  className={`p-1.5 rounded-lg text-slate-400 transition-colors ${
+                                    isWhite ? 'hover:text-slate-900 hover:bg-slate-100' : 'hover:text-white hover:bg-slate-800'
+                                  }`}
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
@@ -734,7 +780,7 @@ export function DashboardFinanceiro({
                                     }
                                   }}
                                   title="Excluir"
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
