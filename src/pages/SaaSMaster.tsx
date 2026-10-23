@@ -178,8 +178,8 @@ export default function SaaSMaster() {
     alternarPermissaoDRE(tenant.id, novoStatus, 'Italo Lemos (Super Admin)');
     setToastDRE(
       novoStatus
-        ? `DRE Básico LIBERADO com sucesso para "${tenant.nomeFantasia}"! O estabelecimento já pode consultar resultados operacionais.`
-        : `Acesso ao DRE Básico BLOQUEADO para "${tenant.nomeFantasia}". O restaurante não poderá mais acessar o demonstrativo.`
+        ? `Módulo Financeiro & DRE LIBERADO com sucesso para "${tenant.nomeFantasia}"! O estabelecimento já pode consultar resultados contábeis e operacionais.`
+        : `Acesso ao Financeiro & DRE BLOQUEADO para "${tenant.nomeFantasia}". O restaurante não poderá mais acessar o módulo.`
     );
     setTimeout(() => setToastDRE(null), 5000);
   }
@@ -2331,7 +2331,7 @@ export default function SaaSMaster() {
                   <th className="py-3.5 px-4">Plano</th>
                   <th className="py-3.5 px-4">Mensalidade</th>
                   <th className="py-3.5 px-4">Status Assinatura</th>
-                  <th className="py-3.5 px-4">DRE Básico</th>
+                  <th className="py-3.5 px-4 text-center">Financeiro & DRE</th>
                   <th className="py-3.5 px-4">Vencimento</th>
                   <th className="py-3.5 px-5 text-right">Ações Rápidas</th>
                 </tr>
@@ -2447,7 +2447,7 @@ export default function SaaSMaster() {
                           )}
                         </td>
 
-                        {/* DRE Básico (Feature Gating) */}
+                        {/* Financeiro & DRE (Feature Gating) */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-2">
                             <button
@@ -2456,7 +2456,7 @@ export default function SaaSMaster() {
                               className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                                 tenant.dreHabilitado ? 'bg-emerald-500' : 'bg-slate-700'
                               }`}
-                              title={tenant.dreHabilitado ? 'DRE Habilitado - Clique para Bloquear' : 'DRE Bloqueado - Clique para Liberar'}
+                              title={tenant.dreHabilitado ? 'Financeiro & DRE Liberado - Clique para Bloquear' : 'Financeiro & DRE Bloqueado - Clique para Liberar'}
                             >
                               <span
                                 className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
@@ -3490,16 +3490,16 @@ export default function SaaSMaster() {
                       />
                     </div>
 
-                    {/* Permissão Especial DRE Básico */}
+                    {/* Permissão Especial Financeiro & DRE */}
                     <div className="pt-2 border-t border-slate-800">
                       <div className="flex items-center justify-between p-3.5 rounded-2xl bg-purple-950/20 border border-purple-500/30">
                         <div className="space-y-0.5 pr-2">
                           <label className="text-white font-bold block text-xs flex items-center gap-1.5">
                             <BarChart3 className="w-4 h-4 text-purple-400" />
-                            <span>Módulo DRE Básico do Restaurante</span>
+                            <span>Módulo Financeiro & DRE da Loja</span>
                           </label>
                           <p className="text-[11px] text-slate-400 leading-snug">
-                            Permite aos gestores desta loja visualizar o demonstrativo de lucros, CMV calculado e despesas operacionais. Se desativado, o acesso é bloqueado na interface e URLs diretas.
+                            Permite aos gestores desta loja visualizar o módulo Financeiro, lançamentos, receitas e o DRE automatizado.
                           </p>
                         </div>
                         <button

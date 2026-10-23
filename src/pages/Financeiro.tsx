@@ -153,7 +153,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       return paramAba as SubAbaFinanceiro;
     }
     if (location.pathname === '/notas-fiscais') return 'notas_fiscais';
-    if (location.pathname === '/dre') return 'dre';
+    if (location.pathname === '/dre' || location.pathname === '/relatorios') return 'dre';
     if (location.pathname === '/gastos') return 'lancamentos';
     return 'dashboard';
   });
