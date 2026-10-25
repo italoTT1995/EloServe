@@ -30,14 +30,16 @@ async function runDREExecutivoAudit() {
     nomeFantasia: 'Pizzaria Bella Forneria',
     razaoSocial: 'Bella Forneria LTDA',
     documento: '12.345.678/0001-90',
-    telefone: '(11) 98888-7777',
+    responsavelNome: 'Roberto Bella',
+    telefoneWhatsApp: '(11) 98888-7777',
     email: 'contato@bellaforneria.com.br',
     cidadeUf: 'São Paulo - SP',
-    planoId: 'plano-pro',
+    planoId: 'pro',
     valorMensalidade: 199.0,
     statusAssinatura: 'ativo',
-    dataVencimento: '2026-11-10',
-    diaVencimento: 10,
+    dataInicio: '2026-01-01',
+    proximoVencimento: '2026-11-10',
+    instanciaWhatsAppConectada: true,
     dreHabilitado: true,
   });
 
@@ -45,14 +47,16 @@ async function runDREExecutivoAudit() {
     nomeFantasia: 'Churrascaria Fogo Nobre',
     razaoSocial: 'Fogo Nobre Carnes Nobres ME',
     documento: '98.765.432/0001-11',
-    telefone: '(31) 97777-6666',
+    responsavelNome: 'Carlos Silva',
+    telefoneWhatsApp: '(31) 97777-6666',
     email: 'gerente@fogonobre.com.br',
     cidadeUf: 'Belo Horizonte - MG',
-    planoId: 'plano-enterprise',
+    planoId: 'enterprise',
     valorMensalidade: 299.0,
     statusAssinatura: 'ativo',
-    dataVencimento: '2026-11-15',
-    diaVencimento: 15,
+    dataInicio: '2026-01-01',
+    proximoVencimento: '2026-11-15',
+    instanciaWhatsAppConectada: true,
     dreHabilitado: true,
   });
 
@@ -79,7 +83,7 @@ async function runDREExecutivoAudit() {
   assert(!auth.temPermissao(['super_admin']), 'Gestor de Loja (admin_restaurante) é bloqueado no DRE Executivo SaaS');
   assert(auth.temPermissao(['admin_restaurante']), 'Gestor de Loja tem acesso estrito ao seu Financeiro & DRE Nível 2');
 
-  // 2. Coerência Matemática das Linhas Contábeis do SaaS
+  // 2. Coerência Matemática das Linhas Contábeis do SaaS (Sem custos/receitas fake de teste!)
   console.log('\n🔹 2. Coerência das Fórmulas Contábeis do DRE Executivo...');
   const mrr = saas.getMRR();
   const custos = saas.custosInfra;
@@ -88,8 +92,8 @@ async function runDREExecutivoAudit() {
   assert(custos.impostoSimplesPct > 0, `Alíquota Simples Nacional configurada: ${custos.impostoSimplesPct}%`);
   assert(custos.taxaGatewayPct > 0, `Taxa de Gateway configurada: ${custos.taxaGatewayPct}%`);
 
-  // Simulação Mês Vigente (fator 1)
-  const receitaBrutaMensal = mrr + (saas.tenants.length > 0 ? 150 : 0);
+  // Simulação Mês Vigente (fator 1, receita pura das assinaturas sem dados de teste)
+  const receitaBrutaMensal = mrr;
   const impostosMensal = receitaBrutaMensal * (custos.impostoSimplesPct / 100);
   const receitaLiquidaMensal = Math.max(0, receitaBrutaMensal - impostosMensal);
 
@@ -103,7 +107,7 @@ async function runDREExecutivoAudit() {
 
   // 3. Coerência da Visão Anualizada (ARR)
   console.log('\n🔹 3. Coerência da Visão Anualizada (ARR)...');
-  const receitaBrutaAnual = (mrr * 12) + (saas.tenants.length > 0 ? 450 : 0);
+  const receitaBrutaAnual = mrr * 12;
   const impostosAnual = receitaBrutaAnual * (custos.impostoSimplesPct / 100);
   const rolAnual = receitaBrutaAnual - impostosAnual;
   const cogsAnual = (custos.cloudVps * 12) + (custos.evolutionWhatsapp * 12) + (receitaBrutaAnual * (custos.taxaGatewayPct / 100));

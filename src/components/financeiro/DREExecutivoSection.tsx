@@ -16,18 +16,27 @@ import {
   Layers,
   Sparkles,
   ArrowRight,
+  LayoutDashboard,
+  PieChart,
+  Bot,
+  CreditCard,
+  Building2,
+  Megaphone,
+  AlertTriangle,
+  Zap,
 } from 'lucide-react';
 import { TenantRestaurante } from '../../types';
 import { CustosInfraSaaS } from '../../store/useSaaSStore';
+import { ModalAjusteCustosSaaS } from './ModalAjusteCustosSaaS';
 
 export type PeriodoDREExecutivo = 'mensal' | 'trimestral' | 'anual';
-export type VisualizacaoDREExecutivo = 'demonstrativo' | 'comparativo';
+export type VisualizacaoDREExecutivo = 'dashboard' | 'demonstrativo' | 'comparativo';
 
 interface DREExecutivoSectionProps {
   tenants: TenantRestaurante[];
   mrr: number;
   custosInfra: CustosInfraSaaS;
-  onEditarCustos: () => void;
+  onSalvarCustos: (novosCustos: CustosInfraSaaS) => void;
   isWhite: boolean;
 }
 
@@ -35,27 +44,40 @@ export function DREExecutivoSection({
   tenants,
   mrr,
   custosInfra,
-  onEditarCustos,
+  onSalvarCustos,
   isWhite,
 }: DREExecutivoSectionProps) {
   const [periodo, setPeriodo] = useState<PeriodoDREExecutivo>('mensal');
-  const [visualizacao, setVisualizacao] = useState<VisualizacaoDREExecutivo>('demonstrativo');
+  const [visualizacao, setVisualizacao] = useState<VisualizacaoDREExecutivo>('dashboard');
+  const [modalAjusteAberto, setModalAjusteAberto] = useState(false);
 
   // Multiplicador de período
   const fator = periodo === 'anual' ? 12 : periodo === 'trimestral' ? 3 : 1;
 
-  // Estatísticas Reais da Base de Assinantes
+  // Estatísticas Reais da Base de Assinantes (100% DINÂMICAS - ZERO DADOS FAKE)
   const totalLojas = tenants.length;
   const assinantesAtivos = tenants.filter((t) => t.statusAssinatura === 'ativo').length;
   const assinantesTrial = tenants.filter((t) => t.statusAssinatura === 'trial').length;
   const assinantesAtrasados = tenants.filter((t) => t.statusAssinatura === 'atrasado').length;
   const ticketMedioReal = assinantesAtivos > 0 ? mrr / assinantesAtivos : 0;
 
-  // Função pura de cálculo do DRE Corporativo do SaaS
+  // Planos contratados
+  const contagemPlanos = useMemo(() => {
+    const planosMap: Record<string, number> = { starter: 0, pro: 0, enterprise: 0 };
+    tenants.forEach((t) => {
+      const p = (t.planoId || '').toLowerCase();
+      if (p.includes('starter')) planosMap.starter++;
+      else if (p.includes('pro')) planosMap.pro++;
+      else if (p.includes('enterprise')) planosMap.enterprise++;
+    });
+    return planosMap;
+  }, [tenants]);
+
+  // Função pura de cálculo do DRE Corporativo do SaaS (Sem custos de teste!)
   function calcularDRESaaS(fatorMultiplicador: number) {
+    // Receita estritamente ligada às assinaturas reais
     const receitaAssinaturas = mrr * fatorMultiplicador;
-    const receitaSetup = (totalLojas > 0 ? 150 : 0) * (fatorMultiplicador === 12 ? 3 : 1);
-    const receitaBruta = receitaAssinaturas + receitaSetup;
+    const receitaBruta = receitaAssinaturas;
 
     const deducoesImpostos = receitaBruta * (custosInfra.impostoSimplesPct / 100);
     const receitaLiquida = Math.max(0, receitaBruta - deducoesImpostos);
@@ -71,12 +93,11 @@ export function DREExecutivoSection({
     const despesasOpex = custosInfra.suporteMarketing * fatorMultiplicador;
     const lucroLiquidoEbitda = lucroBruto - despesasOpex;
     const margemLiquidaPct = receitaLiquida > 0 ? (lucroLiquidoEbitda / receitaLiquida) * 100 : 0;
-    const custosTotais = cogsTecnologia + despesasOpex;
+    const custosTotais = cogsTecnologia + despesasOpex + deducoesImpostos;
 
     return {
       receitaBruta,
       receitaAssinaturas,
-      receitaSetup,
       deducoesImpostos,
       receitaLiquida,
       custoCloud,
@@ -95,12 +116,12 @@ export function DREExecutivoSection({
   // Dados do período ativo
   const dadosAtivos = useMemo(() => calcularDRESaaS(fator), [mrr, fator, custosInfra, totalLojas]);
 
-  // Comparativo de múltiplos períodos (Mês Vigente, Mês Anterior Est., Trimestre, Anual ARR)
+  // Comparativo de múltiplos períodos (Mês Vigente, Trimestre, Anual ARR)
   const comparativo = useMemo(() => {
     return [
       { titulo: 'Mês Vigente', fator: 1, ...calcularDRESaaS(1) },
-      { titulo: 'Trimestre', fator: 3, ...calcularDRESaaS(3) },
-      { titulo: 'Anual (ARR)', fator: 12, ...calcularDRESaaS(12) },
+      { titulo: 'Trimestre (3M)', fator: 3, ...calcularDRESaaS(3) },
+      { titulo: 'Anual (ARR 12M)', fator: 12, ...calcularDRESaaS(12) },
     ];
   }, [mrr, custosInfra, totalLojas]);
 
@@ -108,7 +129,7 @@ export function DREExecutivoSection({
   function exportarCSV() {
     const linhas = [
       ['DRE Executivo Corporativo - Plataforma EloServe SaaS'],
-      ['Padrão:', 'SaaS B2B Contábil e Gerencial'],
+      ['Padrão:', 'SaaS B2B Contábil e Gerencial Oficial'],
       ['Período:', periodo === 'anual' ? 'Anual (12 Meses - ARR)' : periodo === 'trimestral' ? 'Trimestral (3 Meses)' : 'Mensal Vigente'],
       ['MRR Atual:', `R$ ${mrr.toFixed(2)}`],
       ['Lojas Ativas:', assinantesAtivos.toString()],
@@ -117,8 +138,7 @@ export function DREExecutivoSection({
       ['Linha Contábil', 'Valor (R$)', '% ROL'],
       ['1. (+) RECEITA OPERACIONAL BRUTA DO SAAS', dadosAtivos.receitaBruta.toFixed(2), '-'],
       ['   ↳ Mensalidades Recorrentes de Software (MRR)', dadosAtivos.receitaAssinaturas.toFixed(2), '-'],
-      ['   ↳ Taxas de Setup e Configuração Inicial', dadosAtivos.receitaSetup.toFixed(2), '-'],
-      ['2. (-) DEDUÇÕES TRIBUTÁRIAS (Simples Nacional 6%)', (-dadosAtivos.deducoesImpostos).toFixed(2), `-${custosInfra.impostoSimplesPct.toFixed(1)}%`],
+      ['2. (-) DEDUÇÕES TRIBUTÁRIAS (Simples Nacional)', (-dadosAtivos.deducoesImpostos).toFixed(2), `-${custosInfra.impostoSimplesPct.toFixed(1)}%`],
       ['3. (=) RECEITA OPERACIONAL LÍQUIDA (ROL)', dadosAtivos.receitaLiquida.toFixed(2), '100.0%'],
       ['4. (-) CUSTOS DOS SERVIÇOS PRESTADOS (COGS CLOUD)', (-dadosAtivos.cogsTecnologia).toFixed(2), `-${((dadosAtivos.cogsTecnologia / (dadosAtivos.receitaLiquida || 1)) * 100).toFixed(1)}%`],
       ['   ↳ Servidores Cloud VPS & Banco de Dados', (-dadosAtivos.custoCloud).toFixed(2), '-'],
@@ -143,6 +163,16 @@ export function DREExecutivoSection({
 
   return (
     <div className="space-y-6">
+      {/* MODAL DE AJUSTE DE CUSTOS REAIS MELHORADO */}
+      <ModalAjusteCustosSaaS
+        custosAtuais={custosInfra}
+        mrrAtual={mrr}
+        isOpen={modalAjusteAberto}
+        onClose={() => setModalAjusteAberto(false)}
+        onSalvar={onSalvarCustos}
+        isWhite={isWhite}
+      />
+
       {/* HEADER DA ABA DRE EXECUTIVO: SIMPLIFICADO & MODERNO */}
       <div
         className={`p-6 rounded-3xl border flex flex-col lg:flex-row lg:items-center justify-between gap-5 shadow-xl transition-colors ${
@@ -158,40 +188,54 @@ export function DREExecutivoSection({
               <span>Inteligência Contábil Franqueador</span>
             </span>
             <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-400 font-bold border border-purple-500/30 uppercase tracking-wider">
-              SaaS B2B • Nível 1
+              SaaS B2B • Nível 1 Master
             </span>
           </div>
           <h3 className="text-xl font-black flex items-center gap-2">
             <TrendingUp className="w-6 h-6 text-emerald-400" />
-            <span>DRE Executivo da Plataforma EloServe</span>
+            <span>DRE Executivo & Inteligência SaaS</span>
           </h3>
           <p className={`text-xs max-w-3xl ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-            Demonstração consolidada do resultado operacional da sua empresa fornecedora de software: receitas de assinaturas (MRR), custos reais de servidores/WhatsApp e margem líquida EBITDA.
+            Demonstração consolidada do resultado da empresa fornecedora de software: receitas de assinaturas (MRR), custos reais de infraestrutura sem simulações fictícias e margem líquida EBITDA.
           </p>
         </div>
 
-        {/* CONTROLES RÁPIDOS: PERÍODO, VISUALIZAÇÃO E AÇÕES */}
+        {/* CONTROLES RÁPIDOS: PERÍODO, NAVEGAÇÃO E AÇÕES */}
         <div className="flex items-center gap-2.5 flex-wrap shrink-0">
           <button
             type="button"
-            onClick={onEditarCustos}
+            onClick={() => setModalAjusteAberto(true)}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${
               isWhite
-                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
-                : 'bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30'
+                ? 'bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200'
+                : 'bg-purple-900/40 hover:bg-purple-800/50 text-purple-300 border border-purple-500/40 shadow-purple-900/20'
             }`}
-            title="Configurar custos reais da sua VPS, WhatsApp e impostos"
+            title="Ajustar custos reais de VPS, WhatsApp, Impostos e Marketing"
           >
             <Sliders className="w-3.5 h-3.5 text-purple-400" />
             <span>Ajustar Custos</span>
           </button>
 
-          {/* Toggle: Demonstrativo vs Comparativo */}
+          {/* Seletor de Visualização: Dashboard vs Demonstrativo vs Comparativo */}
           <div className={`p-1 rounded-xl border flex items-center gap-1 text-xs ${isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'}`}>
             <button
               type="button"
+              onClick={() => setVisualizacao('dashboard')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                visualizacao === 'dashboard'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : isWhite
+                  ? 'text-slate-600 hover:text-slate-900'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span>Dashboard</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setVisualizacao('demonstrativo')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 visualizacao === 'demonstrativo'
                   ? 'bg-purple-600 text-white shadow-sm'
                   : isWhite
@@ -199,12 +243,13 @@ export function DREExecutivoSection({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Demonstrativo
+              <FileText className="w-3.5 h-3.5" />
+              <span>Demonstrativo DRE</span>
             </button>
             <button
               type="button"
               onClick={() => setVisualizacao('comparativo')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 visualizacao === 'comparativo'
                   ? 'bg-purple-600 text-white shadow-sm'
                   : isWhite
@@ -212,12 +257,13 @@ export function DREExecutivoSection({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Comparativo
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Comparativo</span>
             </button>
           </div>
 
           {/* Seletor de Período (Mensal, Trimestral, Anual) */}
-          {visualizacao === 'demonstrativo' && (
+          {visualizacao !== 'comparativo' && (
             <div className={`p-1 rounded-xl border flex items-center gap-1 text-xs ${isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'}`}>
               <button
                 type="button"
@@ -230,7 +276,7 @@ export function DREExecutivoSection({
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Mês Atual
+                Mês
               </button>
               <button
                 type="button"
@@ -289,9 +335,9 @@ export function DREExecutivoSection({
         </div>
       </div>
 
-      {/* 4 CARDS KPIS EXECUTIVOS SIMPLIFICADOS (IDÊNTICOS AO PADRÃO DO FINANCEIRO & DRE) */}
+      {/* 4 CARDS KPIS EXECUTIVOS PRINCIPAIS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Receita Operacional Líquida */}
+        {/* 1. MRR / Faturamento Recorrente */}
         <div
           className={`p-5 rounded-3xl border space-y-2 transition-all shadow-sm ${
             isWhite ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
@@ -299,17 +345,17 @@ export function DREExecutivoSection({
         >
           <div className="flex items-center justify-between">
             <span className={`text-xs font-semibold ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-              Receita Líquida (ROL)
+              Receita de Assinaturas (MRR)
             </span>
             <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-black font-mono">
-            R$ {dadosAtivos.receitaLiquida.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            R$ {dadosAtivos.receitaAssinaturas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <span className="text-[10px] text-purple-400 font-semibold block">
-            Após Simples Nacional ({custosInfra.impostoSimplesPct}%)
+            ARR Anualizado: R$ {(mrr * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </span>
         </div>
 
@@ -321,7 +367,7 @@ export function DREExecutivoSection({
         >
           <div className="flex items-center justify-between">
             <span className={`text-xs font-semibold ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-              Margem Bruta SaaS
+              Margem Bruta do Software
             </span>
             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
               <Percent className="w-4 h-4" />
@@ -335,7 +381,7 @@ export function DREExecutivoSection({
           </span>
         </div>
 
-        {/* 3. Custos de Infraestrutura & OPEX */}
+        {/* 3. Custos & Despesas Operacionais Totais */}
         <div
           className={`p-5 rounded-3xl border space-y-2 transition-all shadow-sm ${
             isWhite ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
@@ -343,7 +389,7 @@ export function DREExecutivoSection({
         >
           <div className="flex items-center justify-between">
             <span className={`text-xs font-semibold ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-              Custos Totais (COGS + OPEX)
+              Custos Totais Operacionais
             </span>
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
               <Server className="w-4 h-4" />
@@ -353,7 +399,7 @@ export function DREExecutivoSection({
             R$ {dadosAtivos.custosTotais.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <span className="text-[10px] text-amber-500/80 font-semibold block">
-            Cloud, WhatsApp, Gateway e Suporte
+            Cloud, WhatsApp, Gateway e Simples Nacional
           </span>
         </div>
 
@@ -386,60 +432,218 @@ export function DREExecutivoSection({
         </div>
       </div>
 
-      {/* PAINEL DINÂMICO DE CARTEIRA E SAÚDE DO SAAS */}
-      <div
-        className={`p-5 rounded-3xl border flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm ${
-          isWhite ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
-        }`}
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-purple-600/15 text-purple-400 flex items-center justify-center font-bold shrink-0">
-            <Users className="w-5 h-5" />
-          </div>
-          <div>
-            <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
-              <span>Saúde da Carteira de Clientes</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300">
-                {totalLojas} estabelecimentos
-              </span>
-            </h4>
-            <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-              Métricas reais vinculadas aos planos contratados dos restaurantes.
-            </p>
+      {/* ========================================================================= */}
+      {/* 1. VISUALIZAÇÃO DASHBOARD EXECUTIVO                                       */}
+      {/* ========================================================================= */}
+      {visualizacao === 'dashboard' && (
+        <div className="space-y-6">
+          {/* Grid: Decomposição Visual de Custos & Saúde Operacional */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Card Grande: Decomposição da Receita e Custos (Waterfall Progressivo) */}
+            <div
+              className={`lg:col-span-2 p-6 rounded-3xl border shadow-xl space-y-5 ${
+                isWhite ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-black flex items-center gap-2">
+                    <PieChart className="w-4 h-4 text-purple-400" />
+                    <span>Decomposição de Custos & Rentabilidade do Software</span>
+                  </h4>
+                  <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Como cada real do faturamento é distribuído entre tributos, infraestrutura e lucro líquido
+                  </p>
+                </div>
+                <span className="text-xs px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 font-bold border border-purple-500/30">
+                  Base 100% ROL
+                </span>
+              </div>
+
+              {/* Barras de Decomposição Proporcional */}
+              <div className="space-y-3.5 text-xs">
+                {/* 1. Receita Líquida */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between font-bold">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                      <span>Receita Operacional Líquida (ROL)</span>
+                    </span>
+                    <span className="font-mono">
+                      R$ {dadosAtivos.receitaLiquida.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (100%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 rounded-full bg-slate-800/40 overflow-hidden">
+                    <div className="h-full rounded-full bg-purple-500" style={{ width: '100%' }} />
+                  </div>
+                </div>
+
+                {/* 2. Custos Cloud & Servidores */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                      <span>Servidores Cloud VPS & Banco de Dados</span>
+                    </span>
+                    <span className="font-mono text-slate-400">
+                      R$ {dadosAtivos.custoCloud.toFixed(2)} ({dadosAtivos.receitaLiquida > 0 ? ((dadosAtivos.custoCloud / dadosAtivos.receitaLiquida) * 100).toFixed(1) : 0}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-800/40 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-blue-500"
+                      style={{ width: `${Math.min(100, dadosAtivos.receitaLiquida > 0 ? (dadosAtivos.custoCloud / dadosAtivos.receitaLiquida) * 100 : 0)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* 3. WhatsApp / Evolution API */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      <span>Servidor de WhatsApp Multi-Tenant (Baileys)</span>
+                    </span>
+                    <span className="font-mono text-slate-400">
+                      R$ {dadosAtivos.custoWhatsapp.toFixed(2)} ({dadosAtivos.receitaLiquida > 0 ? ((dadosAtivos.custoWhatsapp / dadosAtivos.receitaLiquida) * 100).toFixed(1) : 0}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-800/40 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-emerald-500"
+                      style={{ width: `${Math.min(100, dadosAtivos.receitaLiquida > 0 ? (dadosAtivos.custoWhatsapp / dadosAtivos.receitaLiquida) * 100 : 0)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* 4. Taxas de Gateway */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      <span>Taxas de Gateway de Cobrança ({custosInfra.taxaGatewayPct}%)</span>
+                    </span>
+                    <span className="font-mono text-slate-400">
+                      R$ {dadosAtivos.custoGateway.toFixed(2)} ({custosInfra.taxaGatewayPct.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-800/40 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-amber-500"
+                      style={{ width: `${Math.min(100, custosInfra.taxaGatewayPct)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* 5. Despesas Operacionais OPEX */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                      <span>Despesas Operacionais (Marketing, Suporte & CAC)</span>
+                    </span>
+                    <span className="font-mono text-slate-400">
+                      R$ {dadosAtivos.despesasOpex.toFixed(2)} ({dadosAtivos.receitaLiquida > 0 ? ((dadosAtivos.despesasOpex / dadosAtivos.receitaLiquida) * 100).toFixed(1) : 0}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-800/40 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-rose-500"
+                      style={{ width: `${Math.min(100, dadosAtivos.receitaLiquida > 0 ? (dadosAtivos.despesasOpex / dadosAtivos.receitaLiquida) * 100 : 0)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* 6. Lucro Líquido EBITDA Final (Destaque Verde) */}
+                <div className="space-y-1 pt-2 border-t border-slate-800/50">
+                  <div className="flex items-center justify-between font-black text-emerald-500">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Sobra Líquida Operacional / EBITDA</span>
+                    </span>
+                    <span className="font-mono text-sm">
+                      R$ {dadosAtivos.lucroLiquidoEbitda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({dadosAtivos.margemLiquidaPct.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-3 rounded-full bg-slate-800/40 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-teal-400 shadow-md shadow-emerald-500/30"
+                      style={{ width: `${Math.min(100, Math.max(0, dadosAtivos.margemLiquidaPct))}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card Lateral: Indicadores de Eficiência SaaS */}
+            <div
+              className={`p-6 rounded-3xl border shadow-xl flex flex-col justify-between space-y-5 ${
+                isWhite ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+              }`}
+            >
+              <div>
+                <h4 className="text-sm font-black flex items-center gap-2 mb-1">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  <span>Eficiência do Modelo SaaS</span>
+                </h4>
+                <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Métricas de saúde e sustentabilidade
+                </p>
+              </div>
+
+              {/* Status de Margem Líquida */}
+              <div className={`p-4 rounded-2xl border space-y-1.5 ${
+                dadosAtivos.margemLiquidaPct >= 50
+                  ? isWhite ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200'
+                  : dadosAtivos.margemLiquidaPct >= 20
+                  ? isWhite ? 'bg-blue-50 border-blue-200 text-blue-950' : 'bg-blue-950/30 border-blue-500/30 text-blue-200'
+                  : isWhite ? 'bg-amber-50 border-amber-200 text-amber-950' : 'bg-amber-950/30 border-amber-500/30 text-amber-200'
+              }`}>
+                <span className="text-[10px] font-black uppercase tracking-wider block">
+                  Classificação da Margem
+                </span>
+                <p className="text-xs font-bold leading-snug">
+                  {dadosAtivos.margemLiquidaPct >= 50
+                    ? '🔥 Margem Excelente (Padrão Top-Tier SaaS B2B)'
+                    : dadosAtivos.margemLiquidaPct >= 20
+                    ? '✅ Margem Saudável e Sustentável'
+                    : '⚠️ Margem em fase de escala ou custos elevados'}
+                </p>
+                <span className="text-[11px] block opacity-80">
+                  {dadosAtivos.margemLiquidaPct >= 50
+                    ? 'Custos de infraestrutura controlados com alta alavancagem operacional.'
+                    : 'Acompanhe a proporção de servidores conforme o número de clientes cresce.'}
+                </span>
+              </div>
+
+              {/* Distribuição por Planos */}
+              <div className="space-y-2 text-xs">
+                <span className={`text-[10px] font-bold uppercase tracking-wider block ${isWhite ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Distribuição da Base por Plano
+                </span>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/40 border border-slate-800/60">
+                    <span className="text-slate-300">Plano Starter</span>
+                    <strong className="font-mono">{contagemPlanos.starter} lojas</strong>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/40 border border-slate-800/60">
+                    <span className="text-emerald-400 font-semibold">Plano Pro (Mais Popular)</span>
+                    <strong className="font-mono text-emerald-400">{contagemPlanos.pro} lojas</strong>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/40 border border-slate-800/60">
+                    <span className="text-purple-300 font-semibold">Plano Enterprise</span>
+                    <strong className="font-mono text-purple-300">{contagemPlanos.enterprise} lojas</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      )}
 
-        <div className="flex items-center gap-3 flex-wrap text-xs">
-          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
-            isWhite ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Adimplentes: <strong>{assinantesAtivos}</strong></span>
-          </div>
-
-          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
-            isWhite ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-amber-950/40 border-amber-500/30 text-amber-300'
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-amber-500" />
-            <span>Em Trial: <strong>{assinantesTrial}</strong></span>
-          </div>
-
-          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
-            isWhite ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-rose-950/40 border-rose-500/30 text-rose-300'
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-rose-500" />
-            <span>Tolerância/Atraso: <strong>{assinantesAtrasados}</strong></span>
-          </div>
-
-          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
-            isWhite ? 'bg-purple-50 border-purple-200 text-purple-900' : 'bg-purple-950/40 border-purple-500/30 text-purple-300'
-          }`}>
-            <span>Ticket Médio: <strong className="font-mono">R$ {ticketMedioReal.toFixed(2)}/mês</strong></span>
-          </div>
-        </div>
-      </div>
-
-      {/* VISUALIZAÇÃO 1: DEMONSTRATIVO CONTÁBIL OFICIAL */}
+      {/* ========================================================================= */}
+      {/* 2. VISUALIZAÇÃO DEMONSTRATIVO CONTÁBIL OFICIAL                            */}
+      {/* ========================================================================= */}
       {visualizacao === 'demonstrativo' && (
         <div
           className={`rounded-3xl border overflow-hidden shadow-xl ${
@@ -455,7 +659,7 @@ export function DREExecutivoSection({
                 <span>Demonstração do Resultado do Exercício — DRE Gerencial ({periodo === 'anual' ? 'Anual / ARR' : periodo === 'trimestral' ? 'Trimestral' : 'Mês Vigente'})</span>
               </h4>
               <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-                Estrutura oficial de resultado operacional para empresas de tecnologia SaaS
+                Estrutura contábil oficial padrão de software e tecnologia
               </p>
             </div>
             <div className="text-right">
@@ -483,7 +687,7 @@ export function DREExecutivoSection({
                     <span className="text-emerald-500 font-black">(+)</span>
                     <span>1. RECEITA OPERACIONAL BRUTA DO SAAS</span>
                   </td>
-                  <td className="py-3 px-4 text-slate-500">Mensalidades + Taxas de Onboarding</td>
+                  <td className="py-3 px-4 text-slate-500">Mensalidades Recorrentes de Software (MRR)</td>
                   <td className="py-3 px-4 text-right text-emerald-500 font-mono text-sm">
                     R$ {dadosAtivos.receitaBruta.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
@@ -492,23 +696,13 @@ export function DREExecutivoSection({
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2.5 px-4 pl-8 text-slate-500">1.1. Mensalidades Recorrentes de Software (MRR)</td>
-                  <td className="py-2.5 px-4 text-slate-400">Assinaturas de restaurantes ativos</td>
+                  <td className="py-2.5 px-4 pl-8 text-slate-500">1.1. Planos Mensais Contratados (Starter, Pro, Enterprise)</td>
+                  <td className="py-2.5 px-4 text-slate-400">Assinaturas ativas dos clientes</td>
                   <td className="py-2.5 px-4 text-right font-mono font-semibold">
                     R$ {dadosAtivos.receitaAssinaturas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="py-2.5 px-4 text-right font-mono text-slate-400">
                     {dadosAtivos.receitaLiquida > 0 ? ((dadosAtivos.receitaAssinaturas / dadosAtivos.receitaLiquida) * 100).toFixed(1) : 0}%
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-4 pl-8 text-slate-500">1.2. Taxas de Implantação & Setup Inicial</td>
-                  <td className="py-2.5 px-4 text-slate-400">Configuração de cardápio e hardware</td>
-                  <td className="py-2.5 px-4 text-right font-mono font-semibold">
-                    R$ {dadosAtivos.receitaSetup.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-mono text-slate-400">
-                    {dadosAtivos.receitaLiquida > 0 ? ((dadosAtivos.receitaSetup / dadosAtivos.receitaLiquida) * 100).toFixed(1) : 0}%
                   </td>
                 </tr>
 
@@ -518,7 +712,7 @@ export function DREExecutivoSection({
                     <span className="text-rose-500 font-black">(-)</span>
                     <span>2. DEDUÇÕES DA RECEITA BRUTA & TRIBUTOS</span>
                   </td>
-                  <td className="py-3 px-4 text-slate-400">Impostos federais e municipais</td>
+                  <td className="py-3 px-4 text-slate-400">Impostos Simples Nacional</td>
                   <td className="py-3 px-4 text-right text-rose-500 font-mono">
                     - R$ {dadosAtivos.deducoesImpostos.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
@@ -643,7 +837,9 @@ export function DREExecutivoSection({
         </div>
       )}
 
-      {/* VISUALIZAÇÃO 2: COMPARATIVO DIRETO DE PERÍODOS (MÊS VIGENTE VS TRIMESTRE VS ANUAL) */}
+      {/* ========================================================================= */}
+      {/* 3. VISUALIZAÇÃO COMPARATIVO DIRETO DE PERÍODOS                             */}
+      {/* ========================================================================= */}
       {visualizacao === 'comparativo' && (
         <div
           className={`rounded-3xl border overflow-hidden shadow-xl ${

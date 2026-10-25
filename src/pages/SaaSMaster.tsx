@@ -3722,15 +3722,19 @@ export default function SaaSMaster() {
         )
       )}
 
-      {/* CONTEÚDO DA ABA: DRE EXECUTIVO SIMPLIFICADO DO SAAS MASTER */}
+      {/* CONTEÚDO DA ABA: DRE EXECUTIVO & DASHBOARD DO SAAS MASTER */}
       {abaAtiva === 'dre_saas' && (
         <DREExecutivoSection
           tenants={tenants}
           mrr={mrr}
           custosInfra={custosInfra}
-          onEditarCustos={() => {
-            setFormCustos({ ...custosInfra });
-            setModalEditarCustos(true);
+          onSalvarCustos={(novos) => {
+            atualizarCustosInfra(novos);
+            registrarLogAuditoria(
+              'Atualização de Parâmetros de Custos',
+              'financeiro',
+              'Custos atualizados: VPS R$ ' + novos.cloudVps + ', WhatsApp R$ ' + novos.evolutionWhatsapp + ', Gateway ' + novos.taxaGatewayPct + '%, Impostos ' + novos.impostoSimplesPct + '%, Marketing R$ ' + novos.suporteMarketing
+            );
           }}
           isWhite={isWhite}
         />

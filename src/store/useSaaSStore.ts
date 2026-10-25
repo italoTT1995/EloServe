@@ -224,11 +224,11 @@ export const TENANT_GLOBAL: TenantRestaurante = {
 const TENANTS_INICIAIS: TenantRestaurante[] = [];
 
 const CUSTOS_INFRA_PADRAO: CustosInfraSaaS = {
-  cloudVps: 180.0,
-  evolutionWhatsapp: 120.0,
+  cloudVps: 0.0,
+  evolutionWhatsapp: 0.0,
   taxaGatewayPct: 2.9,
   impostoSimplesPct: 6.0,
-  suporteMarketing: 350.0,
+  suporteMarketing: 0.0,
 };
 
 const AVISOS_INICIAIS: AvisoGlobalSaaS[] = [];
