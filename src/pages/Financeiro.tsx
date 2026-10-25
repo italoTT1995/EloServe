@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   DollarSign,
   TrendingUp,
@@ -632,6 +632,21 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             </span>
           </button>
         </div>
+
+        {isMasterUser && (
+          <Link
+            to="/saas?aba=dre_saas"
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 shadow-sm ${
+              isWhite
+                ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+                : 'bg-purple-950/40 text-purple-300 border-purple-500/30 hover:bg-purple-900/40'
+            }`}
+            title="Abrir DRE Executivo Corporativo da Plataforma Franqueadora (SaaS Master)"
+          >
+            <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
+            <span>DRE Executivo SaaS (Master) ➔</span>
+          </Link>
+        )}
       </div>
 
       {/* ========================================================================= */}
