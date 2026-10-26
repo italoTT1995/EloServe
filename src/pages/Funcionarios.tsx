@@ -16,12 +16,14 @@ import {
   X,
   Search,
   Check,
+  KeyRound,
 } from 'lucide-react';
 import { useFuncionarioStore } from '../store/useFuncionarioStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { SecaoComissoesGarcons } from '../components/funcionarios/SecaoComissoesGarcons';
+import { SecaoLoginsEquipe } from '../components/funcionarios/SecaoLoginsEquipe';
 import { FuncionarioCompleto, CargoUsuario } from '../types';
 
 export default function Funcionarios() {
@@ -47,7 +49,8 @@ export default function Funcionarios() {
   const searchParams = new URLSearchParams(location.search);
   const paramAba = searchParams.get('aba');
 
-  const [abaAtiva, setAbaAtiva] = useState<'equipe' | 'rh_admin' | 'calendario' | 'comissoes'>(() => {
+  const [abaAtiva, setAbaAtiva] = useState<'equipe' | 'logins' | 'rh_admin' | 'calendario' | 'comissoes'>(() => {
+    if (paramAba === 'logins') return 'logins';
     if (paramAba === 'comissoes') return 'comissoes';
     if (paramAba === 'rh_admin') return 'rh_admin';
     if (paramAba === 'calendario') return 'calendario';
@@ -55,7 +58,7 @@ export default function Funcionarios() {
   });
 
   useEffect(() => {
-    if (paramAba && ['equipe', 'rh_admin', 'calendario', 'comissoes'].includes(paramAba)) {
+    if (paramAba && ['equipe', 'logins', 'rh_admin', 'calendario', 'comissoes'].includes(paramAba)) {
       setAbaAtiva(paramAba as any);
     }
   }, [paramAba]);
@@ -210,6 +213,21 @@ export default function Funcionarios() {
         >
           <Users className="w-4 h-4" />
           <span>Quadro da Equipe ({funcionarios.length})</span>
+        </button>
+
+        <button
+          onClick={() => setAbaAtiva('logins')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            abaAtiva === 'logins'
+              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/25 ring-2 ring-amber-400'
+              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <KeyRound className="w-4 h-4 text-amber-400" />
+          <span>Logins & Acessos</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold">
+            Hierarquias
+          </span>
         </button>
 
         <button
@@ -512,6 +530,16 @@ export default function Funcionarios() {
           isWhite={isWhite}
           usuarioNome={usuarioLogado?.nome || 'Gerente'}
           nomeRestaurante={tenantAtual?.nomeFantasia || 'EloGastrô'}
+        />
+      )}
+
+      {/* ============================================================== */}
+      {/* ABA 5: LOGINS & HIERARQUIAS DE ACESSO                          */}
+      {/* ============================================================== */}
+      {abaAtiva === 'logins' && (
+        <SecaoLoginsEquipe
+          tenantId={currentTenantId}
+          isWhite={isWhite}
         />
       )}
 

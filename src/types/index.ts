@@ -16,6 +16,8 @@ export interface Usuario {
   pin: string;
   senha?: string;
   ativo: boolean;
+  criadoEm?: string;
+  ultimoAcesso?: string;
 }
 
 export type PerfilUsuario = CargoUsuario;

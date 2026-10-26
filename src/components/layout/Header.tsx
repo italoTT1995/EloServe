@@ -26,6 +26,7 @@ import {
   Send,
   CheckCircle2,
   Printer,
+  KeyRound,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useSaaSStore } from '../../store/useSaaSStore';
@@ -532,6 +533,22 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   </button>
                 </div>
               </div>
+
+              {/* Gerenciamento de Logins (Dono / Super Admin) */}
+              {(usuarioLogado?.cargo === 'admin_restaurante' || usuarioLogado?.cargo === 'super_admin') && (
+                <div className={`px-2 py-1 border-b ${isWhite ? 'border-slate-100' : 'border-slate-800'}`}>
+                  <Link
+                    to="/funcionarios?aba=logins"
+                    onClick={() => setMenuPerfilAberto(false)}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-2 font-bold transition-colors cursor-pointer ${
+                      isWhite ? 'text-amber-800 hover:bg-amber-50' : 'text-amber-400 hover:bg-amber-500/10'
+                    }`}
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Logins & Hierarquias</span>
+                  </Link>
+                </div>
+              )}
 
 <div className={`pt-2 mt-1 border-t ${isWhite ? 'border-slate-100' : 'border-slate-800'}`}>
                 <button

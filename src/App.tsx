@@ -34,6 +34,16 @@ function RotaInicialInteligente() {
     return <Navigate to="/kds" replace />;
   }
 
+  // Garçom vai direto para Mesas & Salão
+  if (usuarioLogado?.cargo === 'garcom') {
+    return <Navigate to="/mesas" replace />;
+  }
+
+  // Entregador vai direto para Delivery & Entregas
+  if (usuarioLogado?.cargo === 'entregador') {
+    return <Navigate to="/delivery" replace />;
+  }
+
   // Dono e Gerente da Loja (ou Super Admin inspecionando uma loja específica) vai direto para o Painel do Dono!
   if (usuarioLogado?.cargo === 'admin_restaurante' || (usuarioLogado?.cargo === 'super_admin' && tenantAtivoId !== 'global')) {
     return <PainelDono />;
