@@ -433,7 +433,7 @@ export type FormaPagamentoFinanceiro =
   | 'cartao_debito'
   | 'outros';
 
-export type OrigemLancamentoFinanceiro = 'manual' | 'recorrente' | 'pdv' | 'estoque' | 'nfe';
+export type OrigemLancamentoFinanceiro = 'manual' | 'recorrente' | 'pdv' | 'estoque' | 'nfe' | 'comissao';
 
 export type LinhaDREContabil =
   | 'receita_bruta'
@@ -716,4 +716,83 @@ export interface QuestionarioFechamentoCaixa {
   justificativaDivergencia?: string;
   fechadoEm: string;
   responsavel: string;
+}
+
+// -------------------------------------------------------------
+// IMPRESSÃO TÉRMICA DIRETA & SILENCIOSA (COZINHA, BAR, CAIXA)
+// -------------------------------------------------------------
+export interface ConfiguracaoImpressaoTermica {
+  impressaoAutomaticaCozinha: boolean;
+  impressaoAutomaticaBar: boolean;
+  impressaoAutomaticaCaixa: boolean;
+  larguraPapel: '80mm' | '58mm';
+  nomeImpressoraCozinha: string;
+  nomeImpressoraBar: string;
+  nomeImpressoraCaixa: string;
+  viasImpressao: number;
+  beepSonoroAoImprimir: boolean;
+  destacarObservacoes: boolean;
+  ipBridgeLocal?: string;
+}
+
+export interface ItemTicketImpressao {
+  id?: string;
+  nome: string;
+  quantidade: number;
+  observacoes?: string;
+  setorPreparo?: 'cozinha' | 'bar' | 'nenhum';
+  precoUnitario?: number;
+  subtotal?: number;
+  clienteNome?: string;
+}
+
+export interface TicketImpressao {
+  pedidoId: string;
+  numeroPedido: number | string;
+  tipo: 'mesa' | 'balcao' | 'delivery';
+  mesaNumero?: number;
+  clienteNome?: string;
+  garcomNome?: string;
+  dataHora?: string;
+  setorAlvo: 'cozinha' | 'bar' | 'caixa';
+  itens: ItemTicketImpressao[];
+  observacaoGeral?: string;
+  subtotal?: number;
+  taxaServico?: number;
+  total?: number;
+  formaPagamento?: string;
+}
+
+// -------------------------------------------------------------
+// COMISSÕES & RATEIO DOS 10% DO GARÇOM
+// -------------------------------------------------------------
+export interface RateioGarcomDetalhe {
+  garcomId: string;
+  garcomNome: string;
+  totalVendido: number;
+  mesasAtendidas: number;
+  taxaBrutaArrecadada: number;
+  valorRetencaoCasa: number;
+  comissaoLiquida: number;
+  status: 'pago' | 'pendente';
+  pagoEm?: string;
+}
+
+export interface RegistroFechamentoComissao {
+  id: string;
+  tenantId: string;
+  dataFechamento: string;
+  periodoDescricao: string;
+  modeloRateio: 'direto' | 'igualitario';
+  totalVendasFaturadas: number;
+  totalTaxaServicoBruta: number;
+  percentualRetencaoCasa: number;
+  valorRetencaoCasa: number;
+  totalLiquidoRateado: number;
+  garcons: RateioGarcomDetalhe[];
+  lancadoNoFinanceiro: boolean;
+  financeiroLancamentoId?: string;
+  criadoPor: string;
+  criadoEm: string;
+  observacoes?: string;
 }

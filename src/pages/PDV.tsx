@@ -27,7 +27,10 @@ import {
   MapPin,
   Phone,
   Pencil,
+  Printer,
 } from 'lucide-react';
+import { impressaoTermicaService } from '../services/impressaoTermicaService';
+import { ModalConfiguracaoImpressao } from '../components/impressao/ModalConfiguracaoImpressao';
 import { Link } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAppStore } from '../store/useAppStore';
@@ -43,6 +46,7 @@ import { VendaRealizada } from '../types';
 export default function PDV() {
   const [categoriaAtiva, setCategoriaAtiva] = useState('todas');
   const [busca, setBusca] = useState('');
+  const [modalImpressaoConfigAberto, setModalImpressaoConfigAberto] = useState(false);
   const [modalPagamentoAberto, setModalPagamentoAberto] = useState(false);
   const [comandaMobileAberta, setComandaMobileAberta] = useState(false);
   const [formaSelecionada, setFormaSelecionada] = useState<'dinheiro' | 'pix' | 'debito' | 'credito'>('pix');
@@ -69,7 +73,8 @@ export default function PDV() {
   } = useCartStore();
 
   const { registrarVenda, vendas, cancelarVenda, operadorAtivo } = useAppStore();
-  const { tenantAtivoId } = useSaaSStore();
+  const { tenantAtivoId, getTenantAtivo } = useSaaSStore();
+  const tenantAtual = getTenantAtivo();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
   const idLoja = !tenantAtivoId || tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
   const produtos = getProdutosPorTenant(idLoja);
@@ -272,6 +277,21 @@ export default function PDV() {
 
     audio.tocarSucessoVenda();
     setVendaSucesso(true);
+
+    // Dispara Impressão Automática e Silenciosa na Cozinha e no Bar se houver itens
+    impressaoTermicaService.imprimirTicketCozinhaEBar({
+      pedidoId: novaVenda.id,
+      numeroPedido: novaVenda.id.slice(-4),
+      tipo: tipoPedido === 'delivery' ? 'delivery' : 'balcao',
+      clienteNome: dadosEntrega.clienteNome || (tipoPedido === 'delivery' ? 'Cliente Delivery' : 'Balcão'),
+      garcomNome: operadorAtivo || 'Caixa',
+      itens: itens.map((it) => ({
+        nome: it.produto.nome,
+        quantidade: it.quantidade,
+        observacoes: it.produto.descricao,
+      })),
+      nomeRestaurante: tenantAtual?.nomeFantasia || 'EloGastrô',
+    });
     setTimeout(() => {
       setVendaSucesso(false);
       setModalPagamentoAberto(false);
@@ -663,6 +683,15 @@ export default function PDV() {
             >
               <RotateCcw className="w-4 h-4 text-orange-400" />
               <span className="hidden sm:inline">Vendas & Estorno ({vendas.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setModalImpressaoConfigAberto(true)}
+              className="p-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-[#FF6B00] rounded-xl transition-all cursor-pointer shadow-sm shrink-0"
+              title="Configurações de Impressão Térmica Automática"
+            >
+              <Printer className="w-4 h-4" />
             </button>
           </div>
 
@@ -1470,6 +1499,13 @@ export default function PDV() {
           </div>
         </div>
       )}
+
+      {/* Modal de Configuração de Impressão Térmica */}
+      <ModalConfiguracaoImpressao
+        isOpen={modalImpressaoConfigAberto}
+        onClose={() => setModalImpressaoConfigAberto(false)}
+        nomeRestaurante={tenantAtual?.nomeFantasia || 'EloGastrô'}
+      />
     </div>
   );
 }

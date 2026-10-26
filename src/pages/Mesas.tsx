@@ -69,8 +69,13 @@ import {
   imprimirDisplayMesaIndividual,
   imprimirTodosDisplaysMesas,
 } from '../utils/qrCodeHelper';
+import { impressaoTermicaService } from '../services/impressaoTermicaService';
+import { ModalConfiguracaoImpressao } from '../components/impressao/ModalConfiguracaoImpressao';
+import { useThemeStore } from '../store/useThemeStore';
 
 export default function Mesas() {
+  const { tema } = useThemeStore();
+  const isWhite = tema === 'light';
   const {
     getMesasPorTenant,
     atualizarStatusMesa,
@@ -106,6 +111,7 @@ export default function Mesas() {
   const isPlanoPermiteReservas = planoAtual.limites.reservaMesasIncluso ?? false;
 
   const garconsDisponiveis = funcionarios.filter((f) => f.cargo === 'garcom' && f.ativo);
+  const [modalImpressaoConfigAberto, setModalImpressaoConfigAberto] = useState(false);
 
   const [setorSelecionado, setSetorSelecionado] = useState<string>('todos');
   const [menuAcoesMesaId, setMenuAcoesMesaId] = useState<number | null>(null);
@@ -956,8 +962,25 @@ export default function Mesas() {
     );
 
     if (res.sucesso) {
+      // Dispara Impressão Automática e Silenciosa na Cozinha e no Bar
+      impressaoTermicaService.imprimirTicketCozinhaEBar({
+        pedidoId: res.pedidoKDSId,
+        numeroPedido: res.pedidoKDSId.replace('kds_', '').slice(-4),
+        tipo: 'mesa',
+        mesaNumero: mesaParaLancar.numero,
+        clienteNome: mesaParaLancar.responsavelNome,
+        garcomNome: mesaParaLancar.garcomResponsavel || 'Garçom',
+        itens: novosItens.map((it) => ({
+          nome: it.nome,
+          quantidade: it.quantidade,
+          observacoes: it.observacoes,
+          clienteNome: it.clienteNome,
+        })),
+        nomeRestaurante: tenantAtual?.nomeFantasia || 'EloGastrô',
+      });
+
       dispararToast(
-        `Pedido #${res.pedidoKDSId.replace('kds_', '')} da Mesa #${mesaParaLancar.numero} enviado com sucesso ao KDS da Cozinha! R$ ${res.totalAdicionado.toFixed(2)} lançado e estoque atualizado.`
+        `Pedido #${res.pedidoKDSId.replace('kds_', '')} da Mesa #${mesaParaLancar.numero} enviado ao KDS e impresso automaticamente na Cozinha/Bar!`
       );
       setCarrinhoMesa([]);
       // Atualiza a mesa no modal para refletir os novos itens
@@ -1245,6 +1268,16 @@ export default function Mesas() {
           >
             <Printer className="w-4 h-4 text-orange-400" />
             <span className="hidden sm:inline">Imprimir Todos os QRs</span>
+          </button>
+
+          {/* Botão Configuração de Impressoras Térmicas */}
+          <button
+            onClick={() => setModalImpressaoConfigAberto(true)}
+            title="Configurar Impressão Automática na Cozinha e no Bar (80mm/58mm)"
+            className="px-3 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95"
+          >
+            <Printer className="w-4 h-4 text-[#FF6B00]" />
+            <span className="hidden md:inline">Impressoras Térmicas</span>
           </button>
 
           {/* Botão + Nova Mesa */}
@@ -3513,10 +3546,31 @@ export default function Mesas() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => window.print()}
+                        onClick={() => {
+                          const totais = getTotaisComanda(mesaParaLancar, pessoaAtivaComanda);
+                          impressaoTermicaService.imprimirConferenciaMesa({
+                            mesaNumero: mesaParaLancar.numero,
+                            clienteNome: mesaParaLancar.responsavelNome,
+                            garcomNome: mesaParaLancar.garcomResponsavel,
+                            pessoas: mesaParaLancar.pessoas,
+                            itens: (mesaParaLancar.comandaItens || []).map((it) => ({
+                              nome: it.nome,
+                              quantidade: it.quantidade,
+                              precoUnitario: it.precoUnitario,
+                              subtotal: it.subtotal,
+                              clienteNome: it.clienteNome,
+                            })),
+                            subtotal: totais.subtotal,
+                            taxaServico: totais.taxaServico,
+                            couvertTotal: totais.couvertTotal,
+                            desconto: totais.desconto,
+                            total: totais.total,
+                            nomeRestaurante: tenantAtual?.nomeFantasia || 'EloGastrô',
+                          });
+                        }}
                         className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
                       >
-                        <Printer className="w-3.5 h-3.5" />
+                        <Printer className="w-3.5 h-3.5 text-orange-400" />
                         <span>Imprimir Conferência</span>
                       </button>
                     </div>
@@ -5624,6 +5678,14 @@ export default function Mesas() {
           </div>
         </div>
       )}
+
+      {/* Modal de Configuração de Impressão Térmica (Cozinha & Bar) */}
+      <ModalConfiguracaoImpressao
+        isOpen={modalImpressaoConfigAberto}
+        onClose={() => setModalImpressaoConfigAberto(false)}
+        isWhite={isWhite}
+        nomeRestaurante={tenantAtual?.nomeFantasia || 'EloGastrô'}
+      />
     </div>
   );
 }

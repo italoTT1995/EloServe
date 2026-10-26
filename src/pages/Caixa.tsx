@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   DollarSign,
   TrendingDown,
@@ -21,11 +22,13 @@ import {
   Package,
   Trash2,
   ShieldCheck,
+  Award,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
 import { AdminAuthModal } from '../components/common/AdminAuthModal';
+import { ModalConfiguracaoImpressao } from '../components/impressao/ModalConfiguracaoImpressao';
 import { ContagemDinheiroFisico, QuestionarioFechamentoCaixa, VendaRealizada } from '../types';
 
 export default function Caixa() {
@@ -50,6 +53,7 @@ export default function Caixa() {
   // Modais
   const [modalAbertura, setModalAbertura] = useState(false);
   const [modalFechamento, setModalFechamento] = useState(false);
+  const [modalImpressaoAberto, setModalImpressaoAberto] = useState(false);
   const [comprovanteAbertura, setComprovanteAbertura] = useState<{ troco: number; horario: string; operador: string } | null>(null);
   const [comprovanteFechamento, setComprovanteFechamento] = useState<QuestionarioFechamentoCaixa | null>(null);
 
@@ -270,6 +274,24 @@ export default function Caixa() {
               >
                 <Lock className="w-4 h-4" />
                 <span>Fechamento Diário</span>
+              </button>
+
+              <Link
+                to="/funcionarios?aba=comissoes"
+                title="Fechar e Ratear os 10% das Gorjetas da Equipe de Garçons"
+                className="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Award className="w-4 h-4 text-emerald-400" />
+                <span>Rateio 10% (Garçom)</span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => setModalImpressaoAberto(true)}
+                title="Configuração de Impressão Térmica"
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+              >
+                <Printer className="w-4 h-4 text-[#FF6B00]" />
               </button>
             </>
           ) : (
@@ -1284,6 +1306,12 @@ export default function Caixa() {
         onClose={() => setModalAuthLimpeza(false)}
         onSuccess={handleAuthLimpezaSucesso}
         actionTitle="Apenas o Gerente ou Administrador pode autorizar a limpeza do histórico de vendas."
+      />
+
+      {/* Modal de Configuração de Impressão Térmica */}
+      <ModalConfiguracaoImpressao
+        isOpen={modalImpressaoAberto}
+        onClose={() => setModalImpressaoAberto(false)}
       />
     </div>
   );

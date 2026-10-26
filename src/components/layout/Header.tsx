@@ -25,6 +25,7 @@ import {
   X,
   Send,
   CheckCircle2,
+  Printer,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useSaaSStore } from '../../store/useSaaSStore';
@@ -32,6 +33,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useEloBotStore } from '../../store/useEloBotStore';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useWindowFocus } from '../../hooks/useWindowFocus';
+import { ModalConfiguracaoImpressao } from '../impressao/ModalConfiguracaoImpressao';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -45,6 +47,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const [menuTenantAberto, setMenuTenantAberto] = useState(false);
   const [modalAtalhosAberto, setModalAtalhosAberto] = useState(false);
   const [modalSuporteAberto, setModalSuporteAberto] = useState(false);
+  const [modalImpressaoHeaderAberto, setModalImpressaoHeaderAberto] = useState(false);
   const [formSuporte, setFormSuporte] = useState({
     categoria: 'duvida' as 'caixa' | 'kds' | 'pedidos' | 'whatsapp' | 'duvida' | 'urgente',
     descricao: '',
@@ -343,6 +346,22 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             NOVO
           </span>
         </Link>
+
+        {/* Atalho Configuração de Impressão Térmica */}
+        <button
+          type="button"
+          onClick={() => setModalImpressaoHeaderAberto(true)}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-sm ${
+            isWhite
+              ? 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'
+          }`}
+          title="Configuração de Impressão Térmica (Cozinha & Bar)"
+        >
+          <Printer className="w-3.5 h-3.5 text-[#FF6B00]" />
+          <span className="hidden xl:inline">Impressoras</span>
+        </button>
+
         {/* Botão de Solicitar Suporte ao Admin Master para Restaurantes */}
         {usuarioLogado?.cargo !== 'super_admin' && (
           <button
@@ -788,6 +807,13 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         </div>
       )}
 
+      {/* Modal de Configuração de Impressão Térmica */}
+      <ModalConfiguracaoImpressao
+        isOpen={modalImpressaoHeaderAberto}
+        onClose={() => setModalImpressaoHeaderAberto(false)}
+        isWhite={isWhite}
+        nomeRestaurante={tenantAtual?.nomeFantasia}
+      />
     </header>
   );
 }

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Users,
   UserPlus,
@@ -19,6 +20,8 @@ import {
 import { useFuncionarioStore } from '../store/useFuncionarioStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSaaSStore } from '../store/useSaaSStore';
+import { useThemeStore } from '../store/useThemeStore';
+import { SecaoComissoesGarcons } from '../components/funcionarios/SecaoComissoesGarcons';
 import { FuncionarioCompleto, CargoUsuario } from '../types';
 
 export default function Funcionarios() {
@@ -30,7 +33,33 @@ export default function Funcionarios() {
     getAniversariantesDeEmpresa,
   } = useFuncionarioStore();
 
-  const [abaAtiva, setAbaAtiva] = useState<'equipe' | 'rh_admin' | 'calendario'>('equipe');
+  const { usuarioLogado } = useAuthStore();
+  const { tenantAtivoId, getTenantAtivo } = useSaaSStore();
+  const tenantAtual = getTenantAtivo();
+  const currentTenantId = usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global'
+    ? usuarioLogado.tenantId
+    : (tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId);
+
+  const { tema } = useThemeStore();
+  const isWhite = tema === 'light';
+
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const paramAba = searchParams.get('aba');
+
+  const [abaAtiva, setAbaAtiva] = useState<'equipe' | 'rh_admin' | 'calendario' | 'comissoes'>(() => {
+    if (paramAba === 'comissoes') return 'comissoes';
+    if (paramAba === 'rh_admin') return 'rh_admin';
+    if (paramAba === 'calendario') return 'calendario';
+    return 'equipe';
+  });
+
+  useEffect(() => {
+    if (paramAba && ['equipe', 'rh_admin', 'calendario', 'comissoes'].includes(paramAba)) {
+      setAbaAtiva(paramAba as any);
+    }
+  }, [paramAba]);
+
   const [cargoFiltro, setCargoFiltro] = useState<string>('todos');
   const [busca, setBusca] = useState('');
   const [modalNovo, setModalNovo] = useState(false);
@@ -205,6 +234,21 @@ export default function Funcionarios() {
         >
           <ShieldCheck className="w-4 h-4" />
           <span>Dados Administrativos & Salários</span>
+        </button>
+
+        <button
+          onClick={() => setAbaAtiva('comissoes')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            abaAtiva === 'comissoes'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25 ring-2 ring-emerald-400'
+              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <Award className="w-4 h-4 text-emerald-400" />
+          <span>Comissões & 10% Garçom</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold">
+            NOVO
+          </span>
         </button>
       </div>
 
@@ -457,6 +501,18 @@ export default function Funcionarios() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* ABA 4: COMISSÕES & RATEIO DOS 10% DO GARÇOM                    */}
+      {/* ============================================================== */}
+      {abaAtiva === 'comissoes' && (
+        <SecaoComissoesGarcons
+          tenantId={currentTenantId}
+          isWhite={isWhite}
+          usuarioNome={usuarioLogado?.nome || 'Gerente'}
+          nomeRestaurante={tenantAtual?.nomeFantasia || 'EloGastrô'}
+        />
       )}
 
       {/* ============================================================== */}
