@@ -5,6 +5,7 @@ import {
   ChefHat,
   BookOpen,
   DollarSign,
+  TrendingUp,
   Bot,
   Zap,
   LogOut,
@@ -156,6 +157,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               return [
                 { id: 'restaurantes', label: 'Restaurantes Assinantes', icon: Store, badge: 'Clientes' },
                 { id: 'editor_loja', label: 'Ambiente de Edição das Lojas', icon: Sliders, badge: 'Editar' },
+                { id: 'faturamento', label: 'Faturamento & MRR', icon: TrendingUp },
                 { id: 'planos', label: 'Planos & Mensalidades', icon: Layers },
                 { id: 'avisos_globais', label: 'Central de Avisos (Broadcast)', icon: Megaphone, badge: 'Avisos' },
                 { id: 'auditoria', label: 'Logs de Auditoria SaaS', icon: History, badge: 'Logs' },

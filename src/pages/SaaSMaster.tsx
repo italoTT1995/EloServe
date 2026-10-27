@@ -1473,68 +1473,6 @@ export default function SaaSMaster() {
         </div>
       </div>
 
-      {/* Cards de Métricas SaaS no Topo */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* MRR */}
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-medium">MRR (Faturamento Recorrente Mensal)</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-              <DollarSign className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-black text-emerald-400 font-mono">
-            R$ {mrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </p>
-          <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-1">
-            <span>ARR Anualizado:</span>
-            <strong className="text-white font-mono">R$ {arr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
-          </div>
-        </div>
-
-        {/* Assinantes Ativos */}
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-medium">Restaurantes Clientes Ativos</span>
-            <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
-              <Building2 className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-black text-white font-mono">{totalAtivos}</p>
-          <span className="text-[10px] text-emerald-400 font-semibold block">
-            100% com acesso liberado aos módulos
-          </span>
-        </div>
-
-        {/* Em Teste / Trial */}
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-medium">Em Período de Teste (Trial 7d)</span>
-            <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
-              <Users className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-black text-amber-400 font-mono">{totalTrials}</p>
-          <span className="text-[10px] text-amber-400/80 font-semibold block">
-            Oportunidades de conversão este mês
-          </span>
-        </div>
-
-        {/* Atrasados / Inadimplentes */}
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-medium">Faturas em Atraso</span>
-            <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
-              <AlertCircle className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-black text-rose-400 font-mono">{totalAtrasados}</p>
-          <span className="text-[10px] text-rose-400/80 font-semibold block">
-            Disparar cobrança amigável via WhatsApp
-          </span>
-        </div>
-      </div>
-
       {/* Abas Administrativas do Super Admin */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto scrollbar-none">
         <button
@@ -1584,6 +1522,18 @@ export default function SaaSMaster() {
           <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/30 uppercase font-black">
             Modificar
           </span>
+        </button>
+
+        <button
+          onClick={() => handleMudarAba('faturamento')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            abaAtiva === 'faturamento'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25 ring-2 ring-purple-400'
+              : 'bg-slate-900 text-purple-300 hover:text-white border border-purple-500/30'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4 text-purple-400" />
+          <span>Faturamento & MRR</span>
         </button>
 
         <button
@@ -2459,6 +2409,166 @@ export default function SaaSMaster() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* CONTEÚDO DA ABA EXCLUSIVA: FATURAMENTO & MRR */}
+      {abaAtiva === 'faturamento' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header da aba */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-purple-950/40 via-slate-900 to-slate-900 border border-purple-500/30 p-5 rounded-3xl shadow-xl">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 uppercase tracking-wider">
+                  Visão Executiva Franqueador
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-emerald-400" />
+                <span>Métricas de Faturamento Recorrente (MRR)</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Acompanhe o faturamento mensal das assinaturas dos restaurantes, taxa de adimplência, períodos de teste e faturas em atraso.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleExportarRestaurantesCSV}
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Exportar Dados</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Cards de Métricas SaaS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* MRR */}
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-medium">MRR (Faturamento Recorrente Mensal)</span>
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-emerald-400 font-mono">
+                R$ {mrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-1">
+                <span>ARR Anualizado:</span>
+                <strong className="text-white font-mono">R$ {arr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+              </div>
+            </div>
+
+            {/* Assinantes Ativos */}
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-medium">Restaurantes Clientes Ativos</span>
+                <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                  <Building2 className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-white font-mono">{totalAtivos}</p>
+              <span className="text-[10px] text-emerald-400 font-semibold block">
+                100% com acesso liberado aos módulos
+              </span>
+            </div>
+
+            {/* Em Teste / Trial */}
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-medium">Em Período de Teste (Trial 7d)</span>
+                <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                  <Users className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-amber-400 font-mono">{totalTrials}</p>
+              <span className="text-[10px] text-amber-400/80 font-semibold block">
+                Oportunidades de conversão este mês
+              </span>
+            </div>
+
+            {/* Atrasados / Inadimplentes */}
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-medium">Faturas em Atraso</span>
+                <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-rose-400 font-mono">{totalAtrasados}</p>
+              <span className="text-[10px] text-rose-400/80 font-semibold block">
+                Restaurantes com pendência financeira
+              </span>
+            </div>
+          </div>
+
+          {/* Métricas Adicionais e Distribuição por Plano */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <span>Indicadores Chave do SaaS</span>
+              </h4>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
+                  <span className="text-xs text-slate-400">Ticket Médio por Assinante</span>
+                  <strong className="text-sm font-mono text-white">
+                    R$ {(mrr / (tenants.length || 1)).toFixed(2)} /mês
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
+                  <span className="text-xs text-slate-400">Taxa de Adimplência</span>
+                  <strong className="text-sm font-mono text-emerald-400">
+                    {Math.round(((tenants.length - totalAtrasados) / (tenants.length || 1)) * 100)}%
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
+                  <span className="text-xs text-slate-400">Meta para 100 Restaurantes</span>
+                  <strong className="text-sm font-mono text-purple-400">
+                    R$ 19.900,00 /mês
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <Layers className="w-4 h-4 text-purple-400" />
+                <span>Receita por Plano de Assinatura</span>
+              </h4>
+              <div className="space-y-3">
+                {planos.map((plano) => {
+                  const totalNestePlano = tenants.filter((t) => t.planoId === plano.id).length;
+                  const receitaPlano = totalNestePlano * plano.precoMensal;
+                  const percentual = mrr > 0 ? Math.round((receitaPlano / mrr) * 100) : 0;
+
+                  return (
+                    <div key={plano.id} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <strong className="text-white">{plano.nome}</strong>
+                          <span className="text-slate-400 font-mono">({totalNestePlano} lojas)</span>
+                        </div>
+                        <span className="font-mono font-bold text-emerald-400">
+                          R$ {receitaPlano.toFixed(2)}/mês ({percentual}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-500 to-emerald-400 rounded-full"
+                          style={{ width: `${percentual}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}

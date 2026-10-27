@@ -118,6 +118,7 @@ export type AbaMasterSaaS =
   | 'suporte_ao_vivo'
   | 'restaurantes'
   | 'editor_loja'
+  | 'faturamento'
   | 'planos'
   | 'regras_planos'
     | 'config'
