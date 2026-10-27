@@ -155,6 +155,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               const abaAtual = searchParams.get('aba') || 'restaurantes';
 
               return [
+                { id: 'central_master', label: 'Central de Gestão Master', icon: Crown, badge: 'Início' },
                 { id: 'restaurantes', label: 'Restaurantes Assinantes', icon: Store, badge: 'Clientes' },
                 { id: 'editor_loja', label: 'Ambiente de Edição das Lojas', icon: Sliders, badge: 'Editar' },
                 { id: 'faturamento', label: 'Faturamento & MRR', icon: TrendingUp },
