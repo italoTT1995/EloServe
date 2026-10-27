@@ -58,7 +58,7 @@ interface DashboardFinanceiroProps {
   onAlternarStatus: (id: string) => void;
   onNovaRecorrencia?: () => void;
   onIrParaLancamentos?: () => void;
-  onIrParaDRE: () => void;
+  onIrParaDRE?: () => void;
   onMarcarComoPago?: (id: string) => void;
 }
 
@@ -406,14 +406,7 @@ export function DashboardFinanceiro({
                 isWhite ? 'border-slate-100 text-slate-500' : 'border-slate-700/50 text-slate-400'
               }`}>
                 <span>{dados.resultadoEstimado >= 0 ? 'Lucro estimado' : 'Déficit no período'}</span>
-                <button
-                  type="button"
-                  onClick={onIrParaDRE}
-                  className="text-[#FF6B00] font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
-                >
-                  <span>Ver DRE</span>
-                  <ChevronRight className="w-3 h-3" />
-                </button>
+                
               </div>
             </div>
 

@@ -22,20 +22,7 @@ interface ProductState {
   removerCategoria: (id: string, tenantId?: string) => void;
 }
 
-function sincronizarComWhatsAppServer(tenantId?: string) {
-  try {
-    const tId = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
-    setTimeout(async () => {
-      try {
-        const { useEloBotStore } = await import('./useEloBotStore');
-        const { useSaaSStore } = await import('./useSaaSStore');
-        const prods = useProductStore.getState().getProdutosPorTenant(tId);
-        const tenant = useSaaSStore.getState().tenants.find((t) => t.id === tId);
-        useEloBotStore.getState().sincronizarConfigComServidor(tId, prods, tenant?.nomeFantasia);
-      } catch (err) {}
-    }, 150);
-  } catch (e) {}
-}
+function sincronizarComWhatsAppServer(_tenantId?: string) {}
 
 export const useProductStore = create<ProductState>()(
   persist(

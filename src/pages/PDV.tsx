@@ -37,7 +37,6 @@ import { useAppStore } from '../store/useAppStore';
 import { useProductStore } from '../store/useProductStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
 import { useSaaSStore } from '../store/useSaaSStore';
-import { useEloBotStore } from '../store/useEloBotStore';
 import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useWindowFocus } from '../hooks/useWindowFocus';
 import { audio } from '../lib/audio';
@@ -80,8 +79,6 @@ export default function PDV() {
   const produtos = getProdutosPorTenant(idLoja);
   const categorias = getCategoriasPorTenant(idLoja);
   const { processarBaixaVenda } = useEstoqueStore();
-  const { getTotalTransbordosPendentes } = useEloBotStore();
-  const pendentesTransbordo = getTotalTransbordosPendentes(idLoja);
 
   // Integração com Módulo de Delivery & Taxas
   const { calcularTaxaPorDistancia, adicionarPedidoDelivery, clientes: clientesCadastrados } = useDeliveryStore();
@@ -623,32 +620,6 @@ export default function PDV() {
 
       {/* Coluna Principal: Catálogo e Produtos */}
       <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
-        {/* Alerta de Transbordo Humano no WhatsApp */}
-        {pendentesTransbordo > 0 && (
-          <div className="mb-3.5 bg-amber-500/15 border border-amber-500/40 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-lg shadow-amber-950/30 animate-pulse">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-amber-500 text-black flex items-center justify-center font-bold shrink-0">
-                <Bell className="w-5 h-5 animate-bounce" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-xs font-black text-amber-300 block truncate">
-                  {pendentesTransbordo} Cliente{pendentesTransbordo > 1 ? 's' : ''} aguardando Atendimento Humano no WhatsApp!
-                </span>
-                <p className="text-[11px] text-amber-200/80 truncate">
-                  O EloBot pausou a IA para você responder diretamente da loja.
-                </p>
-              </div>
-            </div>
-            <Link
-              to="/elobot"
-              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Atender no WhatsApp</span>
-            </Link>
-          </div>
-        )}
-
         {/* Barra Superior: Busca & Filtro de Categorias */}
         <div className="space-y-3 mb-4">
           <div className="flex items-center gap-2.5">

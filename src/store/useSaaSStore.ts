@@ -122,10 +122,8 @@ export type AbaMasterSaaS =
   | 'editor_loja'
   | 'planos'
   | 'regras_planos'
-  | 'whatsapp'
-  | 'config'
-  | 'dre_saas'
-  | 'avisos_globais'
+    | 'config'
+    | 'avisos_globais'
   | 'auditoria';
 
 export interface CustosInfraSaaS {

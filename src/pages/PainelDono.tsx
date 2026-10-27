@@ -30,7 +30,6 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useAppStore } from '../store/useAppStore';
 import { useProductStore } from '../store/useProductStore';
 import { useDeliveryStore } from '../store/useDeliveryStore';
-import { useEloBotStore } from '../store/useEloBotStore';
 import { useThemeStore } from '../store/useThemeStore';
 
 export default function PainelDono() {
@@ -46,9 +45,6 @@ export default function PainelDono() {
   const { getProdutosPorTenant, alternarDisponibilidade, atualizarPreco } = useProductStore();
   const produtos = getProdutosPorTenant(currentTenantId);
   const { pedidos: pedidosDelivery } = useDeliveryStore();
-  const { getConversas, getConfig } = useEloBotStore();
-  const configEloBot = getConfig(currentTenantId);
-  const conversasEloBot = getConversas(currentTenantId);
 
   // Estados locais
   const [lojaAberta, setLojaAberta] = useState(true);
@@ -119,8 +115,8 @@ export default function PainelDono() {
     setLojaAberta(novoStatus);
     dispararToast(
       novoStatus
-        ? 'Restaurante ABERTO para pedidos no Balcão, Mesas e WhatsApp!'
-        : 'Restaurante FECHADO! EloBot e PDV agora recusam novos pedidos.'
+        ? 'Restaurante ABERTO para pedidos no Balcão e Mesas!'
+        : 'Restaurante FECHADO! O PDV agora recusa novos pedidos.'
     );
   }
 

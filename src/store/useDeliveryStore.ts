@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { PedidoDelivery, ClienteDelivery, FaixaTaxaEntrega, StatusDelivery } from '../types';
-import { useEloBotStore } from './useEloBotStore';
 import { useAppStore } from './useAppStore';
 import { useEstoqueStore } from './useEstoqueStore';
 
@@ -244,21 +243,6 @@ export const useDeliveryStore = create<DeliveryState>()(
             return { ...p, status: prox };
           }),
         }));
-
-        if (pedidoAlterado && novoStatusCalc) {
-          try {
-            const { notificarStatusPedidoWhatsApp } = useEloBotStore.getState();
-            notificarStatusPedidoWhatsApp(
-              'tenant-01',
-              pedidoAlterado.clienteTelefone,
-              pedidoAlterado.clienteNome,
-              pedidoAlterado.numero,
-              novoStatusCalc
-            );
-          } catch (e) {
-            console.error('Erro ao disparar notificação WhatsApp:', e);
-          }
-        }
       },
 
       marcarComoPago: (pedidoId) => {

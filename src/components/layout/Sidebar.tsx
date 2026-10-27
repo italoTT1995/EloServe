@@ -50,8 +50,7 @@ const menuItemsDonoSimples: MenuItemDef[] = [
   { path: '/mesas', label: 'Mesas', icon: LayoutGrid, cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
   { path: '/estoque', label: 'Estoque', icon: Package, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/caixa', label: 'Caixa', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante', 'caixa'] },
-  { path: '/financeiro', label: 'Financeiro & DRE', icon: DollarSign, badge: 'NOVO', highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
-  { path: '/elobot', label: 'Marketing', icon: Megaphone, highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/financeiro', label: 'Financeiro', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/funcionarios', label: 'Funcionários', icon: Users, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/delivery', label: 'Entregas/Entregadores', icon: Bike, cargos: ['super_admin', 'admin_restaurante', 'caixa', 'entregador'] },
   { path: '/kds', label: 'Cozinha (KDS)', icon: ChefHat, cargos: ['super_admin', 'admin_restaurante', 'cozinha'] },
@@ -157,14 +156,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
               return [
                 { id: 'restaurantes', label: 'Restaurantes Assinantes', icon: Store, badge: 'Clientes' },
-                { id: 'dossie_mensal', label: 'Dossiê Mensal & Consultoria', icon: FileSpreadsheet, badge: 'DRE' },
                 { id: 'editor_loja', label: 'Ambiente de Edição das Lojas', icon: Sliders, badge: 'Editar' },
-                { id: 'dre_saas', label: 'DRE Executivo & Gráficos', icon: BarChart3, badge: 'DRE' },
                 { id: 'financeiro', label: 'Métricas Financeiras & MRR', icon: TrendingUp },
                 { id: 'planos', label: 'Planos & Mensalidades', icon: Layers },
                 { id: 'avisos_globais', label: 'Central de Avisos (Broadcast)', icon: Megaphone, badge: 'Avisos' },
                 { id: 'auditoria', label: 'Logs de Auditoria SaaS', icon: History, badge: 'Logs' },
-                { id: 'whatsapp', label: 'Instâncias WhatsApp & IA', icon: Bot },
                 { id: 'config', label: 'Configuração Franqueador', icon: ShieldCheck },
               ].map((item) => {
                 const isTabActive = location.pathname === '/saas' && abaAtual === item.id;
@@ -210,13 +206,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               });
             })()}
 
-            {/* ATALHO DIRETO: CENTRAL FINANCEIRA & DRE DAS LOJAS */}
+            {/* ATALHO DIRETO: CENTRAL FINANCEIRA DAS LOJAS */}
             <div className={`pt-3 pb-1 mt-3 border-t ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
               <p className={`px-3 text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5 ${
                 isWhite ? 'text-[#10B981]' : 'text-emerald-400'
               }`}>
                 <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Gestão das Lojas & DRE</span>
+                <span>Gestão das Lojas</span>
               </p>
 
               <NavLink
@@ -236,11 +232,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               >
                 <div className="flex items-center gap-3">
                   <DollarSign className="w-4 h-4 text-emerald-400" />
-                  <span>Financeiro & DRE (Lojas)</span>
+                  <span>Financeiro (Lojas)</span>
                 </div>
-                <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                  NOVO
-                </span>
               </NavLink>
             </div>
           </div>

@@ -9,7 +9,6 @@ import { useSaaSStore } from '../store/useSaaSStore';
 import { useProductStore } from '../store/useProductStore';
 import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useReservaStore } from '../store/useReservaStore';
-import { useEloBotStore } from '../store/useEloBotStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
 
 interface TestResult {
@@ -134,28 +133,7 @@ async function runAllTests() {
     },
   });
 
-  useEloBotStore.setState({
-    configuracoes: {
-      'tenant-01': {
-        tenantId: 'tenant-01',
-        nomeLoja: 'Churrascaria Teste 1',
-        nomeAgente: 'EloBot Fogo de Minas',
-        tomDeVoz: 'amigavel',
-        instrucoesCustomizadas: 'Especialista em carnes',
-        chavePix: 'financeiro@fogodeminas.com.br',
-        ativo: true,
-        palavrasCardapio: 'cardapio',
-        palavrasAtendente: 'humano',
-        palavrasPix: 'pix',
-        mensagemBoasVindas: 'Ola',
-        mensagemCardapio: 'Cardapio',
-        mensagemTransbordo: 'Aguarde',
-        mensagemChavePix: 'Pix',
-        produtosPersonalizados: [],
-      } as any,
-    },
-  });
-
+  
   useEstoqueStore.setState({
     itens: [
       {
@@ -557,27 +535,7 @@ async function runAllTests() {
   }
 
   // -----------------------------------------------------------------
-  // 8. MÓDULO ELOBOT (WHATSAPP IA & ATENDIMENTO AUTOMÁTICO)
-  // -----------------------------------------------------------------
-  console.log('\n🔹 8. Testando Módulo EloBot & WhatsApp IA...');
-  try {
-    const eloBot = useEloBotStore.getState();
-    assert('ELOBOT', 'Store EloBot inicializada', !!eloBot);
-
-    const config = eloBot.getConfig('tenant-01');
-    assert('ELOBOT', 'Configuração de WhatsApp do Tenant 01 recuperada', !!config, `Agente: ${config.nomeAgente}`);
-
-    // Criar nova conversa e enviar mensagem
-    const prods = useProductStore.getState().getProdutosPorTenant('tenant-01');
-    const convId = eloBot.criarNovaConversa('tenant-01', 'Roberto Teste', '5531988880000', 'Olá, gostaria de fazer um pedido');
-    assert('ELOBOT', 'Criação de conversa WhatsApp', !!convId);
-
-    eloBot.enviarMensagemCliente('tenant-01', convId, 'Quais são as opções de carne?', prods, 'Fogo de Minas');
-    const conversa = eloBot.getConversas('tenant-01').find(c => c.id === convId);
-    assert('ELOBOT', 'Mensagem do cliente processada no chat', !!conversa && conversa.mensagens.length >= 2);
-  } catch (err: any) {
-    assert('ELOBOT', 'Falha crítica em EloBot', false, err?.message);
-  }
+  // 8. Modulo EloBot removido
 
   // -----------------------------------------------------------------
   // 9. MÓDULO ESTOQUE & FICHA TÉCNICA

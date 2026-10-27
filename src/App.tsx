@@ -9,7 +9,6 @@ import Cardapio from './pages/Cardapio';
 import Caixa from './pages/Caixa';
 import Financeiro from './pages/Financeiro';
 import Relatorios from './pages/Relatorios';
-import EloBot from './pages/EloBot';
 import SaaSMaster from './pages/SaaSMaster';
 import MinhaAssinatura from './pages/MinhaAssinatura';
 import Estoque from './pages/Estoque';
@@ -170,7 +169,7 @@ export default function App() {
                     }
                   />
 
-                  {/* Financeiro, Notas Fiscais & DRE (Nível 1: Master, Nível 2: Restaurantes) */}
+                  {/* Financeiro & Notas Fiscais (Nível 1: Master, Nível 2: Restaurantes) */}
                   <Route
                     path="/financeiro"
                     element={
@@ -188,28 +187,10 @@ export default function App() {
                     }
                   />
                   <Route
-                    path="/dre"
-                    element={
-                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
-                        <Financeiro />
-                      </RotaProtegida>
-                    }
-                  />
-                  <Route
                     path="/relatorios"
                     element={
                       <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
                         <Financeiro />
-                      </RotaProtegida>
-                    }
-                  />
-
-                  {/* EloBot WhatsApp IA */}
-                  <Route
-                    path="/elobot"
-                    element={
-                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
-                        <EloBot />
                       </RotaProtegida>
                     }
                   />

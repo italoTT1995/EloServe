@@ -65,13 +65,12 @@ import { extrairDadosXmlNFe } from '../utils/nfeXmlParser';
 import { DashboardFinanceiro } from '../components/financeiro/DashboardFinanceiro';
 import { LancamentosSection } from '../components/financeiro/LancamentosSection';
 import { RecorrenciasSection } from '../components/financeiro/RecorrenciasSection';
-import { DRESection } from '../components/financeiro/DRESection';
 import { ModalLancamento } from '../components/financeiro/ModalLancamento';
 import { ModalRecorrencia } from '../components/financeiro/ModalRecorrencia';
 import { ModalHistorico } from '../components/financeiro/ModalHistorico';
 import { ModalCategoria } from '../components/financeiro/ModalCategoria';
 
-export type SubAbaFinanceiro = 'dashboard' | 'lancamentos' | 'recorrencias' | 'dre' | 'notas_fiscais';
+export type SubAbaFinanceiro = 'dashboard' | 'lancamentos' | 'recorrencias' | 'notas_fiscais';
 
 interface FinanceiroProps {
   tenantIdInicial?: string;
@@ -149,18 +148,18 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
   const searchParams = new URLSearchParams(location.search);
   const paramAba = searchParams.get('aba');
   const [subAba, setSubAba] = useState<SubAbaFinanceiro>(() => {
-    if (paramAba === 'dashboard' || paramAba === 'lancamentos' || paramAba === 'recorrencias' || paramAba === 'dre' || paramAba === 'notas_fiscais') {
+    if (paramAba === 'dashboard' || paramAba === 'lancamentos' || paramAba === 'recorrencias'  || paramAba === 'notas_fiscais') {
       return paramAba as SubAbaFinanceiro;
     }
     if (location.pathname === '/notas-fiscais') return 'notas_fiscais';
-    if (location.pathname === '/dre' || location.pathname === '/relatorios') return 'dre';
+    if (location.pathname === '/relatorios') return 'dashboard';
     if (location.pathname === '/gastos') return 'lancamentos';
     return 'dashboard';
   });
 
   // Atualiza sub-aba se a URL mudar
   useEffect(() => {
-    if (paramAba && ['dashboard', 'lancamentos', 'recorrencias', 'dre', 'notas_fiscais'].includes(paramAba)) {
+    if (paramAba && ['dashboard', 'lancamentos', 'recorrencias', 'notas_fiscais'].includes(paramAba)) {
       setSubAba(paramAba as SubAbaFinanceiro);
     }
   }, [paramAba]);
@@ -414,7 +413,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       cadastradoPor: usuarioLogado?.nome || (isRestauranteUser ? 'Gestor da Loja' : 'Admin Master'),
     });
 
-    exibirToast(`Nota Fiscal #${formNF.numero} cadastrada e integrada ao DRE!`);
+    exibirToast(`Nota Fiscal #${formNF.numero} cadastrada e registrada com sucesso!`);
     setModalNFAberto(false);
   }
 
@@ -445,7 +444,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
       tenantId: tenantParaSalvar,
       cadastradoPor: usuarioLogado?.nome || (isRestauranteUser ? 'Gestor da Loja' : 'Admin Master'),
     });
-    exibirToast(`XML NF-e #${xmlPrevia.numero} importado e integrado ao DRE!`);
+    exibirToast(`XML NF-e #${xmlPrevia.numero} importado e importado com sucesso!`);
     setModalImportarXmlAberto(false);
     setXmlPrevia(null);
     setXmlInputTexto('');
@@ -482,12 +481,12 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             }`}
           >
             <DollarSign className="w-6 h-6 text-[#FF6B00]" />
-            <span>{isRestauranteUser ? 'Gestão Financeira & DRE' : 'Central Financeira & DRE Multi-Lojas'}</span>
+            <span>{isRestauranteUser ? 'Gestão Financeira' : 'Central Financeira Multi-Lojas'}</span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
             {isRestauranteUser
-              ? `Acompanhamento de receitas, despesas, lançamentos recorrentes, fluxo de caixa e DRE contábil do restaurante.`
-              : 'Auditoria consolidada de receitas, custos, despesas recorrentes e DRE em tempo real de toda a rede.'}
+              ? `Acompanhamento de receitas, despesas, lançamentos recorrentes, fluxo de caixa do restaurante.`
+              : 'Auditoria consolidada de receitas, custos, despesas recorrentes em tempo real de toda a rede.'}
           </p>
         </div>
 
@@ -586,25 +585,6 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             </span>
           </button>
 
-          {/* Sub-Aba 3: DRE Automático */}
-          <button
-            type="button"
-            onClick={() => setSubAba('dre')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              subAba === 'dre'
-                ? 'bg-[#FF6B00] !text-white shadow-lg shadow-[#FF6B00]/30 font-black'
-                : isWhite
-                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>3. DRE Automático</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-[#10B981] font-bold">
-              Ao Vivo
-            </span>
-          </button>
-
           {/* Sub-Aba 4: Notas Fiscais & XML SEFAZ */}
           <button
             type="button"
@@ -618,7 +598,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             }`}
           >
             <QrCode className="w-4 h-4" />
-            <span>4. Notas Fiscais & XML</span>
+            <span>3. Notas Fiscais & XML</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
                 subAba === 'notas_fiscais'
@@ -678,7 +658,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             setRecorrenciaEmEdicao(null);
             setModalRecorrenciaAberto(true);
           }}
-          onIrParaDRE={() => setSubAba('dre')}
+          
         />
       )}
 
@@ -772,23 +752,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* 4. DRE AUTOMÁTICO & FLUXO DE CAIXA                                        */}
-      {/* ========================================================================= */}
-      {subAba === 'dre' && (
-        <DRESection
-          lancamentos={todosLancamentos}
-          vendas={todasVendas}
-          notasFiscais={todasNotasFiscais}
-          despesasLegado={todasDespesasLegado}
-          categorias={categoriasAtivas}
-          nomeRestaurante={restauranteAtual.nomeFantasia}
-          documentoRestaurante={restauranteAtual.documento}
-          isWhite={isWhite}
-          periodoFiltro="mes_atual"
-        />
-      )}
-
+      
       {/* ========================================================================= */}
       {/* 5. NOTAS FISCAIS & XML SEFAZ                                              */}
       {/* ========================================================================= */}
@@ -798,7 +762,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             <div>
               <h3 className="text-sm font-bold text-white">Notas Fiscais de Compras, Serviços e Vendas</h3>
               <p className="text-xs text-slate-400">
-                Cada nota lançada aqui abate diretamente do CMV (Insumos) ou compõe as despesas do DRE deste restaurante.
+                Controle e escrituração fiscal das notas de entrada e saída.
               </p>
             </div>
 
@@ -862,7 +826,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
                   <th className="py-3 px-4">Número / Modelo</th>
                   <th className="py-3 px-4">Fornecedor / Emitente</th>
                   <th className="py-3 px-4">Data Emissão</th>
-                  <th className="py-3 px-4">Destino no DRE</th>
+                  <th className="py-3 px-4">Classificação Fiscal</th>
                   <th className="py-3 px-4 text-right">Valor Total (R$)</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-center">Ações</th>
@@ -1091,7 +1055,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
                 onClick={confirmarXml}
                 className="flex-1 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#E66000] text-white font-black text-xs disabled:opacity-50 transition-all cursor-pointer"
               >
-                Confirmar & Lançar no DRE
+                Confirmar & Lançar Nota
               </button>
             </div>
           </div>
@@ -1123,7 +1087,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
             <form onSubmit={handleSalvarNF} className="space-y-3">
               <div>
                 <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
-                  Tipo da Nota (Linha DRE) *
+                  Tipo da Nota Fiscal *
                 </label>
                 <select
                   value={formNF.tipo}
@@ -1248,7 +1212,7 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
                   type="submit"
                   className="flex-1 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#E66000] text-white font-black text-xs uppercase shadow-md transition-all cursor-pointer"
                 >
-                  Salvar & Lançar no DRE
+                  Salvar Nota Fiscal
                 </button>
               </div>
             </form>

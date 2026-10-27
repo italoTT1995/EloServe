@@ -31,7 +31,6 @@ import {
 import { useAppStore } from '../../store/useAppStore';
 import { useSaaSStore } from '../../store/useSaaSStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useEloBotStore } from '../../store/useEloBotStore';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useWindowFocus } from '../../hooks/useWindowFocus';
 import { ModalConfiguracaoImpressao } from '../impressao/ModalConfiguracaoImpressao';
@@ -50,7 +49,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const [modalSuporteAberto, setModalSuporteAberto] = useState(false);
   const [modalImpressaoHeaderAberto, setModalImpressaoHeaderAberto] = useState(false);
   const [formSuporte, setFormSuporte] = useState({
-    categoria: 'duvida' as 'caixa' | 'kds' | 'pedidos' | 'whatsapp' | 'duvida' | 'urgente',
+    categoria: 'duvida' as 'caixa' | 'kds' | 'pedidos' | 'duvida' | 'urgente',
     descricao: '',
     prioridade: 'normal' as 'normal' | 'urgente',
     telefoneWhatsApp: '',
@@ -66,8 +65,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const isSuperAdmin = usuarioLogado?.cargo === 'super_admin';
   const isModoGlobal = tenantAtivoId === 'global';
   const mrr = getMRR();
-  const { getTotalTransbordosPendentes } = useEloBotStore();
-  const pendentesTransbordo = getTotalTransbordosPendentes(tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId);
   const { tema, alternarTema, setTema } = useThemeStore();
   const isWhite = tema === 'light';
 
@@ -414,18 +411,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </div>
         )}
 
-        {/* Alerta de Transbordo Humano no WhatsApp */}
-        {pendentesTransbordo > 0 && (
-          <Link
-            to="/elobot"
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 border border-amber-500/40 text-xs font-bold transition-all animate-pulse"
-            title="Clique para atender o cliente no WhatsApp!"
-          >
-            <Bell className="w-3.5 h-3.5 text-amber-700" />
-            <span>{pendentesTransbordo} no WhatsApp</span>
-          </Link>
-        )}
-
         {/* Status de Foco do Sistema (Verifica se fica fora do foco) */}
         <div
           title={
@@ -743,7 +728,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   <option value="caixa">🛒 Frente de Caixa / Fechamento de Venda</option>
                   <option value="kds">🍳 Cozinha & Bar (KDS) / Pedidos</option>
                   <option value="pedidos">🪑 Mesas, Comandas ou Delivery</option>
-                  <option value="whatsapp">🤖 EloBot & WhatsApp IA</option>
                   <option value="urgente">🚨 Problema Crítico / Travamento</option>
                 </select>
               </div>
