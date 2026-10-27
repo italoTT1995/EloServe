@@ -9,7 +9,6 @@ import {
   EyeOff,
   ShieldCheck,
   CheckCircle2,
-  Sparkles,
   KeyRound,
   ChefHat,
   Coffee,
@@ -182,13 +181,6 @@ export default function Login() {
         setErro(res.mensagem || 'Não foi possível criar o login. Verifique os dados informados.');
       }
     }, 450);
-  }
-
-  function preencherAcessoRapido(emailDemo: string, senhaDemo: string) {
-    setEmail(emailDemo);
-    setSenha(senhaDemo);
-    setErro(null);
-    setSucesso(null);
   }
 
   function gerarPinAleatorio() {
@@ -399,97 +391,6 @@ export default function Login() {
                   </>
                 )}
               </button>
-
-              {/* Atalhos Rápidos para Testar as 6 Hierarquias */}
-              <div className="mt-4 pt-3.5 border-t border-slate-800/90">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-[#FF6B00]" />
-                    Testar Hierarquias com 1 Clique
-                  </span>
-                  <span className="text-[9px] text-slate-500 font-mono">Simulador</span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => preencherAcessoRapido('master@eloserve.com.br', '8899')}
-                    className="flex flex-col p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 text-left transition-all group"
-                  >
-                    <div className="flex items-center justify-between w-full mb-0.5">
-                      <span className="text-xs">👑</span>
-                      <span className="text-[9px] font-mono text-purple-400 font-bold">Nível 1</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-white group-hover:text-purple-300 truncate">Admin Master</span>
-                    <span className="text-[9px] text-slate-500 font-mono">PIN: 8899</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => preencherAcessoRapido('gerente@eloserve.com.br', '1234')}
-                    className="flex flex-col p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 text-left transition-all group"
-                  >
-                    <div className="flex items-center justify-between w-full mb-0.5">
-                      <span className="text-xs">👔</span>
-                      <span className="text-[9px] font-mono text-emerald-400 font-bold">Nível 2</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-white group-hover:text-emerald-300 truncate">Dono / Gerente</span>
-                    <span className="text-[9px] text-slate-500 font-mono">PIN: 1234</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => preencherAcessoRapido('caixa@eloserve.com.br', '2233')}
-                    className="flex flex-col p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 text-left transition-all group"
-                  >
-                    <div className="flex items-center justify-between w-full mb-0.5">
-                      <span className="text-xs">🛒</span>
-                      <span className="text-[9px] font-mono text-blue-400 font-bold">Nível 3</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-white group-hover:text-blue-300 truncate">Caixa (PDV)</span>
-                    <span className="text-[9px] text-slate-500 font-mono">PIN: 2233</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => preencherAcessoRapido('garcom@eloserve.com.br', '3344')}
-                    className="flex flex-col p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 text-left transition-all group"
-                  >
-                    <div className="flex items-center justify-between w-full mb-0.5">
-                      <span className="text-xs">📱</span>
-                      <span className="text-[9px] font-mono text-amber-400 font-bold">Nível 4</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-white group-hover:text-amber-300 truncate">Garçom (Salão)</span>
-                    <span className="text-[9px] text-slate-500 font-mono">PIN: 3344</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => preencherAcessoRapido('cozinha@eloserve.com.br', '5566')}
-                    className="flex flex-col p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-rose-500/50 text-left transition-all group"
-                  >
-                    <div className="flex items-center justify-between w-full mb-0.5">
-                      <span className="text-xs">🍳</span>
-                      <span className="text-[9px] font-mono text-rose-400 font-bold">Nível 5</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-white group-hover:text-rose-300 truncate">Cozinha (KDS)</span>
-                    <span className="text-[9px] text-slate-500 font-mono">PIN: 5566</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => preencherAcessoRapido('entregador@eloserve.com.br', '7788')}
-                    className="flex flex-col p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 text-left transition-all group"
-                  >
-                    <div className="flex items-center justify-between w-full mb-0.5">
-                      <span className="text-xs">🛵</span>
-                      <span className="text-[9px] font-mono text-cyan-400 font-bold">Nível 5</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-white group-hover:text-cyan-300 truncate">Entregador</span>
-                    <span className="text-[9px] text-slate-500 font-mono">PIN: 7788</span>
-                  </button>
-                </div>
-              </div>
             </form>
           ) : (
             /* ============================================================== */
