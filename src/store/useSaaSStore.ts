@@ -117,7 +117,6 @@ export const PLANOS_DISPONIVEIS: PlanoAssinatura[] = [
 export type AbaMasterSaaS =
   | 'suporte_ao_vivo'
   | 'restaurantes'
-  | 'dossie_mensal'
   | 'editor_loja'
   | 'planos'
   | 'regras_planos'

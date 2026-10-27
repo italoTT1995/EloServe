@@ -123,11 +123,10 @@ export default function SaaSMaster() {
   const { pedidos: pedidosDelivery } = useDeliveryStore();
   const chamadosAbertos = getChamadosAbertos ? getChamadosAbertos() : [];
 
-  // Estados da Aba Dossiê Mensal & Consultoria Contábil
-  const [dossieTenantId, setDossieTenantId] = useState<string>('todos');
-  const [dossieMes, setDossieMes] = useState<number>(new Date().getMonth() + 1);
-  const [dossieAno, setDossieAno] = useState<number>(new Date().getFullYear());
-  const [dossieAbaInterna, setDossieAbaInterna] = useState<'dre' | 'vendas' | 'estoque' | 'equipe'>('dre');
+  // Estados de Métricas & Relatório Operacional por Loja (integrado na Aba de Restaurantes)
+  const [modalMetricasLoja, setModalMetricasLoja] = useState<TenantRestaurante | null>(null);
+  const [metricasMes, setMetricasMes] = useState<number>(new Date().getMonth() + 1);
+  const [metricasAno, setMetricasAno] = useState<number>(new Date().getFullYear());
 
   const {
     getProdutosPorTenant,
@@ -162,19 +161,6 @@ export default function SaaSMaster() {
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
   const [modalNovoTenant, setModalNovoTenant] = useState(false);
   const [modalCobrancaWhatsApp, setModalCobrancaWhatsApp] = useState<any | null>(null);
-  const [toastDRE, setToastDRE] = useState<string | null>(null);
-
-  function handleToggleDRETenant(tenant: TenantRestaurante) {
-    const novoStatus = !tenant.dreHabilitado;
-    alternarPermissaoDRE(tenant.id, novoStatus, 'Italo Lemos (Super Admin)');
-    setToastDRE(
-      novoStatus
-        ? `Módulo Financeiro & DRE LIBERADO com sucesso para "${tenant.nomeFantasia}"! O estabelecimento já pode consultar resultados contábeis e operacionais.`
-        : `Acesso ao Financeiro & DRE BLOQUEADO para "${tenant.nomeFantasia}". O restaurante não poderá mais acessar o módulo.`
-    );
-    setTimeout(() => setToastDRE(null), 5000);
-  }
-
   // Estados do Cofre de Segurança Master
   const [pinDigitado, setPinDigitado] = useState('');
   const [erroPin, setErroPin] = useState<string | null>(null);
@@ -986,7 +972,7 @@ export default function SaaSMaster() {
 
     let csv = '\uFEFF';
     csv += '=========================================================================\n';
-    csv += `DOSSIÊ FINANCEIRO MENSAL & DRE CONTÁBIL - PLATAFORMA eloGastrô (PADRÃO ABRASEL)\n`;
+    csv += `RELATÓRIO MENSAL DE OPERAÇÕES E VENDAS - PLATAFORMA eloGastrô\n`;
     csv += `Restaurante:;${tenantInfo.nomeFantasia}\n`;
     csv += `Documento (CNPJ/CPF):;${tenantInfo.documento || '-'}\n`;
     csv += `Cidade / UF:;${tenantInfo.cidadeUf || '-'}\n`;
@@ -994,7 +980,7 @@ export default function SaaSMaster() {
     csv += `Data de Emissão do Relatório:;${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}\n`;
     csv += '=========================================================================\n\n';
 
-    csv += '--- 1. DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE) ---\n';
+    csv += '--- 1. DEMONSTRATIVO FINANCEIRO E OPERACIONAL DO MÊS ---\n';
     csv += 'Linha Contábil;Valor (R$);% sobre Receita Líquida\n';
     csv += `1. (+) Receita Bruta Total;R$ ${dados.receitaBruta.toFixed(2)};-\n`;
     csv += `    - Vendas no Salão (Mesas);R$ ${dados.vendasSalao.toFixed(2)};${dados.receitaLiquida > 0 ? ((dados.vendasSalao / dados.receitaLiquida) * 100).toFixed(1) : 0}%\n`;
@@ -1067,7 +1053,7 @@ export default function SaaSMaster() {
     const link = document.createElement('a');
     link.href = url;
     const slug = tenantInfo.nomeFantasia.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    link.setAttribute('download', `dossie_mensal_${slug}_${anoAlvo}_${String(mesAlvo).padStart(2, '0')}.csv`);
+    link.setAttribute('download', `relatorio_operacoes_${slug}_${anoAlvo}_${String(mesAlvo).padStart(2, '0')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1123,7 +1109,7 @@ export default function SaaSMaster() {
     const link = document.createElement('a');
     link.href = url;
     const slug = tenantInfo.nomeFantasia.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    link.setAttribute('download', `dossie_mensal_${slug}_${anoAlvo}_${String(mesAlvo).padStart(2, '0')}.json`);
+    link.setAttribute('download', `relatorio_operacoes_${slug}_${anoAlvo}_${String(mesAlvo).padStart(2, '0')}.json`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1143,8 +1129,6 @@ export default function SaaSMaster() {
       t.cidadeUf.toLowerCase().includes(busca.toLowerCase());
     const matchStatus =
       filtroStatus === 'todos' ||
-      (filtroStatus === 'dre_ativo' && t.dreHabilitado) ||
-      (filtroStatus === 'dre_bloqueado' && !t.dreHabilitado) ||
       t.statusAssinatura === filtroStatus;
     return matchBusca && matchStatus;
   });
@@ -1586,23 +1570,6 @@ export default function SaaSMaster() {
           <Store className="w-4 h-4" />
           <span>Restaurantes Assinantes ({tenants.length})</span>
         </button>
-
-        <button
-          onClick={() => handleMudarAba('dossie_mensal')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            abaAtiva === 'dossie_mensal'
-              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25 ring-2 ring-purple-400'
-              : 'bg-slate-900 text-purple-300 hover:text-white border border-purple-500/30'
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4 text-purple-300" />
-          <span>Dossiê Mensal & DRE Lojas</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/30 uppercase font-black">
-            Consultor
-          </span>
-        </button>
-
-        
 
         <button
           onClick={() => handleMudarAba('editor_loja')}
@@ -2185,6 +2152,15 @@ export default function SaaSMaster() {
                   </button>
 
                   <button
+                    onClick={() => setModalMetricasLoja(tFoco)}
+                    className="px-4 py-2.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-500/40 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+                    title="Ver resumo de vendas, canais e exportar relatório"
+                  >
+                    <BarChart3 className="w-4 h-4 text-purple-400" />
+                    <span>Métricas da Loja</span>
+                  </button>
+
+                  <button
                     onClick={() => selecionarTenant('global')}
                     className="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 font-bold text-xs transition-all cursor-pointer"
                   >
@@ -2212,8 +2188,6 @@ export default function SaaSMaster() {
               {[
                 { id: 'todos', label: `Todos (${tenants.length})` },
                 { id: 'ativo', label: 'Ativos' },
-                { id: 'dre_ativo', label: 'Com DRE Liberado' },
-                { id: 'dre_bloqueado', label: 'DRE Bloqueado' },
                 { id: 'trial', label: 'Em Teste' },
                 { id: 'atrasado', label: 'Atrasados' },
                 { id: 'bloqueado', label: 'Bloqueados' },
@@ -2230,21 +2204,18 @@ export default function SaaSMaster() {
                   {item.label}
                 </button>
               ))}
-            </div>
-          </div>
 
-          {/* Feedback de Alteração de Permissão DRE */}
-          {toastDRE && (
-            <div className="p-3.5 rounded-2xl bg-purple-950/90 border border-purple-500/50 text-purple-200 text-xs font-bold flex items-center justify-between shadow-2xl animate-in fade-in">
-              <div className="flex items-center gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0" />
-                <span>{toastDRE}</span>
-              </div>
-              <button onClick={() => setToastDRE(null)} className="text-slate-400 hover:text-white">
-                <X className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => setModalMetricasLoja({ id: 'todos', nomeFantasia: 'Todos os Restaurantes (Consolidado Geral)' } as any)}
+                className="px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 text-purple-300 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                title="Ver métricas consolidadas de todas as lojas"
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
+                <span>Métricas Consolidadas</span>
               </button>
             </div>
-          )}
+          </div>
 
           {/* Tabela de Assinantes SaaS */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-x-auto shadow-xl">
@@ -2256,7 +2227,7 @@ export default function SaaSMaster() {
                   <th className="py-3.5 px-4">Plano</th>
                   <th className="py-3.5 px-4">Mensalidade</th>
                   <th className="py-3.5 px-4">Status Assinatura</th>
-                  <th className="py-3.5 px-4 text-center">Financeiro & DRE</th>
+                  <th className="py-3.5 px-4 text-center">Relatório & Métricas</th>
                   <th className="py-3.5 px-4">Vencimento</th>
                   <th className="py-3.5 px-5 text-right">Ações Rápidas</th>
                 </tr>
@@ -2372,38 +2343,17 @@ export default function SaaSMaster() {
                           )}
                         </td>
 
-                        {/* Financeiro & DRE (Feature Gating) */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleDRETenant(tenant)}
-                              className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                tenant.dreHabilitado ? 'bg-emerald-500' : 'bg-slate-700'
-                              }`}
-                              title={tenant.dreHabilitado ? 'Financeiro & DRE Liberado - Clique para Bloquear' : 'Financeiro & DRE Bloqueado - Clique para Liberar'}
-                            >
-                              <span
-                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                  tenant.dreHabilitado ? 'translate-x-5' : 'translate-x-0'
-                                }`}
-                              />
-                            </button>
-                            <span
-                              className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                                tenant.dreHabilitado
-                                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
-                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
-                              }`}
-                            >
-                              {tenant.dreHabilitado ? 'Liberado' : 'Bloqueado'}
-                            </span>
-                          </div>
-                          {tenant.drePermissaoModificadoEm && (
-                            <span className="text-[9px] text-slate-500 block mt-1 font-mono">
-                              Mod: {tenant.drePermissaoModificadoEm.split(' ')[0]}
-                            </span>
-                          )}
+                        {/* Relatório & Métricas */}
+                        <td className="py-3.5 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setModalMetricasLoja(tenant)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-purple-500/40 text-purple-300 hover:text-white text-[11px] font-bold transition-all shadow-sm cursor-pointer"
+                            title="Abrir Raio-X com vendas, canais e métricas desta loja"
+                          >
+                            <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
+                            <span>Ver Métricas</span>
+                          </button>
                         </td>
 
                         {/* Vencimento */}
@@ -2414,6 +2364,16 @@ export default function SaaSMaster() {
                         {/* Ações */}
                         <td className="py-3.5 px-5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Botão Ver Métricas */}
+                            <button
+                              type="button"
+                              onClick={() => setModalMetricasLoja(tenant)}
+                              title="Ver resumo de vendas e métricas operacionais"
+                              className="px-2.5 py-1.5 rounded-xl bg-purple-950/80 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                            >
+                              <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
+                              <span className="hidden lg:inline">Métricas</span>
+                            </button>
                             {/* Botão Credenciais & Login Criado pelo Master */}
                             <button
                               type="button"
@@ -2501,1152 +2461,6 @@ export default function SaaSMaster() {
             </table>
           </div>
         </div>
-      )}
-
-      {/* CONTEÚDO DA ABA: DOSSIÊ MENSAL & CONSULTORIA FINANCEIRA (EXCLUSIVO SUPER ADMIN) */}
-      {abaAtiva === 'dossie_mensal' && (() => {
-        const dadosDossie = calcularDossieTenant(dossieTenantId, dossieMes, dossieAno);
-        const tenantInfo = dossieTenantId === 'todos'
-          ? { nomeFantasia: 'Todos os Restaurantes (Consolidado Multi-Loja)', documento: 'Multi-Tenant', cidadeUf: 'Brasil' }
-          : tenants.find((t) => t.id === dossieTenantId) || { nomeFantasia: 'Restaurante', documento: '-', cidadeUf: '-' };
-
-        const NOMES_MESES = [
-          'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-        ];
-
-        return (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Top Banner Exclusivo */}
-            <div className="bg-gradient-to-r from-purple-950/90 via-slate-900 to-indigo-950/90 border border-purple-500/40 p-6 rounded-3xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 uppercase tracking-wider flex items-center gap-1">
-                    <Crown className="w-3 h-3 text-purple-400" />
-                    Exclusivo Super Admin Master
-                  </span>
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 uppercase tracking-wider">
-                    Auditoria & DRE Mensal
-                  </span>
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 uppercase tracking-wider">
-                    Pacote para Consultoria
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
-                  <FileSpreadsheet className="w-6 h-6 text-purple-400 shrink-0" />
-                  <span>Dossiê Mensal & Consultoria Financeira das Lojas</span>
-                </h2>
-                <p className="text-xs text-purple-200/80 max-w-2xl leading-relaxed">
-                  Ambiente exclusivo para o Administrador Master e consultores financeiros. Extraia todos os dados operacionais, faturamento, estoque, CMV, despesas e equipe de cada restaurante para elaborar relatórios contábeis e a DRE mensal definitiva.
-                </p>
-              </div>
-
-              {/* Botões de Exportação Rápida */}
-              <div className="flex items-center gap-2 flex-wrap shrink-0">
-                
-                <button
-                  type="button"
-                  onClick={() => handleBaixarDossieCSV(dossieTenantId, dossieMes, dossieAno)}
-                  className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
-                  title="Baixar planilha completa em formato CSV/Excel com todas as abas e cálculos"
-                >
-                  <Download className="w-4 h-4 text-purple-200" />
-                  <span>Baixar Dossiê (CSV/Excel)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleBaixarDossieJSON(dossieTenantId, dossieMes, dossieAno)}
-                  className="px-3 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
-                  title="Baixar estrutura bruta em JSON"
-                >
-                  <FileText className="w-4 h-4 text-purple-400" />
-                  <span>JSON</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-3 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
-                  title="Imprimir visualização do Dossiê"
-                >
-                  <Printer className="w-4 h-4 text-slate-400" />
-                  <span>Imprimir / PDF</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Barra de Seleção: Restaurante + Mês + Ano */}
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-lg">
-              <div className="flex items-center gap-3 flex-wrap flex-1">
-                {/* Seletor de Restaurante */}
-                <div className="flex items-center gap-2 flex-1 min-w-[240px]">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
-                    <Store className="w-3.5 h-3.5 text-purple-400" />
-                    Restaurante:
-                  </label>
-                  <select
-                    value={dossieTenantId}
-                    onChange={(e) => setDossieTenantId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-purple-500 cursor-pointer"
-                  >
-                    <option value="todos">🌐 Todos os Restaurantes (Consolidado Geral)</option>
-                    {tenants.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        🍽️ {t.nomeFantasia} — {t.cidadeUf || 'Brasil'} ({t.statusAssinatura})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Seletor de Mês */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                    Mês:
-                  </label>
-                  <select
-                    value={dossieMes}
-                    onChange={(e) => setDossieMes(Number(e.target.value))}
-                    className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-purple-500 cursor-pointer"
-                  >
-                    {NOMES_MESES.map((nome, i) => (
-                      <option key={i + 1} value={i + 1}>
-                        {nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Seletor de Ano */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
-                    Ano:
-                  </label>
-                  <select
-                    value={dossieAno}
-                    onChange={(e) => setDossieAno(Number(e.target.value))}
-                    className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-purple-500 cursor-pointer"
-                  >
-                    <option value={2026}>2026</option>
-                    <option value={2025}>2025</option>
-                    <option value={2024}>2024</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Botões rápidos: Mês Atual / Mês Anterior */}
-              <div className="flex items-center gap-1.5 shrink-0 self-end md:self-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const agora = new Date();
-                    setDossieMes(agora.getMonth() + 1);
-                    setDossieAno(agora.getFullYear());
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-purple-300 border border-slate-700 transition-colors cursor-pointer"
-                >
-                  Mês Atual
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const agora = new Date();
-                    const mesAnt = agora.getMonth() === 0 ? 12 : agora.getMonth();
-                    const anoAnt = agora.getMonth() === 0 ? agora.getFullYear() - 1 : agora.getFullYear();
-                    setDossieMes(mesAnt);
-                    setDossieAno(anoAnt);
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-300 border border-slate-700 transition-colors cursor-pointer"
-                >
-                  Mês Anterior
-                </button>
-              </div>
-            </div>
-
-            {/* 6 Cards com KPIs Financeiros do Mês Selecionado */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Receita Bruta</p>
-                <p className="text-lg font-black text-white font-mono">R$ {dadosDossie.receitaBruta.toFixed(2)}</p>
-                <p className="text-[10px] text-slate-400 font-medium">{dadosDossie.totalPedidos} pedidos faturados</p>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Receita Líquida</p>
-                <p className="text-lg font-black text-emerald-400 font-mono">R$ {dadosDossie.receitaLiquida.toFixed(2)}</p>
-                <p className="text-[10px] text-slate-400 font-medium">Após deduções e descontos</p>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CMV Total (Insumos)</p>
-                <p className="text-lg font-black text-amber-400 font-mono">R$ {dadosDossie.cmvTotal.toFixed(2)}</p>
-                <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
-                  dadosDossie.cmvPct <= 35 ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400'
-                }`}>
-                  {dadosDossie.cmvPct.toFixed(1)}% da Receita
-                </span>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Margem Bruta</p>
-                <p className="text-lg font-black text-purple-300 font-mono">R$ {dadosDossie.margemBruta.toFixed(2)}</p>
-                <p className="text-[10px] text-purple-400 font-medium">{dadosDossie.margemBrutaPct.toFixed(1)}% de margem</p>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Despesas + Sangrias</p>
-                <p className="text-lg font-black text-rose-400 font-mono">R$ {dadosDossie.totalDespesasEOperacoes.toFixed(2)}</p>
-                <p className="text-[10px] text-slate-400 font-medium">Fixas, vars. e sangrias</p>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Resultado Operacional</p>
-                <p className={`text-lg font-black font-mono ${
-                  dadosDossie.resultadoOperacional >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                }`}>
-                  R$ {dadosDossie.resultadoOperacional.toFixed(2)}
-                </p>
-                <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
-                  dadosDossie.resultadoOperacional >= 0 ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'
-                }`}>
-                  {dadosDossie.margemOperacionalPct.toFixed(1)}% Lucro
-                </span>
-              </div>
-            </div>
-
-            {/* Menu de Sub-Abas do Dossiê */}
-            <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => setDossieAbaInterna('dre')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
-                  dossieAbaInterna === 'dre'
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                }`}
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>1. DRE Contábil Mensal</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDossieAbaInterna('vendas')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
-                  dossieAbaInterna === 'vendas'
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                }`}
-              >
-                <PieChart className="w-3.5 h-3.5" />
-                <span>2. Mix de Canais & Pagamentos</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDossieAbaInterna('estoque')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
-                  dossieAbaInterna === 'estoque'
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                }`}
-              >
-                <Package className="w-3.5 h-3.5" />
-                <span>3. Insumos & Posição de Estoque</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDossieAbaInterna('equipe')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
-                  dossieAbaInterna === 'equipe'
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>4. Quadro de Colaboradores</span>
-              </button>
-            </div>
-
-            {/* CONTEÚDO DAS SUB-ABAS */}
-            {dossieAbaInterna === 'dre' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
-                  <div>
-                    <h3 className="text-base font-black text-white flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4 text-purple-400" />
-                      <span>Demonstração do Resultado do Exercício — {NOMES_MESES[dossieMes - 1]} de {dossieAno}</span>
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Apuração contábil oficial para {tenantInfo.nomeFantasia}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleBaixarDossieCSV(dossieTenantId, dossieMes, dossieAno)}
-                      className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Exportar CSV</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                        <th className="py-3 px-4">Linha da DRE Contábil</th>
-                        <th className="py-3 px-4 text-right">Valor em R$</th>
-                        <th className="py-3 px-4 text-right">% Receita Líquida</th>
-                        <th className="py-3 px-4 text-center">Classificação</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-medium">
-                      <tr className="bg-slate-950/40 font-bold">
-                        <td className="py-3 px-4 text-white">(+) RECEITA OPERACIONAL BRUTA</td>
-                        <td className="py-3 px-4 text-right font-mono text-white">R$ {dadosDossie.receitaBruta.toFixed(2)}</td>
-                        <td className="py-3 px-4 text-right font-mono text-slate-400">-</td>
-                        <td className="py-3 px-4 text-center"><span className="text-[10px] px-2 py-0.5 rounded bg-purple-950 text-purple-300 font-bold">Faturamento</span></td>
-                      </tr>
-                      <tr className="text-slate-300">
-                        <td className="py-2.5 px-4 pl-8">↳ Vendas no Salão (Mesas & Comandas)</td>
-                        <td className="py-2.5 px-4 text-right font-mono">R$ {dadosDossie.vendasSalao.toFixed(2)}</td>
-                        <td className="py-2.5 px-4 text-right font-mono text-slate-400">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.vendasSalao / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2.5 px-4 text-center text-slate-500">Canal Presencial</td>
-                      </tr>
-                      <tr className="text-slate-300">
-                        <td className="py-2.5 px-4 pl-8">↳ Vendas no Balcão (Takeaway / PDV)</td>
-                        <td className="py-2.5 px-4 text-right font-mono">R$ {dadosDossie.vendasBalcao.toFixed(2)}</td>
-                        <td className="py-2.5 px-4 text-right font-mono text-slate-400">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.vendasBalcao / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2.5 px-4 text-center text-slate-500">Canal Balcão</td>
-                      </tr>
-                      <tr className="text-slate-300">
-                        <td className="py-2.5 px-4 pl-8">↳ Vendas no Delivery</td>
-                        <td className="py-2.5 px-4 text-right font-mono">R$ {dadosDossie.vendasDelivery.toFixed(2)}</td>
-                        <td className="py-2.5 px-4 text-right font-mono text-slate-400">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.vendasDelivery / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2.5 px-4 text-center text-slate-500">Canal Online</td>
-                      </tr>
-                      <tr className="text-slate-300">
-                        <td className="py-2.5 px-4 pl-8">↳ Taxa de Serviço (10% Garçom)</td>
-                        <td className="py-2.5 px-4 text-right font-mono">R$ {dadosDossie.totalTaxaServico.toFixed(2)}</td>
-                        <td className="py-2.5 px-4 text-right font-mono text-slate-400">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.totalTaxaServico / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2.5 px-4 text-center text-slate-500">Gorjeta / Equipe</td>
-                      </tr>
-                      <tr className="text-slate-300">
-                        <td className="py-2.5 px-4 pl-8">↳ Couvert Artístico Cobrado</td>
-                        <td className="py-2.5 px-4 text-right font-mono">R$ {dadosDossie.totalCouvert.toFixed(2)}</td>
-                        <td className="py-2.5 px-4 text-right font-mono text-slate-400">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.totalCouvert / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2.5 px-4 text-center text-slate-500">Música Ao Vivo</td>
-                      </tr>
-                      <tr className="text-rose-400">
-                        <td className="py-2.5 px-4 pl-8">(-) Deduções: Descontos e Cancelamentos</td>
-                        <td className="py-2.5 px-4 text-right font-mono">- R$ {(dadosDossie.totalDescontos + dadosDossie.totalCancelamentos).toFixed(2)}</td>
-                        <td className="py-2.5 px-4 text-right font-mono">{dadosDossie.receitaLiquida > 0 ? (((dadosDossie.totalDescontos + dadosDossie.totalCancelamentos) / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2.5 px-4 text-center"><span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-bold">Dedução</span></td>
-                      </tr>
-                      <tr className="bg-purple-950/30 font-bold text-emerald-400 border-t border-b border-purple-500/30">
-                        <td className="py-3 px-4">(=) RECEITA OPERACIONAL LÍQUIDA</td>
-                        <td className="py-3 px-4 text-right font-mono text-base">R$ {dadosDossie.receitaLiquida.toFixed(2)}</td>
-                        <td className="py-3 px-4 text-right font-mono">100.0%</td>
-                        <td className="py-3 px-4 text-center"><span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-bold">Base 100%</span></td>
-                      </tr>
-                      <tr className="text-amber-400 font-semibold">
-                        <td className="py-3 px-4 pl-8">(-) CUSTO DAS MERCADORIAS VENDIDAS (CMV)</td>
-                        <td className="py-3 px-4 text-right font-mono">- R$ {dadosDossie.cmvTotal.toFixed(2)}</td>
-                        <td className="py-3 px-4 text-right font-mono">{dadosDossie.cmvPct.toFixed(1)}%</td>
-                        <td className="py-3 px-4 text-center"><span className="text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-300 font-bold">Custo Direto</span></td>
-                      </tr>
-                      <tr className="bg-slate-950/40 font-bold text-purple-300">
-                        <td className="py-3 px-4">(=) MARGEM BRUTA / LUCRO BRUTO</td>
-                        <td className="py-3 px-4 text-right font-mono text-base">R$ {dadosDossie.margemBruta.toFixed(2)}</td>
-                        <td className="py-3 px-4 text-right font-mono">{dadosDossie.margemBrutaPct.toFixed(1)}%</td>
-                        <td className="py-3 px-4 text-center"><span className="text-[10px] px-2 py-0.5 rounded bg-purple-950 text-purple-300 font-bold">Margem</span></td>
-                      </tr>
-                      <tr className="text-rose-400 font-semibold bg-rose-950/20">
-                        <td className="py-2.5 px-4 pl-8">(-) Despesas Operacionais Totais (Padrão Abrasel)</td>
-                        <td className="py-2.5 px-4 text-right font-mono">- R$ {dadosDossie.totalDespesasCadastradas.toFixed(2)}</td>
-                        <td className="py-2.5 px-4 text-right font-mono">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.totalDespesasCadastradas / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2.5 px-4 text-center"><span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-bold">Despesas</span></td>
-                      </tr>
-                      <tr className="text-slate-300">
-                        <td className="py-2 px-4 pl-12 text-[11px]">↳ 6.1 Pessoal & Equipe (Salários, Diárias Extras)</td>
-                        <td className="py-2 px-4 text-right font-mono text-[11px]">- R$ {dadosDossie.despesasPessoal.toFixed(2)}</td>
-                        <td className="py-2 px-4 text-right font-mono text-slate-400 text-[11px]">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.despesasPessoal / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2 px-4 text-center text-slate-500 text-[10px]">Pessoal</td>
-                      </tr>
-                      <tr className="text-slate-300">
-                        <td className="py-2 px-4 pl-12 text-[11px]">↳ 6.2 Ocupação & Utilidades (Aluguel, Luz, Água, Gás)</td>
-                        <td className="py-2 px-4 text-right font-mono text-[11px]">- R$ {dadosDossie.despesasOcupacao.toFixed(2)}</td>
-                        <td className="py-2 px-4 text-right font-mono text-slate-400 text-[11px]">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.despesasOcupacao / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2 px-4 text-center text-slate-500 text-[10px]">Ocupação</td>
-                      </tr>
-                      <tr className="text-slate-300">
-                        <td className="py-2 px-4 pl-12 text-[11px]">↳ 6.3 Comercial & Embalagens Delivery</td>
-                        <td className="py-2 px-4 text-right font-mono text-[11px]">- R$ {dadosDossie.despesasComerciais.toFixed(2)}</td>
-                        <td className="py-2 px-4 text-right font-mono text-slate-400 text-[11px]">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.despesasComerciais / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2 px-4 text-center text-slate-500 text-[10px]">Comercial</td>
-                      </tr>
-                      <tr className="text-slate-300">
-                        <td className="py-2 px-4 pl-12 text-[11px]">↳ 6.4 Serviços, TI & Manutenção (eloGastrô)</td>
-                        <td className="py-2 px-4 text-right font-mono text-[11px]">- R$ {dadosDossie.despesasServicos.toFixed(2)}</td>
-                        <td className="py-2 px-4 text-right font-mono text-slate-400 text-[11px]">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.despesasServicos / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2 px-4 text-center text-slate-500 text-[10px]">Serviços / TI</td>
-                      </tr>
-                      <tr className="text-slate-300">
-                        <td className="py-2 px-4 pl-12 text-[11px]">↳ 6.5 Outras Despesas Gerais & Administrativas</td>
-                        <td className="py-2 px-4 text-right font-mono text-[11px]">- R$ {dadosDossie.outrasDespesas.toFixed(2)}</td>
-                        <td className="py-2 px-4 text-right font-mono text-slate-400 text-[11px]">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.outrasDespesas / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2 px-4 text-center text-slate-500 text-[10px]">Gerais</td>
-                      </tr>
-                      <tr className="text-rose-400">
-                        <td className="py-2.5 px-4 pl-8">(-) Sangrias e Retiradas Físicas de Caixa</td>
-                        <td className="py-2.5 px-4 text-right font-mono">- R$ {dadosDossie.totalSangrias.toFixed(2)}</td>
-                        <td className="py-2.5 px-4 text-right font-mono">{dadosDossie.receitaLiquida > 0 ? ((dadosDossie.totalSangrias / dadosDossie.receitaLiquida) * 100).toFixed(1) : 0}%</td>
-                        <td className="py-2.5 px-4 text-center"><span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-bold">Caixa</span></td>
-                      </tr>
-                      <tr className={`font-black border-t-2 ${
-                        dadosDossie.resultadoOperacional >= 0
-                          ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/40'
-                          : 'bg-rose-950/40 text-rose-400 border-rose-500/40'
-                      }`}>
-                        <td className="py-4 px-4 text-sm uppercase">(=) RESULTADO OPERACIONAL DO MÊS (EBITDA ESTIMADO)</td>
-                        <td className="py-4 px-4 text-right font-mono text-lg">R$ {dadosDossie.resultadoOperacional.toFixed(2)}</td>
-                        <td className="py-4 px-4 text-right font-mono text-sm">{dadosDossie.margemOperacionalPct.toFixed(1)}%</td>
-                        <td className="py-4 px-4 text-center">
-                          <span className={`text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider font-black ${
-                            dadosDossie.resultadoOperacional >= 0 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                          }`}>
-                            {dadosDossie.resultadoOperacional >= 0 ? 'Lucro no Mês' : 'Prejuízo no Mês'}
-                          </span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {dossieAbaInterna === 'vendas' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Mix de Canais */}
-                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Store className="w-4 h-4 text-purple-400" />
-                    <span>Faturamento por Canal de Venda</span>
-                  </h3>
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-slate-300">Salão & Mesas</span>
-                        <span className="font-mono text-white font-bold">R$ {dadosDossie.vendasSalao.toFixed(2)} ({dadosDossie.receitaBruta > 0 ? ((dadosDossie.vendasSalao / dadosDossie.receitaBruta) * 100).toFixed(1) : 0}%)</span>
-                      </div>
-                      <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
-                        <div className="h-full bg-purple-500 rounded-full" style={{ width: `${dadosDossie.receitaBruta > 0 ? (dadosDossie.vendasSalao / dadosDossie.receitaBruta) * 100 : 0}%` }} />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-slate-300">Balcão / Takeaway</span>
-                        <span className="font-mono text-white font-bold">R$ {dadosDossie.vendasBalcao.toFixed(2)} ({dadosDossie.receitaBruta > 0 ? ((dadosDossie.vendasBalcao / dadosDossie.receitaBruta) * 100).toFixed(1) : 0}%)</span>
-                      </div>
-                      <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
-                        <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${dadosDossie.receitaBruta > 0 ? (dadosDossie.vendasBalcao / dadosDossie.receitaBruta) * 100 : 0}%` }} />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-slate-300">Delivery & Entregas</span>
-                        <span className="font-mono text-white font-bold">R$ {dadosDossie.vendasDelivery.toFixed(2)} ({dadosDossie.receitaBruta > 0 ? ((dadosDossie.vendasDelivery / dadosDossie.receitaBruta) * 100).toFixed(1) : 0}%)</span>
-                      </div>
-                      <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
-                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${dadosDossie.receitaBruta > 0 ? (dadosDossie.vendasDelivery / dadosDossie.receitaBruta) * 100 : 0}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Meios de Pagamento */}
-                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-emerald-400" />
-                    <span>Meios de Pagamento Utilizados</span>
-                  </h3>
-                  <div className="space-y-2.5 text-xs">
-                    <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                      <span className="text-slate-300">PIX Instantâneo</span>
-                      <span className="font-mono text-emerald-400 font-bold">R$ {dadosDossie.pgtoPix.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                      <span className="text-slate-300">Cartão de Crédito</span>
-                      <span className="font-mono text-purple-300 font-bold">R$ {dadosDossie.pgtoCredito.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                      <span className="text-slate-300">Cartão de Débito</span>
-                      <span className="font-mono text-indigo-300 font-bold">R$ {dadosDossie.pgtoDebito.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                      <span className="text-slate-300">Dinheiro Físico</span>
-                      <span className="font-mono text-amber-300 font-bold">R$ {dadosDossie.pgtoDinheiro.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {dossieAbaInterna === 'estoque' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Package className="w-4 h-4 text-amber-400" />
-                    <span>Insumos Cadastrados & Posição de Estoque</span>
-                  </h3>
-                  <span className="text-xs text-slate-400">{dadosDossie.estoqueItens.length} itens controlados</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                        <th className="py-2.5 px-3">Insumo</th>
-                        <th className="py-2.5 px-3">Categoria</th>
-                        <th className="py-2.5 px-3">Unidade</th>
-                        <th className="py-2.5 px-3 text-right">Saldo Atual</th>
-                        <th className="py-2.5 px-3 text-right">Mínimo</th>
-                        <th className="py-2.5 px-3 text-right">Custo Unit.</th>
-                        <th className="py-2.5 px-3 text-right">Total Imobilizado</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {dadosDossie.estoqueItens.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="text-center py-6 text-slate-500">Nenhum insumo registrado.</td>
-                        </tr>
-                      ) : (
-                        dadosDossie.estoqueItens.map((it) => (
-                          <tr key={it.id} className="hover:bg-slate-800/40">
-                            <td className="py-2.5 px-3 font-bold text-white">{it.nome}</td>
-                            <td className="py-2.5 px-3 text-slate-400 capitalize">{it.categoria}</td>
-                            <td className="py-2.5 px-3 text-slate-400">{it.unidadeMedida}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-white">{it.quantidadeAtual}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-slate-400">{it.estoqueMinimo}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-purple-300">R$ {(it.precoCusto || 0).toFixed(2)}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-400 font-bold">R$ {((it.quantidadeAtual || 0) * (it.precoCusto || 0)).toFixed(2)}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {dossieAbaInterna === 'equipe' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Users className="w-4 h-4 text-purple-400" />
-                    <span>Quadro de Colaboradores & Equipe</span>
-                  </h3>
-                  <span className="text-xs text-slate-400">{dadosDossie.colaboradores.length} colaboradores cadastrados</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                        <th className="py-2.5 px-3">Nome</th>
-                        <th className="py-2.5 px-3">Cargo / Função</th>
-                        <th className="py-2.5 px-3">E-mail</th>
-                        <th className="py-2.5 px-3 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {dadosDossie.colaboradores.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="text-center py-6 text-slate-500">Nenhum colaborador vinculado a esta loja.</td>
-                        </tr>
-                      ) : (
-                        dadosDossie.colaboradores.map((colab) => (
-                          <tr key={colab.id} className="hover:bg-slate-800/40">
-                            <td className="py-2.5 px-3 font-bold text-white">{colab.nome}</td>
-                            <td className="py-2.5 px-3 text-purple-300 capitalize">{colab.cargo.replace('_', ' ')}</td>
-                            <td className="py-2.5 px-3 text-slate-400">{colab.email}</td>
-                            <td className="py-2.5 px-3 text-center">
-                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                                colab.ativo ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'
-                              }`}>
-                                {colab.ativo ? 'Ativo' : 'Inativo'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* CONTEÚDO DA ABA: AMBIENTE DE EDIÇÃO DAS LOJAS */}
-      {abaAtiva === 'editor_loja' && (
-        !tenantEmEdicao ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center space-y-4">
-            <Store className="w-12 h-12 text-purple-400 mx-auto opacity-50" />
-            <h3 className="text-base font-bold text-white">Nenhum restaurante cliente cadastrado ainda</h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Para editar dados e cardápio de uma loja, cadastre o primeiro restaurante na aba "Restaurantes Assinantes".
-            </p>
-            <button
-              onClick={() => {
-                handleMudarAba('restaurantes');
-                setModalNovoTenant(true);
-              }}
-              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 cursor-pointer"
-            >
-              + Cadastrar Primeiro Restaurante
-            </button>
-          </div>
-        ) : (
-        <div className="space-y-6">
-          {/* Seletor Superior e Resumo da Loja */}
-          <div className="bg-gradient-to-r from-slate-900 via-purple-950/40 to-slate-900 border border-purple-500/30 p-5 rounded-3xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 uppercase tracking-wider">
-                  Ambiente Central Franqueador
-                </span>
-                <span className="text-xs text-slate-400">• ID: {tenantEmEdicao?.id}</span>
-              </div>
-              <h3 className="text-xl font-black text-white flex items-center gap-2">
-                <Sliders className="w-5 h-5 text-purple-400" />
-                <span>Modificar Restaurante: {tenantEmEdicao?.nomeFantasia}</span>
-              </h3>
-              <p className="text-xs text-slate-400">
-                Selecione a loja para alterar dados cadastrais, vigência da assinatura, planos de acesso ou ajustar pratos e preços do cardápio.
-              </p>
-            </div>
-
-            {/* Dropdown Seletor de Loja */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="relative">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-purple-300 block mb-1">
-                  Alternar Restaurante:
-                </label>
-                <select
-                  value={tenantEmEdicao?.id || ''}
-                  onChange={(e) => setTenantEmEdicaoId(e.target.value)}
-                  className="w-full sm:w-72 px-3 py-2 bg-slate-950 border border-purple-500/40 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-purple-400 transition-colors"
-                >
-                  {tenants.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.nomeFantasia} ({t.planoId.toUpperCase()} • {t.statusAssinatura})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2 self-end sm:self-auto pt-4 sm:pt-4">
-                <button
-                  onClick={() => tenantEmEdicao && handleEntrarNaLoja(tenantEmEdicao.id)}
-                  title="Abrir o PDV deste restaurante em Modo Suporte"
-                  className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-purple-600/30 cursor-pointer active:scale-95"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Inspecionar PDV</span>
-                </button>
-
-                <button
-                  onClick={() => tenantEmEdicao && setModalCobrancaWhatsApp(tenantEmEdicao)}
-                  title="Cobrança PIX via WhatsApp"
-                  className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Sub-navegação interna do Editor: Dados vs Cardápio & Preços */}
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-            <button
-              onClick={() => setSubAbaEditor('dados_loja')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                subAbaEditor === 'dados_loja'
-                  ? 'bg-purple-600 text-white shadow-md'
-                  : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              <Store className="w-4 h-4" />
-              <span>Dados Cadastrais & Assinatura</span>
-            </button>
-
-            <button
-              onClick={() => setSubAbaEditor('cardapio_precos')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                subAbaEditor === 'cardapio_precos'
-                  ? 'bg-purple-600 text-white shadow-md'
-                  : 'bg-slate-900 border border-purple-500/30 text-purple-300 hover:text-white'
-              }`}
-            >
-              <UtensilsCrossed className="w-4 h-4 text-purple-400" />
-              <span>Cardápio, Itens & Preços da Loja</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/30 uppercase font-black">
-                Autonomia Total
-              </span>
-            </button>
-          </div>
-
-          {/* SUB-ABA 1: DADOS CADASTRAIS & ASSINATURA */}
-          {subAbaEditor === 'dados_loja' && (
-            <form onSubmit={handleSalvarEdicaoRestaurante} className="space-y-6">
-              {sucessoSalvarEdicao && (
-                <div className="p-4 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-150">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <span>{sucessoSalvarEdicao}</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Bloco 1: Informações Gerais da Empresa */}
-                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                  <div className="pb-3 border-b border-slate-800 flex items-center justify-between">
-                    <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                      <Store className="w-4 h-4 text-purple-400" />
-                      <span>Dados Gerais & Contato</span>
-                    </h4>
-                    <span className="text-[10px] text-slate-500 font-mono">ID: {tenantEmEdicao?.id}</span>
-                  </div>
-
-                  <div className="space-y-3.5 text-xs">
-                    <div>
-                      <label className="text-slate-300 font-semibold block mb-1">Nome Fantasia do Restaurante *</label>
-                      <input
-                        type="text"
-                        required
-                        value={formEdicao.nomeFantasia}
-                        onChange={(e) => setFormEdicao({ ...formEdicao, nomeFantasia: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500 font-medium"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-slate-300 font-semibold block mb-1">Razão Social Oficial</label>
-                      <input
-                        type="text"
-                        value={formEdicao.razaoSocial}
-                        onChange={(e) => setFormEdicao({ ...formEdicao, razaoSocial: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-slate-300 font-semibold block mb-1">CNPJ ou CPF</label>
-                        <input
-                          type="text"
-                          value={formEdicao.documento}
-                          onChange={(e) => setFormEdicao({ ...formEdicao, documento: e.target.value })}
-                          className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-slate-300 font-semibold block mb-1">Cidade / Estado</label>
-                        <input
-                          type="text"
-                          value={formEdicao.cidadeUf}
-                          onChange={(e) => setFormEdicao({ ...formEdicao, cidadeUf: e.target.value })}
-                          className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-slate-300 font-semibold block mb-1">Responsável / Proprietário</label>
-                        <input
-                          type="text"
-                          value={formEdicao.responsavelNome}
-                          onChange={(e) => setFormEdicao({ ...formEdicao, responsavelNome: e.target.value })}
-                          className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-slate-300 font-semibold block mb-1">WhatsApp de Contato</label>
-                        <input
-                          type="text"
-                          value={formEdicao.telefoneWhatsApp}
-                          onChange={(e) => setFormEdicao({ ...formEdicao, telefoneWhatsApp: e.target.value })}
-                          className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-slate-300 font-semibold block mb-1">E-mail de Contato & Faturamento</label>
-                      <input
-                        type="email"
-                        value={formEdicao.email}
-                        onChange={(e) => setFormEdicao({ ...formEdicao, email: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-purple-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bloco 2: Gestão do Plano, Status e Mensalidade */}
-                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                  <div className="pb-3 border-b border-slate-800 flex items-center justify-between">
-                    <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-emerald-400" />
-                      <span>Plano SaaS & Status da Assinatura</span>
-                    </h4>
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                      formEdicao.statusAssinatura === 'ativo'
-                        ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
-                        : formEdicao.statusAssinatura === 'trial'
-                        ? 'bg-amber-950 text-amber-400 border border-amber-500/30'
-                        : 'bg-rose-950 text-rose-400 border border-rose-500/30'
-                    }`}>
-                      {formEdicao.statusAssinatura}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3.5 text-xs">
-                    {/* Seleção de Plano */}
-                    <div>
-                      <label className="text-slate-300 font-semibold block mb-1.5">Plano Contratado</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {planos.map((p) => (
-                          <button
-                            type="button"
-                            key={p.id}
-                            onClick={() => {
-                              setFormEdicao({
-                                ...formEdicao,
-                                planoId: p.id,
-                                valorMensalidade: p.precoMensal,
-                              });
-                            }}
-                            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                              formEdicao.planoId === p.id
-                                ? 'border-purple-500 bg-purple-950/40 text-purple-300 shadow-md shadow-purple-500/10'
-                                : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700'
-                            }`}
-                          >
-                            <p className="font-bold text-xs">{p.nome.replace('EloServe ', '')}</p>
-                            <p className="font-mono text-[11px] text-emerald-400 mt-1 font-bold">
-                              R$ {p.precoMensal}/mês
-                            </p>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-slate-300 font-semibold block mb-1">Status da Assinatura</label>
-                        <select
-                          value={formEdicao.statusAssinatura}
-                          onChange={(e) => setFormEdicao({ ...formEdicao, statusAssinatura: e.target.value as StatusAssinatura })}
-                          className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-semibold focus:outline-none focus:border-purple-500"
-                        >
-                          <option value="ativo">Ativo (Acesso Completo)</option>
-                          <option value="trial">Degustação Grátis (Trial)</option>
-                          <option value="atrasado">Atrasado (Alerta de Fatura)</option>
-                          <option value="bloqueado">Bloqueado (Acesso Suspenso)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-slate-300 font-semibold block mb-1">Valor da Mensalidade (R$)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={formEdicao.valorMensalidade}
-                          onChange={(e) => setFormEdicao({ ...formEdicao, valorMensalidade: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-                    </div>
-
-                    {formEdicao.statusAssinatura === 'trial' && (
-                      <div className="p-3 bg-amber-950/30 border border-amber-500/30 rounded-2xl space-y-2">
-                        <label className="text-amber-300 font-bold block text-[11px]">
-                          Dias Restantes de Teste (Trial):
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            value={formEdicao.diasRestantesTrial}
-                            onChange={(e) => setFormEdicao({ ...formEdicao, diasRestantesTrial: parseInt(e.target.value) || 0 })}
-                            className="w-24 px-3 py-1.5 bg-slate-950 border border-amber-500/40 rounded-xl text-white font-mono font-bold"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setFormEdicao({ ...formEdicao, diasRestantesTrial: (formEdicao.diasRestantesTrial || 0) + 7 })}
-                            className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 text-[11px] font-bold hover:bg-amber-500/30"
-                          >
-                            +7 Dias Grátis
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setFormEdicao({ ...formEdicao, diasRestantesTrial: (formEdicao.diasRestantesTrial || 0) + 15 })}
-                            className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 text-[11px] font-bold hover:bg-amber-500/30"
-                          >
-                            +15 Dias
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="text-slate-300 font-semibold block mb-1">Próximo Vencimento / Fechamento</label>
-                      <input
-                        type="text"
-                        value={formEdicao.proximoVencimento}
-                        onChange={(e) => setFormEdicao({ ...formEdicao, proximoVencimento: e.target.value })}
-                        placeholder="DD/MM/AAAA"
-                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-purple-500"
-                      />
-                    </div>
-
-                    {/* Permissão Especial Financeiro & DRE */}
-                    <div className="pt-2 border-t border-slate-800">
-                      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-purple-950/20 border border-purple-500/30">
-                        <div className="space-y-0.5 pr-2">
-                          <label className="text-white font-bold block text-xs flex items-center gap-1.5">
-                            <BarChart3 className="w-4 h-4 text-purple-400" />
-                            <span>Módulo Financeiro & DRE da Loja</span>
-                          </label>
-                          <p className="text-[11px] text-slate-400 leading-snug">
-                            Permite aos gestores desta loja visualizar o módulo Financeiro, lançamentos, receitas e o DRE automatizado.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setFormEdicao({ ...formEdicao, dreHabilitado: !formEdicao.dreHabilitado })}
-                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            formEdicao.dreHabilitado ? 'bg-emerald-500' : 'bg-slate-700'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                              formEdicao.dreHabilitado ? 'translate-x-5' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Botão de Gravação Principal */}
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="submit"
-                  className="px-6 py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-xl shadow-purple-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Salvar Alterações de {tenantEmEdicao?.nomeFantasia}</span>
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* SUB-ABA 2: CARDÁPIO, ITENS & PREÇOS DA LOJA (AUTONOMIA SUPER ADMIN) */}
-          {subAbaEditor === 'cardapio_precos' && (
-            <div className="space-y-4">
-              {/* Banner de autonomia */}
-              <div className="p-4 rounded-2xl bg-purple-950/40 border border-purple-500/40 flex items-start gap-3">
-                <Crown className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <h4 className="text-xs font-black text-white">
-                    Autonomia de Modificação de Cardápio para: {tenantEmEdicao?.nomeFantasia}
-                  </h4>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    Aqui você pode alterar diretamente o preço de venda de qualquer produto, ativar ou pausar itens indisponíveis na cozinha, remover itens indesejados e cadastrar novos pratos. Qualquer alteração tem efeito imediato na operação do restaurante.
-                  </p>
-                </div>
-              </div>
-
-              {/* Barra de Filtros do Cardápio & Botão Novo Item */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                <div className="flex flex-1 items-center gap-2">
-                  <div className="relative flex-1 max-w-sm">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={buscaItemCardapio}
-                      onChange={(e) => setBuscaItemCardapio(e.target.value)}
-                      placeholder="Buscar item do cardápio..."
-                      className="w-full pl-10 pr-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-
-                  <select
-                    value={categoriaCardapioFiltro}
-                    onChange={(e) => setCategoriaCardapioFiltro(e.target.value)}
-                    className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="todas">Todas Categorias</option>
-                    {categorias.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  onClick={() => setModalNovoItemCardapio(true)}
-                  className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Adicionar Novo Item ao Cardápio</span>
-                </button>
-              </div>
-
-              {/* Tabela de Produtos com Edição Rápida de Preço e Autonomia */}
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-x-auto shadow-xl">
-                <table className="w-full text-left text-xs min-w-[700px]">
-                  <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="py-3 px-5">Item / Descrição</th>
-                      <th className="py-3 px-4">Categoria</th>
-                      <th className="py-3 px-4">Setor</th>
-                      <th className="py-3 px-4">Preço Custo</th>
-                      <th className="py-3 px-5">Preço Venda (R$)</th>
-                      <th className="py-3 px-4">Disponibilidade</th>
-                      <th className="py-3 px-5 text-right">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-medium">
-                    {produtos
-                      .filter((prod) => {
-                        const matchBusca = prod.nome.toLowerCase().includes(buscaItemCardapio.toLowerCase());
-                        const matchCat = categoriaCardapioFiltro === 'todas' || prod.categoriaId === categoriaCardapioFiltro;
-                        return matchBusca && matchCat;
-                      })
-                      .map((prod) => {
-                        const cat = categorias.find((c) => c.id === prod.categoriaId);
-                        const precoValorLocal = precosLocais[prod.id] !== undefined ? precosLocais[prod.id] : prod.precoVenda;
-                        const precoSalvoRecente = feedbackPrecoSalvo === prod.id;
-
-                        return (
-                          <tr key={prod.id} className="hover:bg-slate-800/40 transition-colors">
-                            {/* Nome & Descrição */}
-                            <td className="py-3 px-5">
-                              <div>
-                                <span className="font-bold text-white text-sm block">{prod.nome}</span>
-                                {prod.descricao && (
-                                  <span className="text-[11px] text-slate-400 line-clamp-1">{prod.descricao}</span>
-                                )}
-                              </div>
-                            </td>
-
-                            {/* Categoria */}
-                            <td className="py-3 px-4">
-                              <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-purple-300 text-[10px] font-bold">
-                                {cat?.nome || 'Geral'}
-                              </span>
-                            </td>
-
-                            {/* Setor */}
-                            <td className="py-3 px-4">
-                              <span className="text-[11px] text-slate-400 capitalize flex items-center gap-1 font-mono">
-                                <ChefHat className="w-3.5 h-3.5 text-slate-500" />
-                                <span>{prod.setorPreparo}</span>
-                              </span>
-                            </td>
-
-                            {/* Preço de Custo */}
-                            <td className="py-3 px-4 font-mono text-slate-400">
-                              {prod.precoCusto ? `R$ ${prod.precoCusto.toFixed(2)}` : '—'}
-                            </td>
-
-                            {/* Preço de Venda com Edição Instantânea */}
-                            <td className="py-3 px-5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-slate-400 text-xs font-mono">R$</span>
-                                <input
-                                  type="number"
-                                  step="0.10"
-                                  value={precoValorLocal}
-                                  onChange={(e) => {
-                                    const val = parseFloat(e.target.value);
-                                    setPrecosLocais({ ...precosLocais, [prod.id]: val });
-                                  }}
-                                  onBlur={() => handleSalvarPrecoItem(prod.id)}
-                                  className="w-24 px-2 py-1 bg-slate-950 border border-slate-700 focus:border-purple-400 rounded-lg text-emerald-400 font-mono font-bold text-xs"
-                                />
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleSalvarPrecoItem(prod.id)}
-                                  title="Confirmar alteração de preço"
-                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                    precoSalvoRecente
-                                      ? 'bg-emerald-500 text-white'
-                                      : 'bg-slate-800 text-slate-300 hover:bg-purple-600 hover:text-white'
-                                  }`}
-                                >
-                                  <Check className="w-3.5 h-3.5" />
-                                </button>
-
-                                {precoSalvoRecente && (
-                                  <span className="text-[10px] text-emerald-400 font-bold animate-in fade-in">
-                                    Salvo!
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-
-                            {/* Disponibilidade / Pausar Item */}
-                            <td className="py-3 px-4">
-                              <button
-                                type="button"
-                                onClick={() => alternarDisponibilidade(prod.id)}
-                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
-                                  prod.disponivel
-                                    ? 'bg-emerald-950/70 text-emerald-400 border border-emerald-500/30 hover:bg-rose-950/70 hover:text-rose-400'
-                                    : 'bg-rose-950/70 text-rose-400 border border-rose-500/30 hover:bg-emerald-950/70 hover:text-emerald-400'
-                                }`}
-                              >
-                                {prod.disponivel ? '🟢 Disponível' : '🔴 Pausado (Esgotado)'}
-                              </button>
-                            </td>
-
-                            {/* Remover Item */}
-                            <td className="py-3 px-5 text-right">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (confirm(`Tem certeza que deseja remover "${prod.nome}" do cardápio deste restaurante?`)) {
-                                    removerProduto(prod.id);
-                                  }
-                                }}
-                                title="Remover item do cardápio"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-        )
       )}
 
       {/* CONTEÚDO DA ABA 3: PLANOS & LIMITES */}
@@ -5086,6 +3900,218 @@ export default function SaaSMaster() {
           </div>
         </div>
       )}
+
+      {/* Modal: Métricas & Raio-X Operacional da Loja */}
+      {modalMetricasLoja && (() => {
+        const isTodos = modalMetricasLoja.id === 'todos';
+        const dados = calcularDossieTenant(modalMetricasLoja.id, metricasMes, metricasAno);
+        const NOMES_MESES = [
+          'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md overflow-y-auto animate-in fade-in">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-5 sm:p-7 space-y-6 shadow-2xl relative text-left">
+              {/* Header do Modal */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-600/20 border border-purple-500/40 text-purple-400 flex items-center justify-center text-xl shrink-0 font-bold">
+                    📊
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 uppercase tracking-wider">
+                        {isTodos ? 'Visão Multi-Loja' : 'Raio-X Operacional'}
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        {NOMES_MESES[metricasMes - 1]} de {metricasAno}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-black text-white mt-0.5">
+                      {modalMetricasLoja.nomeFantasia}
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Filtro Mês / Ano & Fechar */}
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <select
+                    value={metricasMes}
+                    onChange={(e) => setMetricasMes(Number(e.target.value))}
+                    className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-purple-500"
+                  >
+                    {NOMES_MESES.map((nome, idx) => (
+                      <option key={idx + 1} value={idx + 1}>{nome}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={metricasAno}
+                    onChange={(e) => setMetricasAno(Number(e.target.value))}
+                    className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value={2025}>2025</option>
+                    <option value={2026}>2026</option>
+                    <option value={2027}>2027</option>
+                  </select>
+                  <button
+                    onClick={() => setModalMetricasLoja(null)}
+                    className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 Cards de KPI */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Receita Bruta Total</span>
+                  <p className="text-xl font-black text-white font-mono mt-1">R$ {dados.receitaBruta.toFixed(2)}</p>
+                  <span className="text-[10px] text-emerald-400 font-semibold block mt-1">Líquida: R$ {dados.receitaLiquida.toFixed(2)}</span>
+                </div>
+
+                <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Pedidos Concluídos</span>
+                  <p className="text-xl font-black text-emerald-400 font-mono mt-1">{dados.vendasConcluidas.length}</p>
+                  <span className="text-[10px] text-slate-400 block mt-1">{dados.totalCancelamentos > 0 ? `R$ ${dados.totalCancelamentos.toFixed(2)} cancelados` : 'Sem cancelamentos'}</span>
+                </div>
+
+                <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Ticket Médio</span>
+                  <p className="text-xl font-black text-purple-400 font-mono mt-1">
+                    R$ {(dados.receitaBruta / (dados.vendasConcluidas.length || 1)).toFixed(2)}
+                  </p>
+                  <span className="text-[10px] text-slate-400 block mt-1">Por atendimento</span>
+                </div>
+
+                <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Taxa de Serviço 10%</span>
+                  <p className="text-xl font-black text-amber-400 font-mono mt-1">R$ {dados.totalTaxaServico.toFixed(2)}</p>
+                  <span className="text-[10px] text-amber-400/80 block mt-1">Rateio / Garçom</span>
+                </div>
+              </div>
+
+              {/* Distribuição: Canais e Formas de Pagamento */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Mix de Canais */}
+                <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl space-y-3">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <Store className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Canais de Atendimento</span>
+                  </h4>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-300">Salão (Mesas)</span>
+                      <span className="font-mono font-bold text-white">R$ {dados.vendasSalao.toFixed(2)} ({dados.receitaBruta > 0 ? Math.round((dados.vendasSalao / dados.receitaBruta) * 100) : 0}%)</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-purple-500 rounded-full" style={{ width: `${dados.receitaBruta > 0 ? (dados.vendasSalao / dados.receitaBruta) * 100 : 0}%` }} />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-slate-300">Balcão / PDV</span>
+                      <span className="font-mono font-bold text-white">R$ {dados.vendasBalcao.toFixed(2)} ({dados.receitaBruta > 0 ? Math.round((dados.vendasBalcao / dados.receitaBruta) * 100) : 0}%)</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${dados.receitaBruta > 0 ? (dados.vendasBalcao / dados.receitaBruta) * 100 : 0}%` }} />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-slate-300">Delivery</span>
+                      <span className="font-mono font-bold text-white">R$ {dados.vendasDelivery.toFixed(2)} ({dados.receitaBruta > 0 ? Math.round((dados.vendasDelivery / dados.receitaBruta) * 100) : 0}%)</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: `${dados.receitaBruta > 0 ? (dados.vendasDelivery / dados.receitaBruta) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Formas de Pagamento */}
+                <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl space-y-3">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Formas de Pagamento</span>
+                  </h4>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                      <span className="text-slate-300">PIX Instantâneo</span>
+                      <span className="font-mono font-bold text-emerald-400">R$ {dados.pgtoPix.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                      <span className="text-slate-300">Cartão de Crédito</span>
+                      <span className="font-mono font-bold text-white">R$ {dados.pgtoCredito.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                      <span className="text-slate-300">Cartão de Débito</span>
+                      <span className="font-mono font-bold text-white">R$ {dados.pgtoDebito.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                      <span className="text-slate-300">Dinheiro em Espécie</span>
+                      <span className="font-mono font-bold text-amber-400">R$ {dados.pgtoDinheiro.toFixed(2)}</span>
+                    </div>
+                    {dados.pgtoOutros > 0 && (
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-slate-300">Outros / Vouchers</span>
+                        <span className="font-mono font-bold text-slate-400">R$ {dados.pgtoOutros.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recursos: Equipe e Estoque */}
+              <div className="grid grid-cols-2 gap-3 text-xs bg-slate-950/40 border border-slate-800/80 p-3.5 rounded-2xl">
+                <div className="flex items-center gap-2.5">
+                  <Users className="w-4 h-4 text-purple-400" />
+                  <div>
+                    <span className="text-slate-400 text-[11px] block">Colaboradores Vinculados</span>
+                    <strong className="text-white">{dados.colaboradores.length} funcionários cadastrados</strong>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Package className="w-4 h-4 text-blue-400" />
+                  <div>
+                    <span className="text-slate-400 text-[11px] block">Posição de Insumos/Estoque</span>
+                    <strong className="text-white">{dados.estoqueItens.length} itens monitorados</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ações do Rodapé */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-800">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleBaixarDossieCSV(modalMetricasLoja.id, metricasMes, metricasAno)}
+                    className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 flex items-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Download className="w-4 h-4 text-white" />
+                    <span>Baixar Relatório (CSV)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4 text-slate-400" />
+                    <span>Imprimir</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setModalMetricasLoja(null)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal: Novo Restaurante Assinante */}
       {modalNovoTenant && (
