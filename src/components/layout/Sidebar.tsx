@@ -24,6 +24,7 @@ import {
   LayoutDashboard,
   Settings,
   FileSpreadsheet,
+  KeyRound,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -52,6 +53,7 @@ const menuItemsDonoSimples: MenuItemDef[] = [
   { path: '/caixa', label: 'Caixa', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante', 'caixa'] },
   { path: '/financeiro', label: 'Financeiro', icon: DollarSign, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/funcionarios', label: 'Funcionários', icon: Users, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/funcionarios?aba=logins', label: 'Logins da Equipe', icon: KeyRound, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/delivery', label: 'Entregas/Entregadores', icon: Bike, cargos: ['super_admin', 'admin_restaurante', 'caixa', 'entregador'] },
   { path: '/kds', label: 'Cozinha (KDS)', icon: ChefHat, cargos: ['super_admin', 'admin_restaurante', 'cozinha'] },
 ];
@@ -159,6 +161,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 { id: 'restaurantes', label: 'Restaurantes Assinantes', icon: Store, badge: 'Clientes' },
                 { id: 'editor_loja', label: 'Ambiente de Edição das Lojas', icon: Sliders, badge: 'Editar' },
                 { id: 'faturamento', label: 'Faturamento & MRR', icon: TrendingUp },
+                { id: 'logins', label: 'Gestão de Logins & Acessos', icon: KeyRound, badge: 'Acessos' },
                 { id: 'planos', label: 'Planos & Mensalidades', icon: Layers },
                 { id: 'avisos_globais', label: 'Central de Avisos (Broadcast)', icon: Megaphone, badge: 'Avisos' },
                 { id: 'auditoria', label: 'Logs de Auditoria SaaS', icon: History, badge: 'Logs' },

@@ -64,6 +64,7 @@ import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useProductStore } from '../store/useProductStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { SecaoLoginsEquipe } from '../components/funcionarios/SecaoLoginsEquipe';
 import { TipoPlanoSaaS, StatusAssinatura, Produto, PlanoAssinatura, TenantRestaurante } from '../types';
 
 export default function SaaSMaster() {
@@ -1501,6 +1502,22 @@ export default function SaaSMaster() {
         </button>
 
         <button
+          type="button"
+          onClick={() => handleMudarAba('logins')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            abaAtiva === 'logins'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25 ring-2 ring-purple-400'
+              : 'bg-slate-900 text-purple-300 hover:text-white border border-purple-500/30'
+          }`}
+        >
+          <KeyRound className="w-4 h-4 text-purple-400" />
+          <span>Gestão de Logins & Acessos</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/30 uppercase font-black">
+            Lojas
+          </span>
+        </button>
+
+        <button
           onClick={() => handleMudarAba('planos')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             abaAtiva === 'planos'
@@ -2735,6 +2752,16 @@ export default function SaaSMaster() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* CONTEÚDO DA ABA: GESTÃO DE LOGINS & ACESSOS (SAAS MASTER & LOJAS) */}
+      {abaAtiva === 'logins' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <SecaoLoginsEquipe
+            tenantId="global"
+            onCadastrarRestauranteComLogin={() => setModalNovoTenant(true)}
+          />
         </div>
       )}
 

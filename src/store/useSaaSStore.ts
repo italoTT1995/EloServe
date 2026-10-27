@@ -120,6 +120,7 @@ export type AbaMasterSaaS =
   | 'restaurantes'
   | 'editor_loja'
   | 'faturamento'
+  | 'logins'
   | 'planos'
   | 'regras_planos'
     | 'config'
