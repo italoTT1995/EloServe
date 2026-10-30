@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { SessaoCaixa, Mesa, PedidoKDS, VendaRealizada, ItemComandaMesa, DespesaOperacionalRestaurante, MovimentoCaixa, NotaFiscalRegistro } from '../types';
 import { useEstoqueStore } from './useEstoqueStore';
+import { supabaseService } from '../services/supabaseService';
 import { MESAS_POR_TENANT } from './initialMesas';
 import { NOTAS_FISCAIS_INICIAIS } from './initialNotasFiscais';
 
@@ -13,6 +14,7 @@ interface AppState {
   mesasPorTenant: Record<string, Mesa[]>;
   getMesasPorTenant: (tenantId?: string) => Mesa[];
   mesas: Mesa[];
+  sincronizarComSupabase: (mesasNovas: Mesa[]) => void;
   pedidosKDS: PedidoKDS[];
   vendas: VendaRealizada[];
   despesasRestaurante: DespesaOperacionalRestaurante[];
@@ -113,6 +115,20 @@ export const useAppStore = create<AppState>()(
 
       mesasPorTenant: MESAS_POR_TENANT,
       mesas: [],
+
+      sincronizarComSupabase: (mesasNovas) => {
+        if (!mesasNovas || mesasNovas.length === 0) return;
+        const agrupadoMesas: Record<string, Mesa[]> = {};
+        for (const m of mesasNovas) {
+          const tId = m.tenantId || 'tenant-01';
+          if (!agrupadoMesas[tId]) agrupadoMesas[tId] = [];
+          agrupadoMesas[tId].push(m);
+        }
+        set({
+          mesasPorTenant: agrupadoMesas,
+          mesas: mesasNovas,
+        });
+      },
 
       getMesasPorTenant: (tenantId?: string) => {
         const state = get();

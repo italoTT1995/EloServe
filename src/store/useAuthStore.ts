@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Usuario, CargoUsuario } from '../types';
+import { supabaseService } from '../services/supabaseService';
 
 export const USUARIOS_PADRAO: Usuario[] = [
   {
@@ -86,6 +87,7 @@ interface AuthState {
   usuarioLogado: Usuario | null;
   isAuthenticated: boolean;
   usuarios: Usuario[];
+  sincronizarComSupabase: (usuarios: Usuario[]) => void;
   adicionarUsuario: (u: Omit<Usuario, 'id'>) => Usuario;
   cadastrarNovoUsuario: (dados: {
     nome: string;
@@ -115,6 +117,11 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       usuarios: USUARIOS_PADRAO,
 
+      sincronizarComSupabase: (usuariosNovos) => {
+        if (!usuariosNovos || usuariosNovos.length === 0) return;
+        set({ usuarios: usuariosNovos });
+      },
+
       adicionarUsuario: (dados) => {
         const novo: Usuario = {
           ...dados,
@@ -134,6 +141,7 @@ export const useAuthStore = create<AuthState>()(
           }
           return { usuarios: [...state.usuarios, novo] };
         });
+        supabaseService.salvarUsuario(novo);
         return novo;
       },
 
@@ -182,6 +190,8 @@ export const useAuthStore = create<AuthState>()(
             : {}),
         }));
 
+        supabaseService.salvarUsuario(novoUsuario);
+
         return { sucesso: true, usuario: novoUsuario };
       },
 
@@ -193,17 +203,24 @@ export const useAuthStore = create<AuthState>()(
               ? { ...state.usuarioLogado, ...dados }
               : state.usuarioLogado,
         }));
+        supabaseService.atualizarUsuario(id, dados);
       },
 
       alternarStatusUsuario: (id) => {
         if (id === 'usr-master') {
           return { sucesso: false, mensagem: 'O Admin Master do sistema não pode ser desativado.' };
         }
-        set((state) => ({
-          usuarios: state.usuarios.map((u) =>
-            u.id === id ? { ...u, ativo: !u.ativo } : u
-          ),
-        }));
+        let novoStatus = true;
+        set((state) => {
+          const user = state.usuarios.find((u) => u.id === id);
+          if (user) novoStatus = !user.ativo;
+          return {
+            usuarios: state.usuarios.map((u) =>
+              u.id === id ? { ...u, ativo: !u.ativo } : u
+            ),
+          };
+        });
+        supabaseService.atualizarUsuario(id, { ativo: novoStatus });
         return { sucesso: true };
       },
 
@@ -222,6 +239,10 @@ export const useAuthStore = create<AuthState>()(
               : u
           ),
         }));
+        supabaseService.atualizarUsuario(id, {
+          pin: novoPin.trim(),
+          senha: novaSenha ? novaSenha.trim() : undefined,
+        });
         return { sucesso: true };
       },
 
@@ -236,6 +257,7 @@ export const useAuthStore = create<AuthState>()(
         set((state) => ({
           usuarios: state.usuarios.filter((u) => u.id !== id),
         }));
+        supabaseService.removerUsuario(id);
         return { sucesso: true };
       },
 

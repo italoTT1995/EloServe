@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { TenantRestaurante, PlanoAssinatura, TipoPlanoSaaS, StatusAssinatura, ChamadoSuporte } from '../types';
+import { supabaseService } from '../services/supabaseService';
 
 export const PLANOS_DISPONIVEIS: PlanoAssinatura[] = [
   {
@@ -166,6 +167,7 @@ interface SaaSState {
   setAbaAtivaMaster: (aba: AbaMasterSaaS) => void;
   setTenantEmEdicaoId: (id: string | null) => void;
   selecionarTenant: (tenantId: string) => void;
+  sincronizarComSupabase: (tenants: TenantRestaurante[]) => void;
   adicionarTenant: (novo: Omit<TenantRestaurante, 'id' | 'criadoEm'>) => TenantRestaurante;
   atualizarDadosTenant: (tenantId: string, dados: Partial<TenantRestaurante>) => void;
   atualizarStatusAssinatura: (tenantId: string, status: StatusAssinatura) => void;
@@ -307,6 +309,11 @@ export const useSaaSStore = create<SaaSState>()(
         });
       },
 
+      sincronizarComSupabase: (tenants) => {
+        if (!tenants || tenants.length === 0) return;
+        set({ tenants });
+      },
+
       adicionarTenant: (novo) => {
         const id = `tenant-${Date.now().toString().slice(-4)}`;
         const criadoEm = new Date().toISOString().split('T')[0];
@@ -318,6 +325,9 @@ export const useSaaSStore = create<SaaSState>()(
         set((state) => ({
           tenants: [tenantCompleto, ...state.tenants],
         }));
+
+        // Sincroniza imediatamente com o banco de dados Supabase na nuvem
+        supabaseService.salvarTenant(tenantCompleto);
 
         // Sincroniza o novo restaurante com o backend de catálogo do WhatsApp
         try {
@@ -352,6 +362,7 @@ export const useSaaSStore = create<SaaSState>()(
             t.id === tenantId ? { ...t, ...dados } : t
           ),
         }));
+        supabaseService.atualizarTenant(tenantId, dados);
       },
 
       atualizarStatusAssinatura: (tenantId, status) => {
@@ -360,6 +371,7 @@ export const useSaaSStore = create<SaaSState>()(
             t.id === tenantId ? { ...t, statusAssinatura: status } : t
           ),
         }));
+        supabaseService.atualizarTenant(tenantId, { statusAssinatura: status });
       },
 
       mudarPlanoTenant: (tenantId, planoId) => {

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Produto, Categoria } from '../types';
+import { supabaseService } from '../services/supabaseService';
 
 export const CATEGORIAS_POR_TENANT: Record<string, Categoria[]> = {};
 
@@ -13,6 +14,7 @@ interface ProductState {
   getCategoriasPorTenant: (tenantId?: string) => Categoria[];
   produtos: Produto[];
   categorias: Categoria[];
+  sincronizarComSupabase: (produtos: Produto[], categorias: Categoria[]) => void;
   adicionarProduto: (produto: Omit<Produto, 'id'>, tenantId?: string) => Produto;
   editarProduto: (id: string, dados: Partial<Produto>, tenantId?: string) => void;
   removerProduto: (id: string, tenantId?: string) => void;
@@ -33,6 +35,28 @@ export const useProductStore = create<ProductState>()(
       // Fallbacks globais para retrocompatibilidade
       produtos: [],
       categorias: [],
+
+      sincronizarComSupabase: (produtosNovos, categoriasNovas) => {
+        if (!produtosNovos || !categoriasNovas) return;
+        const agrupadoProd: Record<string, Produto[]> = {};
+        for (const p of produtosNovos) {
+          const tId = (p as any).tenantId || 'tenant-01';
+          if (!agrupadoProd[tId]) agrupadoProd[tId] = [];
+          agrupadoProd[tId].push(p);
+        }
+        const agrupadoCat: Record<string, Categoria[]> = {};
+        for (const c of categoriasNovas) {
+          const tId = (c as any).tenantId || 'tenant-01';
+          if (!agrupadoCat[tId]) agrupadoCat[tId] = [];
+          agrupadoCat[tId].push(c);
+        }
+        set({
+          produtosPorTenant: agrupadoProd,
+          categoriasPorTenant: agrupadoCat,
+          produtos: produtosNovos,
+          categorias: categoriasNovas,
+        });
+      },
 
       getProdutosPorTenant: (tenantId?: string) => {
         const state = get();
@@ -80,6 +104,7 @@ export const useProductStore = create<ProductState>()(
             produtos: novaLista,
           };
         });
+        supabaseService.salvarProduto(novoProduto, idAlvo);
         sincronizarComWhatsAppServer(idAlvo);
         return novoProduto;
       },
@@ -109,6 +134,7 @@ export const useProductStore = create<ProductState>()(
             produtos: tenantAlvo ? novosPorTenant[tenantAlvo] : state.produtos,
           };
         });
+        supabaseService.atualizarProduto(id, dados);
         sincronizarComWhatsAppServer(tenantId);
       },
 
@@ -210,6 +236,7 @@ export const useProductStore = create<ProductState>()(
             },
           };
         });
+        supabaseService.salvarCategoria(novaCat, idAlvo);
         return novaCat;
       },
 

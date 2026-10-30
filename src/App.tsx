@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { RotaProtegida } from './components/auth/RotaProtegida';
@@ -18,6 +19,9 @@ import PainelDono from './pages/PainelDono';
 import AutoatendimentoMesa from './pages/AutoatendimentoMesa';
 import { useAuthStore } from './store/useAuthStore';
 import { useSaaSStore } from './store/useSaaSStore';
+import { useProductStore } from './store/useProductStore';
+import { useAppStore } from './store/useAppStore';
+import { supabaseService } from './services/supabaseService';
 
 function RotaInicialInteligente() {
   const { usuarioLogado } = useAuthStore();
@@ -53,6 +57,25 @@ function RotaInicialInteligente() {
 }
 
 export default function App() {
+  useEffect(() => {
+    // Sincroniza dados oficiais com o Supabase ao inicializar a aplicação
+    supabaseService.carregarTudoDoSupabase().then((dados) => {
+      if (!dados) return;
+      if (dados.tenants && dados.tenants.length > 0) {
+        useSaaSStore.getState().sincronizarComSupabase(dados.tenants);
+      }
+      if (dados.usuarios && dados.usuarios.length > 0) {
+        useAuthStore.getState().sincronizarComSupabase(dados.usuarios);
+      }
+      if (dados.produtos && dados.categorias) {
+        useProductStore.getState().sincronizarComSupabase(dados.produtos, dados.categorias);
+      }
+      if (dados.mesas) {
+        useAppStore.getState().sincronizarComSupabase(dados.mesas);
+      }
+    });
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
