@@ -99,13 +99,6 @@ export default function SaaSMaster() {
     removerAviso,
     alternarPermissaoDRE,
     registrarLogAuditoria,
-    codigoSegurancaMaster,
-    masterDesbloqueado,
-    tentativasFalhasMaster,
-    bloqueadoAte,
-    desbloquearMaster,
-    bloquearMaster,
-    alterarCodigoMaster,
     chamadosSuporte,
     getChamadosAbertos,
     atualizarStatusChamado,
@@ -162,105 +155,6 @@ export default function SaaSMaster() {
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
   const [modalNovoTenant, setModalNovoTenant] = useState(false);
   const [modalCobrancaWhatsApp, setModalCobrancaWhatsApp] = useState<any | null>(null);
-  // Estados do Cofre de Segurança Master
-  const [pinDigitado, setPinDigitado] = useState('');
-  const [erroPin, setErroPin] = useState<string | null>(null);
-  const [mostrarPin, setMostrarPin] = useState(false);
-  const [cooldownSegundos, setCooldownSegundos] = useState(0);
-
-  // Estados de alteração do PIN na aba Configurações
-  const [formPin, setFormPin] = useState({
-    codigoAtual: '',
-    novoCodigo: '',
-    confirmacao: '',
-  });
-  const [msgPinSucesso, setMsgPinSucesso] = useState<string | null>(null);
-  const [msgPinErro, setMsgPinErro] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!bloqueadoAte) {
-      setCooldownSegundos(0);
-      return;
-    }
-    const interval = setInterval(() => {
-      const agora = Date.now();
-      if (agora >= bloqueadoAte) {
-        setCooldownSegundos(0);
-        clearInterval(interval);
-      } else {
-        setCooldownSegundos(Math.ceil((bloqueadoAte - agora) / 1000));
-      }
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [bloqueadoAte]);
-
-  function handleSubmeterPin(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    if (cooldownSegundos > 0) return;
-    if (!pinDigitado || pinDigitado.trim().length === 0) {
-      setErroPin('Digite o Código de Segurança Master para continuar.');
-      return;
-    }
-    const res = desbloquearMaster(pinDigitado.trim());
-    if (res.sucesso) {
-      setErroPin(null);
-      setPinDigitado('');
-    } else {
-      setErroPin(res.mensagem || 'Código Master incorreto.');
-      setPinDigitado('');
-    }
-  }
-
-  function handleTecladoVirtual(num: string) {
-    if (cooldownSegundos > 0) return;
-    if (pinDigitado.length >= 8) return;
-    const novo = pinDigitado + num;
-    setPinDigitado(novo);
-    setErroPin(null);
-    if (novo.length === 6) {
-      const res = desbloquearMaster(novo);
-      if (res.sucesso) {
-        setErroPin(null);
-        setPinDigitado('');
-      } else {
-        setErroPin(res.mensagem || 'Código Master incorreto.');
-        setPinDigitado('');
-      }
-    }
-  }
-
-  function handleBackspaceVirtual() {
-    if (cooldownSegundos > 0) return;
-    setPinDigitado((prev) => prev.slice(0, -1));
-    setErroPin(null);
-  }
-
-  function handleLimparPin() {
-    setPinDigitado('');
-    setErroPin(null);
-  }
-
-  function handleSalvarNovoPin(e: React.FormEvent) {
-    e.preventDefault();
-    setMsgPinErro(null);
-    setMsgPinSucesso(null);
-
-    if (formPin.novoCodigo !== formPin.confirmacao) {
-      setMsgPinErro('A confirmação do novo código não confere com o novo código digitado.');
-      return;
-    }
-
-    const res = alterarCodigoMaster(formPin.codigoAtual, formPin.novoCodigo);
-    if (res.sucesso) {
-      setMsgPinSucesso(res.mensagem || 'Código Master alterado com sucesso!');
-      setFormPin({ codigoAtual: '', novoCodigo: '', confirmacao: '' });
-      setTimeout(() => setMsgPinSucesso(null), 4000);
-    } else {
-      setMsgPinErro(res.mensagem || 'Não foi possível alterar o código.');
-    }
-  }
-
   // Estados do Ambiente de Edição da Loja (editor_loja)
   const [subAbaEditor, setSubAbaEditor] = useState<'dados_loja' | 'cardapio_precos'>('dados_loja');
   const tenantEmEdicao = tenants.find((t) => t.id === (tenantEmEdicaoId || tenants[0]?.id)) || tenants[0];
@@ -1207,223 +1101,6 @@ export default function SaaSMaster() {
     navigate('/');
   }
 
-  if (!masterDesbloqueado) {
-    return (
-      <div className={`min-h-[85vh] flex items-center justify-center p-4 select-none ${isWhite ? 'bg-slate-50' : ''}`}>
-        <div className={`w-full max-w-md ${isWhite ? 'bg-white border-purple-200 shadow-2xl shadow-purple-500/10' : 'bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-purple-500/30 shadow-2xl shadow-purple-950/50'} border rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden backdrop-blur-xl`}>
-          {/* Luz de fundo decorativa */}
-          <div className={`absolute -top-24 -right-24 w-48 h-48 ${isWhite ? 'bg-purple-200/40' : 'bg-purple-600/20'} rounded-full blur-3xl pointer-events-none`} />
-          <div className={`absolute -bottom-24 -left-24 w-48 h-48 ${isWhite ? 'bg-indigo-200/40' : 'bg-indigo-600/20'} rounded-full blur-3xl pointer-events-none`} />
-
-          {/* Cabeçalho do Cofre */}
-          <div className="text-center space-y-2 relative z-10">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 text-white shadow-xl shadow-purple-500/30 mb-1">
-              <Lock className="w-8 h-8 text-white" />
-            </div>
-            <div className="inline-block">
-              <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full ${isWhite ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'} border`}>
-                Acesso Restrito Franqueador
-              </span>
-            </div>
-            <h2 className={`text-2xl font-black ${isWhite ? 'text-slate-900' : 'text-white'} tracking-tight`}>
-              Cofre de Segurança Master
-            </h2>
-            <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'} max-w-xs mx-auto leading-relaxed`}>
-              Autentique-se com o PIN executivo de 6 dígitos para acessar dados fiscais, DRE, métricas financeiras e assinantes.
-            </p>
-          </div>
-
-          {/* Banner de erro ou cooldown */}
-          {cooldownSegundos > 0 ? (
-            <div className={`${isWhite ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-rose-500/15 border-rose-500/40 text-rose-300'} border rounded-2xl p-3.5 text-center text-xs space-y-1 animate-pulse`}>
-              <div className={`flex items-center justify-center gap-1.5 font-bold ${isWhite ? 'text-rose-800' : 'text-rose-200'}`}>
-                <ShieldAlert className="w-4 h-4 text-rose-500" />
-                <span>Cofre Bloqueado por Segurança</span>
-              </div>
-              <p className={`text-[11px] ${isWhite ? 'text-rose-600' : 'text-rose-300/90'}`}>
-                Muitas tentativas incorretas. Aguarde <strong className={`font-mono text-sm ${isWhite ? 'text-rose-900 font-bold' : 'text-white'}`}>{cooldownSegundos}s</strong> para tentar novamente.
-              </p>
-            </div>
-          ) : erroPin ? (
-            <div className={`${isWhite ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-rose-500/10 border-rose-500/30 text-rose-300'} border rounded-2xl p-3 text-center text-xs flex items-center justify-center gap-2 animate-in fade-in`}>
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-              <span>{erroPin}</span>
-            </div>
-          ) : null}
-
-          {/* Mostrador de Dígitos PIN (Bolinhas) */}
-          <div className="flex items-center justify-center gap-3 py-2">
-            {[0, 1, 2, 3, 4, 5].map((index) => {
-              const preenchido = pinDigitado.length > index;
-              return (
-                <div
-                  key={index}
-                  className={`w-4 h-4 rounded-full transition-all duration-200 ${
-                    preenchido
-                      ? 'bg-purple-600 shadow-md shadow-purple-500/50 scale-110'
-                      : isWhite
-                      ? 'bg-slate-200 border border-slate-300'
-                      : 'bg-slate-800 border border-slate-700'
-                  }`}
-                />
-              );
-            })}
-          </div>
-
-          {/* Campo de Input nativo (para quem usa teclado físico) */}
-          <form onSubmit={handleSubmeterPin} className="space-y-4">
-            <div className="relative">
-              <input
-                type={mostrarPin ? 'text' : 'password'}
-                inputMode="numeric"
-                maxLength={8}
-                value={pinDigitado}
-                disabled={cooldownSegundos > 0}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  setPinDigitado(val);
-                  setErroPin(null);
-                  if (val.length === 6) {
-                    const res = desbloquearMaster(val);
-                    if (res.sucesso) {
-                      setErroPin(null);
-                      setPinDigitado('');
-                    } else {
-                      setErroPin(res.mensagem || 'Código Master incorreto.');
-                      setPinDigitado('');
-                    }
-                  }
-                }}
-                placeholder="Ou digite o PIN aqui..."
-                className={`w-full text-center tracking-widest text-lg font-mono font-bold py-2.5 px-10 rounded-2xl focus:outline-none transition-all ${
-                  isWhite
-                    ? 'bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-purple-600 focus:bg-white shadow-inner'
-                    : 'bg-slate-950/80 border border-slate-800 focus:border-purple-500 text-white placeholder:text-slate-600'
-                }`}
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={() => setMostrarPin(!mostrarPin)}
-                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 cursor-pointer transition-colors ${
-                  isWhite ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'
-                }`}
-                title={mostrarPin ? 'Ocultar PIN' : 'Mostrar PIN'}
-              >
-                {mostrarPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-
-            {/* Teclado Virtual Numérico */}
-            <div className="grid grid-cols-3 gap-2 pt-1">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  disabled={cooldownSegundos > 0}
-                  onClick={() => handleTecladoVirtual(num)}
-                  className={`py-3 rounded-2xl font-mono text-lg font-bold shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                    isWhite
-                      ? 'bg-slate-100 hover:bg-slate-200 active:bg-purple-600 active:text-white text-slate-800 border border-slate-200'
-                      : 'bg-slate-800/80 hover:bg-slate-700/80 active:bg-purple-600 text-white border border-slate-700/50'
-                  }`}
-                >
-                  {num}
-                </button>
-              ))}
-              <button
-                type="button"
-                disabled={cooldownSegundos > 0 || !pinDigitado}
-                onClick={handleLimparPin}
-                className={`py-3 rounded-2xl font-semibold text-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                  isWhite
-                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200'
-                    : 'bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700/40'
-                }`}
-              >
-                Limpar
-              </button>
-              <button
-                type="button"
-                disabled={cooldownSegundos > 0}
-                onClick={() => handleTecladoVirtual('0')}
-                className={`py-3 rounded-2xl font-mono text-lg font-bold shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                  isWhite
-                    ? 'bg-slate-100 hover:bg-slate-200 active:bg-purple-600 active:text-white text-slate-800 border border-slate-200'
-                    : 'bg-slate-800/80 hover:bg-slate-700/80 active:bg-purple-600 text-white border border-slate-700/50'
-                }`}
-              >
-                0
-              </button>
-              <button
-                type="button"
-                disabled={cooldownSegundos > 0 || !pinDigitado}
-                onClick={handleBackspaceVirtual}
-                className={`py-3 rounded-2xl font-semibold text-sm transition-all cursor-pointer flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed ${
-                  isWhite
-                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200'
-                    : 'bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700/40'
-                }`}
-                title="Apagar último dígito"
-              >
-                ⌫
-              </button>
-            </div>
-
-            {/* Botão Principal Desbloquear */}
-            <button
-              type="submit"
-              disabled={cooldownSegundos > 0 || !pinDigitado}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 !text-white font-bold text-sm shadow-xl shadow-purple-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
-            >
-              <Unlock className="w-4 h-4 !text-white" />
-              <span className="!text-white">Desbloquear Painel Master</span>
-            </button>
-          </form>
-
-          {/* Dica de Código Padrão */}
-          <div className={`pt-2 border-t flex items-center justify-between text-xs ${
-            isWhite ? 'border-slate-200 text-slate-500' : 'border-slate-800/80 text-slate-400'
-          }`}>
-            <div className="flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-              <span>Código Padrão: <strong className={`font-mono ${isWhite ? 'text-purple-700 font-bold' : 'text-purple-300'}`}>889900</strong></span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setPinDigitado('889900');
-                const res = desbloquearMaster('889900');
-                if (res.sucesso) {
-                  setErroPin(null);
-                  setPinDigitado('');
-                }
-              }}
-              className={`text-[11px] font-bold hover:underline cursor-pointer ${
-                isWhite ? 'text-purple-600 hover:text-purple-800' : 'text-purple-400 hover:text-purple-300'
-              }`}
-            >
-              Autopreencher & Entrar
-            </button>
-          </div>
-
-          {/* Link para voltar ao PDV */}
-          <div className="text-center pt-1">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className={`text-xs transition-colors cursor-pointer ${
-                isWhite ? 'text-slate-500 hover:text-slate-800' : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              ← Voltar ao Terminal de Atendimento (PDV)
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 select-none max-w-7xl mx-auto pb-10">
       {/* Abas Administrativas do Super Admin */}
@@ -1611,15 +1288,6 @@ export default function SaaSMaster() {
 
             <div className="flex items-center gap-2.5 flex-wrap shrink-0">
               <button
-                onClick={bloquearMaster}
-                className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-                title="Bloquear o cofre de segurança executivo do SaaS Master"
-              >
-                <Lock className="w-4 h-4 text-rose-400" />
-                <span>Bloquear Painel</span>
-              </button>
-
-              <button
                 onClick={handleExportarRestaurantesCSV}
                 className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
                 title="Baixar planilha de todos os restaurantes em formato CSV"
@@ -1754,13 +1422,13 @@ export default function SaaSMaster() {
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <h4 className="text-sm font-bold text-white group-hover:text-slate-200 transition-colors">
-                  Parâmetros de Custos & Segurança
+                  Parâmetros de Custos & Infraestrutura
                 </h4>
                 <p className="text-xs text-slate-400">
-                  Altere o PIN do cofre master e gerencie custos de infraestrutura em nuvem.
+                  Gerencie custos e estimativas de infraestrutura em nuvem.
                 </p>
                 <span className="text-[11px] font-mono text-slate-400 font-semibold block pt-1">
-                  Segurança & Infraestrutura
+                  Infraestrutura em Nuvem
                 </span>
               </div>
               <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-slate-300 group-hover:translate-x-1 transition-all mt-1" />
@@ -4111,94 +3779,6 @@ export default function SaaSMaster() {
                 Salvar Configurações
               </button>
             </div>
-          </div>
-
-          {/* Card: Código de Segurança Master (PIN) */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-purple-400" />
-                  <span>Segurança Executiva (PIN Master)</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Altere o PIN de segurança que protege o painel geral do Franqueador.
-                </p>
-              </div>
-              <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Proteção Ativa
-              </span>
-            </div>
-
-            {msgPinSucesso && (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-xs text-emerald-300 flex items-center gap-2 animate-in fade-in">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>{msgPinSucesso}</span>
-              </div>
-            )}
-
-            {msgPinErro && (
-              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-xs text-rose-300 flex items-center gap-2 animate-in fade-in">
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>{msgPinErro}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSalvarNovoPin} className="space-y-3.5 text-xs">
-              <div>
-                <label className="text-slate-300 font-semibold block mb-1">Código de Segurança Atual:</label>
-                <input
-                  type="password"
-                  maxLength={8}
-                  value={formPin.codigoAtual}
-                  onChange={(e) => setFormPin({ ...formPin, codigoAtual: e.target.value.replace(/\D/g, '') })}
-                  placeholder="Digite o PIN atual (padrão de fábrica: 889900)"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono tracking-widest text-sm focus:border-purple-500 focus:outline-none"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Novo Código (4 a 8 dígitos):</label>
-                  <input
-                    type="password"
-                    maxLength={8}
-                    value={formPin.novoCodigo}
-                    onChange={(e) => setFormPin({ ...formPin, novoCodigo: e.target.value.replace(/\D/g, '') })}
-                    placeholder="Novo PIN numérico"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono tracking-widest text-sm focus:border-purple-500 focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Confirmação do Novo PIN:</label>
-                  <input
-                    type="password"
-                    maxLength={8}
-                    value={formPin.confirmacao}
-                    onChange={(e) => setFormPin({ ...formPin, confirmacao: e.target.value.replace(/\D/g, '') })}
-                    placeholder="Repita o novo PIN"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono tracking-widest text-sm focus:border-purple-500 focus:outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-800/80">
-                <span className="text-[11px] text-slate-500">
-                  🔒 Cada alteração ou desbloqueio gera registro no Log de Auditoria.
-                </span>
-                <button
-                  type="submit"
-                  className="py-2.5 px-5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                >
-                  <KeyRound className="w-3.5 h-3.5" />
-                  <span>Atualizar Código Master</span>
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

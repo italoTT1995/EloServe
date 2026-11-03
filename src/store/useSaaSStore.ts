@@ -295,7 +295,7 @@ export const useSaaSStore = create<SaaSState>()(
       },
 
       codigoSegurancaMaster: '889900',
-      masterDesbloqueado: false,
+      masterDesbloqueado: true,
       tentativasFalhasMaster: 0,
       bloqueadoAte: null,
 
