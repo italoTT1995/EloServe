@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Sparkles,
   RefreshCw,
+  RotateCcw,
   Edit2,
   X,
   Check,
@@ -47,7 +48,10 @@ export function SecaoLoginsEquipe({
     editarUsuario,
     alternarStatusUsuario,
     redefinirPinOuSenha,
+    moverParaLixeiraUsuario,
+    restaurarUsuario,
     removerUsuario,
+    esvaziarLixeiraUsuarios,
     getDescricaoCargo,
   } = useAuthStore();
 
@@ -59,7 +63,7 @@ export function SecaoLoginsEquipe({
   // Filtros
   const [busca, setBusca] = useState('');
   const [cargoFiltro, setCargoFiltro] = useState<string>('todos');
-  const [statusFiltro, setStatusFiltro] = useState<'todos' | 'ativos' | 'bloqueados'>('todos');
+  const [statusFiltro, setStatusFiltro] = useState<'todos' | 'ativos' | 'bloqueados' | 'lixeira'>('todos');
   const [filtroTenantId, setFiltroTenantId] = useState<string>('todos');
 
   // Controle de visibilidade de PINs
@@ -125,13 +129,6 @@ export function SecaoLoginsEquipe({
     return usuariosDoRestaurante.filter((u) => {
       const matchCargo = cargoFiltro === 'todos' || u.cargo === cargoFiltro;
 
-      const matchStatus =
-        statusFiltro === 'todos'
-          ? true
-          : statusFiltro === 'ativos'
-          ? u.ativo
-          : !u.ativo;
-
       const termo = busca.toLowerCase();
       const nomeRestaurante = getNomeRestaurante(u.tenantId).toLowerCase();
       const matchBusca =
@@ -141,21 +138,36 @@ export function SecaoLoginsEquipe({
         u.pin.includes(termo) ||
         (isVisaoGlobalMaster && nomeRestaurante.includes(termo));
 
+      if (statusFiltro === 'lixeira') {
+        return matchCargo && matchBusca && Boolean(u.naLixeira);
+      }
+
+      if (u.naLixeira) return false;
+
+      const matchStatus =
+        statusFiltro === 'todos'
+          ? true
+          : statusFiltro === 'ativos'
+          ? u.ativo
+          : !u.ativo;
+
       return matchCargo && matchStatus && matchBusca;
     });
   }, [usuariosDoRestaurante, cargoFiltro, statusFiltro, busca, isVisaoGlobalMaster, tenants]);
 
   // Contadores analíticos
-  const totalAtivos = usuariosDoRestaurante.filter((u) => u.ativo).length;
-  const totalBloqueados = usuariosDoRestaurante.filter((u) => !u.ativo).length;
+  const totalLixeira = usuariosDoRestaurante.filter((u) => u.naLixeira).length;
+  const totalAtivosRestaurante = usuariosDoRestaurante.filter((u) => !u.naLixeira).length;
+  const totalAtivos = usuariosDoRestaurante.filter((u) => !u.naLixeira && u.ativo).length;
+  const totalBloqueados = usuariosDoRestaurante.filter((u) => !u.naLixeira && !u.ativo).length;
   const totalGerentes = usuariosDoRestaurante.filter(
-    (u) => u.cargo === 'super_admin' || u.cargo === 'admin_restaurante'
+    (u) => !u.naLixeira && (u.cargo === 'super_admin' || u.cargo === 'admin_restaurante')
   ).length;
   const totalFrente = usuariosDoRestaurante.filter(
-    (u) => u.cargo === 'caixa' || u.cargo === 'garcom'
+    (u) => !u.naLixeira && (u.cargo === 'caixa' || u.cargo === 'garcom')
   ).length;
   const totalCozinha = usuariosDoRestaurante.filter(
-    (u) => u.cargo === 'cozinha' || u.cargo === 'entregador'
+    (u) => !u.naLixeira && (u.cargo === 'cozinha' || u.cargo === 'entregador')
   ).length;
 
   function handleCriarLogin(e: React.FormEvent) {
@@ -201,14 +213,41 @@ export function SecaoLoginsEquipe({
     }
   }
 
-  function handleExcluir(u: Usuario) {
-    if (confirm(`Tem certeza que deseja excluir o login de ${u.nome}?`)) {
+  function handleMoverParaLixeira(u: Usuario) {
+    if (confirm(`Deseja mover o login de "${u.nome}" para a lixeira?\n\nO colaborador não conseguirá mais acessar o sistema, mas o login poderá ser restaurado a qualquer momento.`)) {
+      const res = moverParaLixeiraUsuario(u.id);
+      if (res.sucesso) {
+        dispararToast('sucesso', res.mensagem || `Login de ${u.nome} movido para a lixeira.`);
+      } else {
+        dispararToast('erro', res.mensagem || 'Erro ao mover login para lixeira.');
+      }
+    }
+  }
+
+  function handleRestaurar(u: Usuario) {
+    const res = restaurarUsuario(u.id);
+    if (res.sucesso) {
+      dispararToast('sucesso', res.mensagem || `Login de ${u.nome} restaurado com sucesso!`);
+    } else {
+      dispararToast('erro', res.mensagem || 'Erro ao restaurar login.');
+    }
+  }
+
+  function handleExcluirDefinitivo(u: Usuario) {
+    if (confirm(`ATENÇÃO: Deseja EXCLUIR DEFINITIVAMENTE o login de "${u.nome}"?\n\nEsta ação apagará permanentemente o usuário e não poderá ser desfeita.`)) {
       const res = removerUsuario(u.id);
       if (res.sucesso) {
-        dispararToast('sucesso', `Login de ${u.nome} removido do sistema.`);
+        dispararToast('sucesso', `Login de ${u.nome} excluído definitivamente do sistema.`);
       } else {
-        dispararToast('erro', res.mensagem || 'Erro ao remover login.');
+        dispararToast('erro', res.mensagem || 'Erro ao remover login definitivamente.');
       }
+    }
+  }
+
+  function handleEsvaziarLixeira() {
+    if (confirm(`ATENÇÃO: Deseja esvaziar a lixeira e EXCLUIR DEFINITIVAMENTE todos os logins na lixeira?\n\nEsta ação não poderá ser desfeita.`)) {
+      esvaziarLixeiraUsuarios(isVisaoGlobalMaster ? (filtroTenantId === 'todos' ? undefined : filtroTenantId) : tenantId);
+      dispararToast('sucesso', 'Lixeira de logins esvaziada com sucesso.');
     }
   }
 
@@ -457,16 +496,17 @@ export function SecaoLoginsEquipe({
               </div>
             )}
 
-            {/* Filtro de Status: Todos / Ativos / Bloqueados */}
+            {/* Filtro de Status: Todos / Ativos / Bloqueados / Lixeira */}
             <div
               className={`flex items-center gap-1 p-1 rounded-xl border ${
                 isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950/60 border-slate-800'
               }`}
             >
               {[
-                { id: 'todos', label: 'Todos' },
-                { id: 'ativos', label: '🟢 Ativos' },
-                { id: 'bloqueados', label: '🔴 Bloqueados' },
+                { id: 'todos', label: `Todos (${totalAtivosRestaurante})` },
+                { id: 'ativos', label: `🟢 Ativos (${totalAtivos})` },
+                { id: 'bloqueados', label: `🔴 Bloqueados (${totalBloqueados})` },
+                { id: 'lixeira', label: `🗑️ Lixeira (${totalLixeira})` },
               ].map((st) => (
                 <button
                   key={st.id}
@@ -474,9 +514,15 @@ export function SecaoLoginsEquipe({
                   onClick={() => setStatusFiltro(st.id as any)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     statusFiltro === st.id
-                      ? isWhite
+                      ? st.id === 'lixeira'
+                        ? 'bg-rose-600 text-white shadow-sm'
+                        : isWhite
                         ? 'bg-white text-slate-900 shadow-sm'
                         : 'bg-slate-800 text-white shadow-sm'
+                      : st.id === 'lixeira'
+                      ? isWhite
+                        ? 'text-rose-700 hover:text-rose-900'
+                        : 'text-rose-400 hover:text-rose-200'
                       : isWhite
                       ? 'text-slate-600 hover:text-slate-900'
                       : 'text-slate-400 hover:text-slate-200'
@@ -521,6 +567,34 @@ export function SecaoLoginsEquipe({
           ))}
         </div>
       </div>
+
+      {/* Banner Informativo da Lixeira */}
+      {statusFiltro === 'lixeira' && (
+        <div
+          className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-md animate-in fade-in duration-150 ${
+            isWhite
+              ? 'bg-rose-50 border-rose-200 text-rose-800'
+              : 'bg-rose-950/30 border-rose-500/30 text-rose-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Trash2 className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>
+              <strong>Lixeira de Logins ({totalLixeira}):</strong> Usuários na lixeira estão desativados e não podem fazer login. Você pode restaurá-los a qualquer momento ou excluí-los definitivamente.
+            </span>
+          </div>
+          {totalLixeira > 0 && (
+            <button
+              type="button"
+              onClick={handleEsvaziarLixeira}
+              className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Esvaziar Lixeira</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Tabela de Logins Cadastrados */}
       <div
@@ -659,61 +733,91 @@ export function SecaoLoginsEquipe({
 
                     {/* Status */}
                     <td className="py-3 px-4">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(u)}
-                        disabled={u.id === 'usr-master'}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
-                          u.ativo
-                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25'
-                            : 'bg-rose-500/15 border-rose-500/30 text-rose-400 hover:bg-rose-500/25'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            u.ativo ? 'bg-emerald-400' : 'bg-rose-400'
-                          }`}
-                        />
-                        <span>{u.ativo ? 'Ativo' : 'Bloqueado'}</span>
-                      </button>
+                      {u.naLixeira ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border bg-rose-500/15 border-rose-500/30 text-rose-400">
+                          <Trash2 className="w-3 h-3 text-rose-400" />
+                          <span>Na Lixeira</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(u)}
+                          disabled={u.id === 'usr-master'}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
+                            u.ativo
+                              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25'
+                              : 'bg-rose-500/15 border-rose-500/30 text-rose-400 hover:bg-rose-500/25'
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              u.ativo ? 'bg-emerald-400' : 'bg-rose-400'
+                            }`}
+                          />
+                          <span>{u.ativo ? 'Ativo' : 'Bloqueado'}</span>
+                        </button>
+                      )}
                     </td>
 
                     {/* Ações */}
                     <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUsuarioAlvo(u);
-                            setNovoPinReset(u.pin);
-                            setNovaSenhaReset(u.senha || '');
-                            setModalResetAberto(true);
-                          }}
-                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                            isWhite
-                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200'
-                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white'
-                          }`}
-                          title="Redefinir PIN / Senha"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${isWhite ? 'text-amber-600' : 'text-amber-400'}`} />
-                        </button>
-
-                        {u.id !== 'usr-master' && u.id !== usuarioLogado?.id && (
+                      {u.naLixeira ? (
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
-                            onClick={() => handleExcluir(u)}
-                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                              isWhite
-                                ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
-                                : 'bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400'
-                            }`}
-                            title="Excluir Login"
+                            onClick={() => handleRestaurar(u)}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                            title="Restaurar Login"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Restaurar</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleExcluirDefinitivo(u)}
+                            className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                            title="Excluir Definitivamente"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
+                            <span>Excluir Definitivo</span>
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUsuarioAlvo(u);
+                              setNovoPinReset(u.pin);
+                              setNovaSenhaReset(u.senha || '');
+                              setModalResetAberto(true);
+                            }}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              isWhite
+                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white'
+                            }`}
+                            title="Redefinir PIN / Senha"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isWhite ? 'text-amber-600' : 'text-amber-400'}`} />
+                          </button>
+
+                          {u.id !== 'usr-master' && u.id !== usuarioLogado?.id && (
+                            <button
+                              type="button"
+                              onClick={() => handleMoverParaLixeira(u)}
+                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                isWhite
+                                  ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+                                  : 'bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400'
+                              }`}
+                              title="Mover para a Lixeira"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );

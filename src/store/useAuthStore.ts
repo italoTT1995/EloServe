@@ -101,7 +101,10 @@ interface AuthState {
   editarUsuario: (id: string, dados: Partial<Usuario>) => void;
   alternarStatusUsuario: (id: string) => { sucesso: boolean; mensagem?: string };
   redefinirPinOuSenha: (id: string, novoPin: string, novaSenha?: string) => { sucesso: boolean; mensagem?: string };
+  moverParaLixeiraUsuario: (id: string) => { sucesso: boolean; mensagem?: string };
+  restaurarUsuario: (id: string) => { sucesso: boolean; mensagem?: string };
   removerUsuario: (id: string) => { sucesso: boolean; mensagem?: string };
+  esvaziarLixeiraUsuarios: (tenantId?: string) => void;
   login: (email: string, senhaOuPin: string) => { sucesso: boolean; usuario?: Usuario; mensagem?: string };
   loginRapidoPorCargo: (cargo: CargoUsuario) => Usuario;
   logout: () => void;
@@ -246,6 +249,43 @@ export const useAuthStore = create<AuthState>()(
         return { sucesso: true };
       },
 
+      moverParaLixeiraUsuario: (id) => {
+        if (id === 'usr-master') {
+          return { sucesso: false, mensagem: 'O Admin Master do sistema não pode ser enviado para a lixeira.' };
+        }
+        const { usuarioLogado, usuarios } = get();
+        if (usuarioLogado?.id === id) {
+          return { sucesso: false, mensagem: 'Você não pode enviar o seu próprio login conectado para a lixeira.' };
+        }
+        const usuario = usuarios.find((u) => u.id === id);
+        if (!usuario) {
+          return { sucesso: false, mensagem: 'Usuário não encontrado.' };
+        }
+        const agora = new Date().toISOString();
+        set((state) => ({
+          usuarios: state.usuarios.map((u) =>
+            u.id === id ? { ...u, naLixeira: true, ativo: false, deletadoEm: agora } : u
+          ),
+        }));
+        supabaseService.atualizarUsuario(id, { ativo: false });
+        return { sucesso: true, mensagem: `Login de "${usuario.nome}" movido para a lixeira.` };
+      },
+
+      restaurarUsuario: (id) => {
+        const { usuarios } = get();
+        const usuario = usuarios.find((u) => u.id === id);
+        if (!usuario) {
+          return { sucesso: false, mensagem: 'Usuário não encontrado.' };
+        }
+        set((state) => ({
+          usuarios: state.usuarios.map((u) =>
+            u.id === id ? { ...u, naLixeira: false, ativo: true, deletadoEm: undefined } : u
+          ),
+        }));
+        supabaseService.atualizarUsuario(id, { ativo: true });
+        return { sucesso: true, mensagem: `Login de "${usuario.nome}" restaurado com sucesso!` };
+      },
+
       removerUsuario: (id) => {
         if (id === 'usr-master') {
           return { sucesso: false, mensagem: 'O Admin Master do sistema não pode ser excluído.' };
@@ -259,6 +299,19 @@ export const useAuthStore = create<AuthState>()(
         }));
         supabaseService.removerUsuario(id);
         return { sucesso: true };
+      },
+
+      esvaziarLixeiraUsuarios: (tenantId) => {
+        const { usuarios } = get();
+        const paraRemover = usuarios.filter(
+          (u) => u.naLixeira && (tenantId && tenantId !== 'global' ? u.tenantId === tenantId : true)
+        );
+        set((state) => ({
+          usuarios: state.usuarios.filter(
+            (u) => !(u.naLixeira && (tenantId && tenantId !== 'global' ? u.tenantId === tenantId : true))
+          ),
+        }));
+        paraRemover.forEach((u) => supabaseService.removerUsuario(u.id));
       },
 
       login: (email, senhaOuPin) => {
@@ -280,6 +333,10 @@ export const useAuthStore = create<AuthState>()(
 
         if (!usuario) {
           return { sucesso: false, mensagem: 'E-mail não cadastrado no sistema. Verifique a digitação ou crie seu login.' };
+        }
+
+        if (usuario.naLixeira) {
+          return { sucesso: false, mensagem: 'Este login foi movido para a lixeira. Solicite a restauração ao administrador.' };
         }
 
         if (!usuario.ativo) {

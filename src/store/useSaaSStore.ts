@@ -171,6 +171,10 @@ interface SaaSState {
   adicionarTenant: (novo: Omit<TenantRestaurante, 'id' | 'criadoEm'>) => TenantRestaurante;
   atualizarDadosTenant: (tenantId: string, dados: Partial<TenantRestaurante>) => void;
   atualizarStatusAssinatura: (tenantId: string, status: StatusAssinatura) => void;
+  moverTenantParaLixeira: (tenantId: string) => { sucesso: boolean; mensagem?: string };
+  restaurarTenant: (tenantId: string) => { sucesso: boolean; mensagem?: string };
+  removerTenantDefinitivo: (tenantId: string) => { sucesso: boolean; mensagem?: string };
+  esvaziarLixeiraTenants: () => void;
   mudarPlanoTenant: (tenantId: string, planoId: TipoPlanoSaaS) => void;
   atualizarPlano: (planoId: TipoPlanoSaaS, dados: Partial<PlanoAssinatura>, atualizarAssinantes?: boolean) => void;
   atualizarCustosInfra: (novos: Partial<CustosInfraSaaS>) => void;
@@ -374,6 +378,90 @@ export const useSaaSStore = create<SaaSState>()(
         supabaseService.atualizarTenant(tenantId, { statusAssinatura: status });
       },
 
+      moverTenantParaLixeira: (tenantId: string) => {
+        if (tenantId === 'global') {
+          return { sucesso: false, mensagem: 'O ambiente Global Master não pode ser enviado para a lixeira.' };
+        }
+        const state = get();
+        const tenant = state.tenants.find((t) => t.id === tenantId);
+        if (!tenant) return { sucesso: false, mensagem: 'Restaurante não encontrado.' };
+
+        const agora = new Date().toISOString();
+        set((s) => ({
+          tenants: s.tenants.map((t) =>
+            t.id === tenantId ? { ...t, naLixeira: true, deletadoEm: agora } : t
+          ),
+          tenantAtivoId: s.tenantAtivoId === tenantId ? 'global' : s.tenantAtivoId,
+        }));
+
+        supabaseService.atualizarTenant(tenantId, { statusAssinatura: 'cancelado' });
+        get().registrarLogAuditoria(
+          'Restaurante movido para Lixeira',
+          'sistema',
+          `O restaurante "${tenant.nomeFantasia}" (${tenant.id}) foi movido para a lixeira.`
+        );
+        return { sucesso: true, mensagem: `Restaurante "${tenant.nomeFantasia}" movido para a lixeira.` };
+      },
+
+      restaurarTenant: (tenantId: string) => {
+        const state = get();
+        const tenant = state.tenants.find((t) => t.id === tenantId);
+        if (!tenant) return { sucesso: false, mensagem: 'Restaurante não encontrado.' };
+
+        set((s) => ({
+          tenants: s.tenants.map((t) =>
+            t.id === tenantId ? { ...t, naLixeira: false, deletadoEm: undefined, statusAssinatura: 'ativo' } : t
+          ),
+        }));
+
+        supabaseService.atualizarTenant(tenantId, { statusAssinatura: 'ativo' });
+        get().registrarLogAuditoria(
+          'Restaurante restaurado da Lixeira',
+          'sistema',
+          `O restaurante "${tenant.nomeFantasia}" (${tenant.id}) foi restaurado da lixeira.`
+        );
+        return { sucesso: true, mensagem: `Restaurante "${tenant.nomeFantasia}" restaurado com sucesso!` };
+      },
+
+      removerTenantDefinitivo: (tenantId: string) => {
+        if (tenantId === 'global') {
+          return { sucesso: false, mensagem: 'O ambiente Global não pode ser excluído.' };
+        }
+        const state = get();
+        const tenant = state.tenants.find((t) => t.id === tenantId);
+        if (!tenant) return { sucesso: false, mensagem: 'Restaurante não encontrado.' };
+
+        set((s) => ({
+          tenants: s.tenants.filter((t) => t.id !== tenantId),
+          tenantAtivoId: s.tenantAtivoId === tenantId ? 'global' : s.tenantAtivoId,
+        }));
+
+        supabaseService.removerTenant(tenantId);
+        get().registrarLogAuditoria(
+          'Restaurante excluído definitivamente',
+          'seguranca',
+          `O restaurante "${tenant.nomeFantasia}" (${tenant.id}) foi excluído definitivamente da base de dados.`
+        );
+        return { sucesso: true, mensagem: `Restaurante "${tenant.nomeFantasia}" excluído definitivamente.` };
+      },
+
+      esvaziarLixeiraTenants: () => {
+        const { tenants } = get();
+        const paraRemover = tenants.filter((t) => t.naLixeira);
+        if (paraRemover.length === 0) return;
+
+        set((state) => ({
+          tenants: state.tenants.filter((t) => !t.naLixeira),
+        }));
+
+        paraRemover.forEach((t) => supabaseService.removerTenant(t.id));
+        get().registrarLogAuditoria(
+          'Lixeira de Restaurantes esvaziada',
+          'seguranca',
+          `${paraRemover.length} restaurante(s) na lixeira foram excluídos definitivamente.`
+        );
+      },
+
       mudarPlanoTenant: (tenantId, planoId) => {
         const plano = get().planos.find((p) => p.id === planoId);
         if (!plano) return;
@@ -436,21 +524,21 @@ export const useSaaSStore = create<SaaSState>()(
       getMRR: () => {
         const { tenants } = get();
         return tenants
-          .filter((t) => t.statusAssinatura === 'ativo' || t.statusAssinatura === 'trial')
+          .filter((t) => !t.naLixeira && (t.statusAssinatura === 'ativo' || t.statusAssinatura === 'trial'))
           .reduce((acc, t) => acc + t.valorMensalidade, 0);
       },
 
       getTotalAtivos: () => {
-        return get().tenants.filter((t) => t.statusAssinatura === 'ativo').length;
+        return get().tenants.filter((t) => !t.naLixeira && t.statusAssinatura === 'ativo').length;
       },
 
       getTotalTrials: () => {
-        return get().tenants.filter((t) => t.statusAssinatura === 'trial').length;
+        return get().tenants.filter((t) => !t.naLixeira && t.statusAssinatura === 'trial').length;
       },
 
       getTotalAtrasados: () => {
         return get().tenants.filter(
-          (t) => t.statusAssinatura === 'atrasado' || t.statusAssinatura === 'bloqueado'
+          (t) => !t.naLixeira && (t.statusAssinatura === 'atrasado' || t.statusAssinatura === 'bloqueado')
         ).length;
       },
 

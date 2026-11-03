@@ -367,6 +367,8 @@ export const supabaseService = {
       dreHabilitado: row.dre_habilitado ?? true,
       couvertArtisticoAtivo: !!row.couvert_artistico_ativo,
       valorCouvertPorPessoa: Number(row.valor_couvert_por_pessoa || 0),
+      naLixeira: !!row.na_lixeira || !!row.naLixeira,
+      deletadoEm: row.deletado_em || row.deletadoEm,
     };
   },
 
@@ -383,6 +385,8 @@ export const supabaseService = {
       ativo: row.ativo ?? true,
       criadoEm: row.criado_em,
       ultimoAcesso: row.ultimo_acesso,
+      naLixeira: !!row.na_lixeira || !!row.naLixeira,
+      deletadoEm: row.deletado_em || row.deletadoEm,
     };
   },
 

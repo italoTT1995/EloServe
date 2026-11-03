@@ -84,6 +84,10 @@ export default function SaaSMaster() {
     adicionarTenant,
     atualizarDadosTenant,
     atualizarStatusAssinatura,
+    moverTenantParaLixeira,
+    restaurarTenant,
+    removerTenantDefinitivo,
+    esvaziarLixeiraTenants,
     mudarPlanoTenant,
     atualizarPlano,
     getMRR,
@@ -1016,12 +1020,22 @@ export default function SaaSMaster() {
   const totalTrials = getTotalTrials();
   const totalAtrasados = getTotalAtrasados();
 
+  const tenantsNaLixeira = tenants.filter((t) => t.naLixeira);
+  const tenantsAtivos = tenants.filter((t) => !t.naLixeira);
+
   const tenantsFiltrados = tenants.filter((t) => {
     const matchBusca =
       t.nomeFantasia.toLowerCase().includes(busca.toLowerCase()) ||
       t.responsavelNome.toLowerCase().includes(busca.toLowerCase()) ||
       t.documento.includes(busca) ||
       t.cidadeUf.toLowerCase().includes(busca.toLowerCase());
+
+    if (filtroStatus === 'lixeira') {
+      return matchBusca && Boolean(t.naLixeira);
+    }
+
+    if (t.naLixeira) return false;
+
     const matchStatus =
       filtroStatus === 'todos' ||
       t.statusAssinatura === filtroStatus;
@@ -1967,18 +1981,23 @@ export default function SaaSMaster() {
 
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
               {[
-                { id: 'todos', label: `Todos (${tenants.length})` },
+                { id: 'todos', label: `Todos (${tenantsAtivos.length})` },
                 { id: 'ativo', label: 'Ativos' },
                 { id: 'trial', label: 'Em Teste' },
                 { id: 'atrasado', label: 'Atrasados' },
                 { id: 'bloqueado', label: 'Bloqueados' },
+                { id: 'lixeira', label: `🗑️ Lixeira (${tenantsNaLixeira.length})` },
               ].map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setFiltroStatus(item.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                     filtroStatus === item.id
-                      ? 'bg-purple-600 text-white shadow-sm font-bold'
+                      ? item.id === 'lixeira'
+                        ? 'bg-rose-600 text-white shadow-sm font-bold'
+                        : 'bg-purple-600 text-white shadow-sm font-bold'
+                      : item.id === 'lixeira'
+                      ? 'bg-rose-950/40 border border-rose-500/30 text-rose-300 hover:text-white'
                       : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
                   }`}
                 >
@@ -2016,6 +2035,31 @@ export default function SaaSMaster() {
               </button>
             </div>
           </div>
+
+          {filtroStatus === 'lixeira' && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-rose-950/30 border border-rose-500/30 rounded-2xl text-rose-200 text-xs shadow-lg animate-in fade-in duration-150">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>
+                  <strong>Lixeira de Restaurantes ({tenantsNaLixeira.length}):</strong> Estabelecimentos na lixeira estão suspensos e não geram faturamento. Você pode restaurá-los com 1 clique ou excluí-los permanentemente.
+                </span>
+              </div>
+              {tenantsNaLixeira.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm(`Atenção: Deseja esvaziar a lixeira e EXCLUIR DEFINITIVAMENTE todos os ${tenantsNaLixeira.length} restaurante(s) da lixeira?\n\nEsta ação apagará permanentemente esses dados e não poderá ser desfeita.`)) {
+                      esvaziarLixeiraTenants();
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Esvaziar Lixeira</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Tabela de Assinantes SaaS */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-x-auto shadow-xl">
@@ -2163,95 +2207,151 @@ export default function SaaSMaster() {
 
                         {/* Ações */}
                         <td className="py-3.5 px-5 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Botão Ver Métricas */}
-                            <button
-                              type="button"
-                              onClick={() => setModalMetricasLoja(tenant)}
-                              title="Ver resumo de vendas e métricas operacionais"
-                              className="px-2.5 py-1.5 rounded-xl bg-purple-950/80 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
-                            >
-                              <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
-                              <span className="hidden lg:inline">Métricas</span>
-                            </button>
-                            {/* Botão Credenciais & Login Criado pelo Master */}
-                            <button
-                              type="button"
-                              onClick={() => handleAbrirCredenciais(tenant)}
-                              title="Gerenciar Login & Senha do Restaurante"
-                              className="px-2.5 py-1.5 rounded-xl bg-purple-950/80 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
-                            >
-                              <KeyRound className="w-3.5 h-3.5 text-purple-400" />
-                              <span className="hidden lg:inline">Acesso</span>
-                            </button>
-
-                            {/* Botão Editar Loja & Cardápio */}
-                            <button
-                              onClick={() => {
-                                setTenantEmEdicaoId(tenant.id);
-                                handleMudarAba('editor_loja');
-                              }}
-                              title="Editar dados, plano e cardápio deste restaurante"
-                              className="px-2.5 py-1.5 rounded-xl bg-purple-950/80 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
-                            >
-                              <Sliders className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Editar Loja</span>
-                            </button>
-
-                            {/* Botão Entrar na Loja (Modo Suporte do Super Admin) */}
-                            <button
-                              onClick={() => handleEntrarNaLoja(tenant.id)}
-                              title="Acessar o PDV deste restaurante em Modo Suporte"
-                              className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Inspecionar PDV</span>
-                            </button>
-
-                            {/* Botão Cobrança WhatsApp */}
-                            <button
-                              onClick={() => setModalCobrancaWhatsApp(tenant)}
-                              title="Enviar Cobrança / PIX via WhatsApp"
-                              className="p-1.5 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer"
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                            </button>
-
-                            {/* Bloquear / Desbloquear */}
-                            {tenant.statusAssinatura === 'bloqueado' ? (
+                          {tenant.naLixeira ? (
+                            <div className="flex items-center justify-end gap-2">
                               <button
+                                type="button"
                                 onClick={() => {
-                                  atualizarStatusAssinatura(tenant.id, 'ativo');
-                                  registrarLogAuditoria(
-                                    'Desbloqueio de Restaurante',
-                                    'seguranca',
-                                    `Acesso do restaurante "${tenant.nomeFantasia}" foi reativado (Desbloqueado)`
-                                  );
-                                }}
-                                title="Desbloquear Restaurante"
-                                className="p-1.5 rounded-xl bg-slate-800 hover:bg-emerald-500 text-emerald-400 hover:text-white transition-all cursor-pointer"
-                              >
-                                <Unlock className="w-4 h-4" />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  if (confirm(`Deseja suspender temporariamente o acesso do restaurante ${tenant.nomeFantasia}?`)) {
-                                    atualizarStatusAssinatura(tenant.id, 'bloqueado');
-                                    registrarLogAuditoria(
-                                      'Bloqueio de Restaurante',
-                                      'seguranca',
-                                      `Acesso do restaurante "${tenant.nomeFantasia}" foi bloqueado temporariamente por inadimplência/administrativo`
-                                    );
+                                  const res = restaurarTenant(tenant.id);
+                                  if (res.sucesso) {
+                                    alert(res.mensagem || 'Restaurante restaurado com sucesso!');
+                                  } else {
+                                    alert(res.mensagem || 'Erro ao restaurar.');
                                   }
                                 }}
-                                title="Bloquear Acesso por Falta de Pagamento"
-                                className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white transition-all cursor-pointer"
+                                title="Restaurar Restaurante para Ativo"
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                               >
-                                <Lock className="w-4 h-4" />
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>Restaurar</span>
                               </button>
-                            )}
-                          </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`ATENÇÃO: Deseja EXCLUIR DEFINITIVAMENTE o restaurante "${tenant.nomeFantasia}"?\n\nEsta ação apagará permanentemente o cadastro e não poderá ser desfeita.`)) {
+                                    const res = removerTenantDefinitivo(tenant.id);
+                                    if (res.sucesso) {
+                                      alert(res.mensagem || 'Restaurante excluído definitivamente.');
+                                    } else {
+                                      alert(res.mensagem || 'Erro ao excluir.');
+                                    }
+                                  }
+                                }}
+                                title="Excluir Definitivamente da Base"
+                                className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Excluir Definitivo</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Botão Ver Métricas */}
+                              <button
+                                type="button"
+                                onClick={() => setModalMetricasLoja(tenant)}
+                                title="Ver resumo de vendas e métricas operacionais"
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-950/80 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                              >
+                                <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
+                                <span className="hidden lg:inline">Métricas</span>
+                              </button>
+                              {/* Botão Credenciais & Login Criado pelo Master */}
+                              <button
+                                type="button"
+                                onClick={() => handleAbrirCredenciais(tenant)}
+                                title="Gerenciar Login & Senha do Restaurante"
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-950/80 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                              >
+                                <KeyRound className="w-3.5 h-3.5 text-purple-400" />
+                                <span className="hidden lg:inline">Acesso</span>
+                              </button>
+
+                              {/* Botão Editar Loja & Cardápio */}
+                              <button
+                                onClick={() => {
+                                  setTenantEmEdicaoId(tenant.id);
+                                  handleMudarAba('editor_loja');
+                                }}
+                                title="Editar dados, plano e cardápio deste restaurante"
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-950/80 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                              >
+                                <Sliders className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Editar Loja</span>
+                              </button>
+
+                              {/* Botão Entrar na Loja (Modo Suporte do Super Admin) */}
+                              <button
+                                onClick={() => handleEntrarNaLoja(tenant.id)}
+                                title="Acessar o PDV deste restaurante em Modo Suporte"
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Inspecionar PDV</span>
+                              </button>
+
+                              {/* Botão Cobrança WhatsApp */}
+                              <button
+                                onClick={() => setModalCobrancaWhatsApp(tenant)}
+                                title="Enviar Cobrança / PIX via WhatsApp"
+                                className="p-1.5 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer"
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                              </button>
+
+                              {/* Bloquear / Desbloquear */}
+                              {tenant.statusAssinatura === 'bloqueado' ? (
+                                <button
+                                  onClick={() => {
+                                    atualizarStatusAssinatura(tenant.id, 'ativo');
+                                    registrarLogAuditoria(
+                                      'Desbloqueio de Restaurante',
+                                      'seguranca',
+                                      `Acesso do restaurante "${tenant.nomeFantasia}" foi reativado (Desbloqueado)`
+                                    );
+                                  }}
+                                  title="Desbloquear Restaurante"
+                                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-emerald-500 text-emerald-400 hover:text-white transition-all cursor-pointer"
+                                >
+                                  <Unlock className="w-4 h-4" />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Deseja suspender temporariamente o acesso do restaurante ${tenant.nomeFantasia}?`)) {
+                                      atualizarStatusAssinatura(tenant.id, 'bloqueado');
+                                      registrarLogAuditoria(
+                                        'Bloqueio de Restaurante',
+                                        'seguranca',
+                                        `Acesso do restaurante "${tenant.nomeFantasia}" foi bloqueado temporariamente por inadimplência/administrativo`
+                                      );
+                                    }
+                                  }}
+                                  title="Bloquear Acesso por Falta de Pagamento"
+                                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white transition-all cursor-pointer"
+                                >
+                                  <Lock className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {/* Botão Mover para a Lixeira */}
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Deseja mover o restaurante "${tenant.nomeFantasia}" para a lixeira?\n\nEle não aparecerá mais nos relatórios ativos e o acesso ao sistema será suspenso.`)) {
+                                    const res = moverTenantParaLixeira(tenant.id);
+                                    if (!res.sucesso && res.mensagem) {
+                                      alert(res.mensagem);
+                                    }
+                                  }
+                                }}
+                                title="Mover Restaurante para a Lixeira"
+                                className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white border border-slate-700 hover:border-rose-500/50 transition-all cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

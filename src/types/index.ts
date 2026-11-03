@@ -18,6 +18,8 @@ export interface Usuario {
   ativo: boolean;
   criadoEm?: string;
   ultimoAcesso?: string;
+  naLixeira?: boolean;
+  deletadoEm?: string;
 }
 
 export type PerfilUsuario = CargoUsuario;
@@ -283,6 +285,8 @@ export interface TenantRestaurante {
   valorCouvertPorPessoa?: number;
   valorCouvertPorComanda?: number;
   diasAoVivo?: string[];
+  naLixeira?: boolean;
+  deletadoEm?: string;
 }
 
 // -------------------------------------------------------------
