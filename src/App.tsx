@@ -17,11 +17,13 @@ import Delivery from './pages/Delivery';
 import Funcionarios from './pages/Funcionarios';
 import PainelDono from './pages/PainelDono';
 import AutoatendimentoMesa from './pages/AutoatendimentoMesa';
+import CardapioDigitalPublico from './pages/CardapioDigitalPublico';
 import { useAuthStore } from './store/useAuthStore';
 import { useSaaSStore } from './store/useSaaSStore';
 import { useProductStore } from './store/useProductStore';
 import { useAppStore } from './store/useAppStore';
 import { supabaseService } from './services/supabaseService';
+import { realtimeService } from './services/realtimeService';
 
 function RotaInicialInteligente() {
   const { usuarioLogado } = useAuthStore();
@@ -74,6 +76,13 @@ export default function App() {
         useAppStore.getState().sincronizarComSupabase(dados.mesas);
       }
     });
+
+    // Inicia a escuta em tempo real do Supabase Realtime (WebSockets)
+    realtimeService.iniciarSincronizacaoRealtime();
+
+    return () => {
+      realtimeService.pararSincronizacaoRealtime();
+    };
   }, []);
 
   return (
@@ -84,6 +93,10 @@ export default function App() {
 
         {/* Rota Pública de Autoatendimento da Mesa via QR Code (Seção 4.12) */}
         <Route path="/mesa/:numero" element={<AutoatendimentoMesa />} />
+
+        {/* Rota Pública do Cardápio Digital */}
+        <Route path="/cardapio" element={<CardapioDigitalPublico />} />
+        <Route path="/cardapio/:tenantId" element={<CardapioDigitalPublico />} />
 
         {/* Rotas Protegidas dentro do Layout da Aplicação */}
         <Route

@@ -67,6 +67,8 @@ import {
   baixarQrCodeMesaPng,
 } from '../utils/qrCodeHelper';
 import { useThemeStore } from '../store/useThemeStore';
+import { ModalReciboWhatsApp } from '../components/common/ModalReciboWhatsApp';
+import { DadosReciboDigital } from '../utils/whatsappReciboHelper';
 
 export default function Mesas() {
   const { tema } = useThemeStore();
@@ -87,6 +89,7 @@ export default function Mesas() {
     toggleTaxaServicoMesa,
     toggleCouvertMesa,
     aplicarDescontoComandaMesa,
+    pedidosKDS,
   } = useAppStore();
   const { funcionarios } = useFuncionarioStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
@@ -156,6 +159,7 @@ export default function Mesas() {
   });
 
   const [mesaParaFechar, setMesaParaFechar] = useState<Mesa | null>(null);
+  const [reciboWhatsAppDados, setReciboWhatsAppDados] = useState<DadosReciboDigital | null>(null);
   const [pessoasDivisao, setPessoasDivisao] = useState(2);
   const [mesaModalQR, setMesaModalQR] = useState<Mesa | null>(null);
   const [modalQrDataUrl, setModalQrDataUrl] = useState<string>('');
@@ -1002,6 +1006,7 @@ export default function Mesas() {
   const totalOcupadas = mesas.filter((m) => m.status === 'ocupada').length;
   const totalLivres = mesas.filter((m) => m.status === 'livre').length;
   const totalChamados = mesas.filter((m) => m.status === 'chamar_garcom').length;
+  const pratosProntos = (pedidosKDS || []).filter((p) => p.status === 'pronto');
   const taxaOcupacao = mesas.length > 0 ? Math.round((totalOcupadas / mesas.length) * 100) : 0;
 
   function handleConfirmarAberturaMesa(e: React.FormEvent) {
@@ -1130,6 +1135,12 @@ export default function Mesas() {
             {totalChamados > 0 && (
               <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black animate-pulse">
                 {totalChamados} Chamados Pendentes
+              </span>
+            )}
+            {pratosProntos.length > 0 && (
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black animate-bounce flex items-center gap-1 shadow-md shadow-emerald-500/20">
+                <span>🍽️</span>
+                <span>{pratosProntos.length} {pratosProntos.length === 1 ? 'Prato Pronto para Servir' : 'Pratos Prontos para Servir'}</span>
               </span>
             )}
           </h2>
@@ -2225,21 +2236,50 @@ export default function Mesas() {
                                   R$ {totPessoa.total.toFixed(2)}
                                 </span>
                                 {totPessoa.total > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setModalPagamentoComanda({
-                                        mesa: mesaParaFechar,
-                                        nomePessoa: p,
-                                        valor: totPessoa.total,
-                                        itens: itensPessoa,
-                                      });
-                                    }}
-                                    className="text-[10px] px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm"
-                                  >
-                                    <CreditCard className="w-3 h-3" />
-                                    <span>Receber deste</span>
-                                  </button>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setReciboWhatsAppDados({
+                                          nomeRestaurante: tenantAtual?.nomeFantasia || 'Restaurante EloServe',
+                                          mesaNumero: mesaParaFechar.numero,
+                                          clienteNome: p,
+                                          garcomNome: mesaParaFechar.garcomResponsavel,
+                                          itens: itensPessoa.map((it) => ({
+                                            nome: it.nome,
+                                            quantidade: it.quantidade,
+                                            subtotal: it.subtotal,
+                                          })),
+                                          subtotal: totPessoa.subtotal,
+                                          taxaServico: totPessoa.taxaAtiva ? totPessoa.taxaServico : 0,
+                                          couvertArtistico: totPessoa.couvertTotal,
+                                          desconto: totPessoa.desconto,
+                                          total: totPessoa.total,
+                                        });
+                                      }}
+                                      className="text-[10px] px-2 py-1 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                      title="Enviar extrato desta pessoa via WhatsApp"
+                                    >
+                                      <MessageSquare className="w-3 h-3" />
+                                      <span>WhatsApp</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setModalPagamentoComanda({
+                                          mesa: mesaParaFechar,
+                                          nomePessoa: p,
+                                          valor: totPessoa.total,
+                                          itens: itensPessoa,
+                                        });
+                                      }}
+                                      className="text-[10px] px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm"
+                                    >
+                                      <CreditCard className="w-3 h-3" />
+                                      <span>Receber</span>
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -2272,7 +2312,34 @@ export default function Mesas() {
                   </div>
                 )}
 
-                <div className="flex gap-2 pt-2">
+                {/* Botão de Envio de Extrato Digital da Mesa via WhatsApp */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReciboWhatsAppDados({
+                      nomeRestaurante: tenantAtual?.nomeFantasia || 'Restaurante EloServe',
+                      mesaNumero: mesaParaFechar.numero,
+                      clienteNome: mesaParaFechar.responsavelNome || `Mesa #${mesaParaFechar.numero}`,
+                      garcomNome: mesaParaFechar.garcomResponsavel,
+                      itens: totaisMesa.itens.map((it) => ({
+                        nome: it.nome,
+                        quantidade: it.quantidade,
+                        subtotal: it.subtotal,
+                      })),
+                      subtotal: totaisMesa.subtotal,
+                      taxaServico: totaisMesa.taxaAtiva ? totaisMesa.taxaServico : 0,
+                      couvertArtistico: totaisMesa.couvertAtivo ? totaisMesa.couvertTotal : 0,
+                      desconto: totaisMesa.desconto,
+                      total: totaisMesa.total,
+                    });
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>📱 Enviar Extrato Digital da Mesa por WhatsApp</span>
+                </button>
+
+                <div className="flex gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => setMesaParaFechar(null)}
@@ -4592,8 +4659,36 @@ export default function Mesas() {
                 </div>
               </div>
 
+              {/* Botão de Envio de Extrato Digital via WhatsApp */}
+              <button
+                type="button"
+                onClick={() => {
+                  setReciboWhatsAppDados({
+                    nomeRestaurante: tenantAtual?.nomeFantasia || 'Restaurante EloServe',
+                    mesaNumero: modalPagamentoComanda.mesa.numero,
+                    clienteNome: modalPagamentoComanda.nomePessoa,
+                    garcomNome: modalPagamentoComanda.mesa.garcomResponsavel,
+                    itens: totPagamento.itens.map((it) => ({
+                      nome: it.nome,
+                      quantidade: it.quantidade,
+                      subtotal: it.subtotal,
+                    })),
+                    subtotal: totPagamento.subtotal,
+                    taxaServico: totPagamento.taxaAtiva ? totPagamento.taxaServico : 0,
+                    couvertArtistico: totPagamento.couvertTotal,
+                    desconto: totPagamento.desconto,
+                    total: totPagamento.total,
+                    formaPagamento: formaPagamentoComanda,
+                  });
+                }}
+                className="w-full py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>📱 Enviar Extrato deste Pagamento via WhatsApp</span>
+              </button>
+
               {/* Ações */}
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setModalPagamentoComanda(null)}
@@ -5572,6 +5667,13 @@ export default function Mesas() {
             </form>
           </div>
         </div>
+      )}
+      {/* Modal de Envio de Extrato Digital via WhatsApp */}
+      {reciboWhatsAppDados && (
+        <ModalReciboWhatsApp
+          dados={reciboWhatsAppDados}
+          onClose={() => setReciboWhatsAppDados(null)}
+        />
       )}
     </div>
   );

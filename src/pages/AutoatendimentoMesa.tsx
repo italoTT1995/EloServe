@@ -428,7 +428,15 @@ export default function AutoatendimentoMesa() {
               onClick={handleConfirmarInicio}
               className="w-full py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-sm shadow-xl shadow-orange-500/30 cursor-pointer transition-all"
             >
-              Acessar Cardápio Digital
+              Iniciar Atendimento na Mesa
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setModalInicioAberto(false)}
+              className="w-full py-2.5 rounded-2xl border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white font-bold text-xs cursor-pointer transition-all flex items-center justify-center gap-1.5"
+            >
+              <span>👁️ Apenas Visualizar Cardápio (Sem Abrir Mesa)</span>
             </button>
           </div>
         </div>

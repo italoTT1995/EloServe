@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { SessaoCaixa, Mesa, PedidoKDS, VendaRealizada, ItemComandaMesa, DespesaOperacionalRestaurante, MovimentoCaixa, NotaFiscalRegistro } from '../types';
 import { useEstoqueStore } from './useEstoqueStore';
 import { supabaseService } from '../services/supabaseService';
+import { tocarSinoPratoPronto } from '../utils/audioAlert';
 import { MESAS_POR_TENANT } from './initialMesas';
 import { NOTAS_FISCAIS_INICIAIS } from './initialNotasFiscais';
 
@@ -15,6 +16,8 @@ interface AppState {
   getMesasPorTenant: (tenantId?: string) => Mesa[];
   mesas: Mesa[];
   sincronizarComSupabase: (mesasNovas: Mesa[]) => void;
+  sincronizarMesaIndividual: (mesa: Mesa) => void;
+  removerMesaRealtime: (idOuNumero: string | number) => void;
   pedidosKDS: PedidoKDS[];
   vendas: VendaRealizada[];
   despesasRestaurante: DespesaOperacionalRestaurante[];
@@ -127,6 +130,44 @@ export const useAppStore = create<AppState>()(
         set({
           mesasPorTenant: agrupadoMesas,
           mesas: mesasNovas,
+        });
+      },
+
+      sincronizarMesaIndividual: (mesaAtualizada) => {
+        if (!mesaAtualizada) return;
+        const tId = mesaAtualizada.tenantId || 'tenant-01';
+        set((state) => {
+          const map = state.mesasPorTenant || {};
+          const listaAtual = map[tId] || [];
+          const existe = listaAtual.some(
+            (m) => m.id === mesaAtualizada.id || m.numero === mesaAtualizada.numero
+          );
+          const novaLista = existe
+            ? listaAtual.map((m) =>
+                m.id === mesaAtualizada.id || m.numero === mesaAtualizada.numero ? mesaAtualizada : m
+              )
+            : [...listaAtual, mesaAtualizada].sort((a, b) => a.numero - b.numero);
+
+          return {
+            mesasPorTenant: {
+              ...map,
+              [tId]: novaLista,
+            },
+            mesas: novaLista,
+          };
+        });
+      },
+
+      removerMesaRealtime: (idOuNumero) => {
+        set((state) => {
+          const map = { ...state.mesasPorTenant };
+          Object.keys(map).forEach((tId) => {
+            map[tId] = map[tId].filter((m) => m.id !== idOuNumero && m.numero !== idOuNumero);
+          });
+          return {
+            mesasPorTenant: map,
+            mesas: state.mesas.filter((m) => m.id !== idOuNumero && m.numero !== idOuNumero),
+          };
         });
       },
 
@@ -1136,6 +1177,25 @@ export const useAppStore = create<AppState>()(
             return pedidoAtual;
           }),
         }));
+
+        // Sino de cozinha para alertar o garçom e vibração no smartphone
+        tocarSinoPratoPronto();
+
+        // Notifica o Supabase para sincronizar com todos os garçons conectados
+        if (pedidoAtual) {
+          const ped = pedidoAtual as PedidoKDS;
+          supabaseService.salvarPedido({
+            id: ped.id,
+            tenantId: (ped as any).tenantId || 'tenant-01',
+            numero: ped.numero,
+            tipo: ped.tipo,
+            mesaNumero: ped.mesaNumero,
+            clienteNome: ped.nomeCliente,
+            statusKDS: 'pronto',
+            itens: ped.itens,
+            total: 0,
+          });
+        }
 
         // Se for delivery, avança status
         if (pedidoAtual && pedidoAtual.status === 'pronto' && pedidoAtual.tipo === 'delivery') {

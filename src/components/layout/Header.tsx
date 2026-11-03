@@ -32,6 +32,7 @@ import { useSaaSStore } from '../../store/useSaaSStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useWindowFocus } from '../../hooks/useWindowFocus';
+import { BotaoInstalarPWA } from '../common/BotaoInstalarPWA';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -419,6 +420,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             {isFocused ? 'Em Foco' : 'Fora de Foco'}
           </span>
         </div>
+
+        {/* Botão de Instalação do App PWA */}
+        <BotaoInstalarPWA />
 
         {/* Botão Rápido White Color / Dark Mode */}
         <button

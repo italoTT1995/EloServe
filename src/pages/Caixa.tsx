@@ -25,8 +25,11 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSaaSStore } from '../store/useSaaSStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
 import { AdminAuthModal } from '../components/common/AdminAuthModal';
+import { ModalReciboWhatsApp } from '../components/common/ModalReciboWhatsApp';
+import { DadosReciboDigital } from '../utils/whatsappReciboHelper';
 import { ContagemDinheiroFisico, QuestionarioFechamentoCaixa, VendaRealizada } from '../types';
 
 export default function Caixa() {
@@ -44,6 +47,8 @@ export default function Caixa() {
   } = useAppStore();
   const { itens, processarAberturaDiaConsumoPrevisto, ajustarSobraDiaAnterior } = useEstoqueStore();
   const { usuarioLogado, temPermissao } = useAuthStore();
+  const { getTenantAtivo } = useSaaSStore();
+  const tenantAtual = getTenantAtivo();
   const ehAdminOuGerente = temPermissao(['super_admin', 'admin_restaurante']);
 
   const isAberto = caixaAtual.status === 'aberto';
@@ -53,6 +58,7 @@ export default function Caixa() {
   const [modalFechamento, setModalFechamento] = useState(false);
   const [comprovanteAbertura, setComprovanteAbertura] = useState<{ troco: number; horario: string; operador: string } | null>(null);
   const [comprovanteFechamento, setComprovanteFechamento] = useState<QuestionarioFechamentoCaixa | null>(null);
+  const [reciboWhatsAppDados, setReciboWhatsAppDados] = useState<DadosReciboDigital | null>(null);
 
   // Estados de Estorno & Histórico de Vendas
   const [vendaParaEstorno, setVendaParaEstorno] = useState<VendaRealizada | null>(null);
@@ -589,16 +595,47 @@ export default function Caixa() {
                       </div>
 
                       {!isCancelada && (
-                        <button
-                          onClick={() => {
-                            setVendaParaEstorno(v);
-                            setMotivoEstorno('Cancelamento solicitado no Caixa');
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-rose-400 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Estornar Venda</span>
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReciboWhatsAppDados({
+                                nomeRestaurante: tenantAtual?.nomeFantasia || 'Restaurante EloServe',
+                                mesaNumero: v.mesaNumero,
+                                clienteNome: v.mesaNumero ? `Mesa #${v.mesaNumero}` : 'Cliente Balcão',
+                                garcomNome: v.operador,
+                                itens: (v.itens || []).map((it) => ({
+                                  nome: it.nome,
+                                  quantidade: it.quantidade,
+                                  subtotal: it.subtotal,
+                                })),
+                                subtotal: v.subtotalBruto || v.total,
+                                taxaServico: v.taxaServico,
+                                couvertArtistico: v.couvertArtistico,
+                                desconto: v.desconto,
+                                total: v.total,
+                                formaPagamento: v.formaPagamento,
+                                dataHora: v.dataHora,
+                              });
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                            title="Enviar comprovante digital por WhatsApp"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>WhatsApp</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setVendaParaEstorno(v);
+                              setMotivoEstorno('Cancelamento solicitado no Caixa');
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-rose-400 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Estornar</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1295,6 +1332,13 @@ export default function Caixa() {
         onSuccess={handleAuthLimpezaSucesso}
         actionTitle="Apenas o Gerente ou Administrador pode autorizar a limpeza do histórico de vendas."
       />
+      {/* Modal de Envio de Extrato Digital via WhatsApp */}
+      {reciboWhatsAppDados && (
+        <ModalReciboWhatsApp
+          dados={reciboWhatsAppDados}
+          onClose={() => setReciboWhatsAppDados(null)}
+        />
+      )}
     </div>
   );
 }

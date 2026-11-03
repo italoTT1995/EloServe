@@ -15,6 +15,8 @@ interface ProductState {
   produtos: Produto[];
   categorias: Categoria[];
   sincronizarComSupabase: (produtos: Produto[], categorias: Categoria[]) => void;
+  sincronizarProdutoIndividual: (produto: Produto, tenantId?: string) => void;
+  removerProdutoRealtime: (id: string) => void;
   adicionarProduto: (produto: Omit<Produto, 'id'>, tenantId?: string) => Produto;
   editarProduto: (id: string, dados: Partial<Produto>, tenantId?: string) => void;
   removerProduto: (id: string, tenantId?: string) => void;
@@ -55,6 +57,40 @@ export const useProductStore = create<ProductState>()(
           categoriasPorTenant: agrupadoCat,
           produtos: produtosNovos,
           categorias: categoriasNovas,
+        });
+      },
+
+      sincronizarProdutoIndividual: (produto, tenantId) => {
+        if (!produto) return;
+        const tId = tenantId || (produto as any).tenantId || 'tenant-01';
+        set((state) => {
+          const map = state.produtosPorTenant || {};
+          const listaAtual = map[tId] || [];
+          const existe = listaAtual.some((p) => p.id === produto.id);
+          const novaLista = existe
+            ? listaAtual.map((p) => (p.id === produto.id ? produto : p))
+            : [produto, ...listaAtual];
+
+          return {
+            produtosPorTenant: {
+              ...map,
+              [tId]: novaLista,
+            },
+            produtos: novaLista,
+          };
+        });
+      },
+
+      removerProdutoRealtime: (id) => {
+        set((state) => {
+          const map = { ...state.produtosPorTenant };
+          Object.keys(map).forEach((tId) => {
+            map[tId] = map[tId].filter((p) => p.id !== id);
+          });
+          return {
+            produtosPorTenant: map,
+            produtos: state.produtos.filter((p) => p.id !== id),
+          };
         });
       },
 

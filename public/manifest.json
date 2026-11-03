@@ -1,0 +1,46 @@
+{
+  "name": "EloServe — Gestão & PDV 100% Digital",
+  "short_name": "EloServe",
+  "description": "Sistema completo de gestão, PDV, KDS, mesas e salão para restaurantes 100% digital.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#020617",
+  "theme_color": "#f97316",
+  "categories": ["business", "food", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon-elogastro.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon-elogastro.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mesas & Salão",
+      "short_name": "Mesas",
+      "url": "/mesas",
+      "icons": [{ "src": "/favicon-elogastro.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Cozinha KDS",
+      "short_name": "KDS",
+      "url": "/kds",
+      "icons": [{ "src": "/favicon-elogastro.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Frente de Caixa (PDV)",
+      "short_name": "PDV",
+      "url": "/",
+      "icons": [{ "src": "/favicon-elogastro.svg", "sizes": "any" }]
+    }
+  ]
+}
