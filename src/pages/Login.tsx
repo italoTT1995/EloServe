@@ -124,22 +124,14 @@ export default function Login() {
           {/* Top Luminous Accent Line em Laranja Oficial #FF6B00 */}
           <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-transparent via-[#FF6B00] to-transparent opacity-95" />
 
-          {/* Header do Card com o Cloche Oficial */}
+          {/* Header do Card com o Logotipo Oficial */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center mb-2.5 transform hover:scale-105 transition-transform duration-300">
-              <EloGastroClocheIcon size={46} color="#FF6B00" />
-            </div>
-
-            <div className="flex items-baseline justify-center font-black tracking-tight leading-none mb-1.5">
-              <span
-                className="text-[#FF6B00] font-black text-2xl select-none italic mr-0.5"
-                style={{ letterSpacing: '-0.03em' }}
-              >
-                elo
-              </span>
-              <span className="text-white font-extrabold text-2xl tracking-tight select-none">
-                Gastrô
-              </span>
+            <div className="flex justify-center mb-2.5 transform hover:scale-105 transition-transform duration-300">
+              <img
+                src="/images/elogastro-logo-transparent.png"
+                alt="eloGastrô"
+                className="h-24 sm:h-28 w-auto object-contain select-none drop-shadow-2xl"
+              />
             </div>
 
             <p className="text-xs text-slate-300 max-w-xs mx-auto leading-relaxed">

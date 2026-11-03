@@ -11,15 +11,15 @@
   "categories": ["business", "food", "productivity"],
   "icons": [
     {
-      "src": "/favicon-elogastro.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/favicon-elogastro.svg",
-      "sizes": "192x192 512x512",
-      "type": "image/svg+xml",
+      "src": "/images/elogastro-app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any"
     }
   ],
@@ -28,19 +28,19 @@
       "name": "Mesas & Salão",
       "short_name": "Mesas",
       "url": "/mesas",
-      "icons": [{ "src": "/favicon-elogastro.svg", "sizes": "any" }]
+      "icons": [{ "src": "/favicon.png", "sizes": "512x512" }]
     },
     {
       "name": "Cozinha KDS",
       "short_name": "KDS",
       "url": "/kds",
-      "icons": [{ "src": "/favicon-elogastro.svg", "sizes": "any" }]
+      "icons": [{ "src": "/favicon.png", "sizes": "512x512" }]
     },
     {
       "name": "Frente de Caixa (PDV)",
       "short_name": "PDV",
       "url": "/",
-      "icons": [{ "src": "/favicon-elogastro.svg", "sizes": "any" }]
+      "icons": [{ "src": "/favicon.png", "sizes": "512x512" }]
     }
   ]
 }
