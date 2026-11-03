@@ -5,7 +5,6 @@ import {
   Award,
   Calendar,
   Percent,
-  Printer,
   CheckCircle2,
   Clock,
   ArrowRight,
@@ -23,7 +22,6 @@ import { useAppStore } from '../../store/useAppStore';
 import { useFuncionarioStore } from '../../store/useFuncionarioStore';
 import { useComissaoStore } from '../../store/useComissaoStore';
 import { useFinanceiroStore } from '../../store/useFinanceiroStore';
-import { impressaoTermicaService } from '../../services/impressaoTermicaService';
 import { RateioGarcomDetalhe, RegistroFechamentoComissao } from '../../types';
 
 interface SecaoComissoesGarconsProps {
@@ -237,39 +235,6 @@ export function SecaoComissoesGarcons({
 
     setModalConfirmarAberto(false);
     dispararToast(`Fechamento de comissões concluído! R$ ${totalLiquidoGarcons.toFixed(2)} registrado com sucesso.`);
-
-    // Imprime comprovante do fechamento
-    impressaoTermicaService.imprimirReciboComissao({
-      fechamento: novoFechamento,
-      nomeRestaurante,
-    });
-  }
-
-  function handleImprimirRecibo(garcomId?: string) {
-    if (rateioGarcons.length === 0) return;
-
-    const fechamentoTemp: RegistroFechamentoComissao = {
-      id: `temp_${Date.now()}`,
-      tenantId,
-      dataFechamento: new Date().toLocaleDateString('pt-BR'),
-      periodoDescricao: `Demonstrativo de Comissões (${periodoFiltro.toUpperCase()})`,
-      modeloRateio,
-      totalVendasFaturadas: totalVendasSalão,
-      totalTaxaServicoBruta: totalTaxaServicoArrecadada,
-      percentualRetencaoCasa: retencaoCasa,
-      valorRetencaoCasa: valorRetencaoCalculado,
-      totalLiquidoRateado: totalLiquidoGarcons,
-      garcons: rateioGarcons,
-      lancadoNoFinanceiro: false,
-      criadoPor: usuarioNome,
-      criadoEm: new Date().toISOString(),
-    };
-
-    impressaoTermicaService.imprimirReciboComissao({
-      fechamento: fechamentoTemp,
-      garcomId,
-      nomeRestaurante,
-    });
   }
 
   return (
@@ -477,20 +442,6 @@ export function SecaoComissoesGarcons({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => handleImprimirRecibo()}
-              disabled={rateioGarcons.length === 0}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                isWhite
-                  ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
-                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <Printer className="w-3.5 h-3.5 text-orange-400" />
-              <span>Imprimir Todos os Recibos</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => setModalConfirmarAberto(true)}
               disabled={rateioGarcons.length === 0 || totalLiquidoGarcons === 0}
               className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
@@ -513,13 +464,12 @@ export function SecaoComissoesGarcons({
                 <th className="py-3 px-4 text-right">10% Bruto Gerado</th>
                 <th className="py-3 px-4 text-right">Retenção ({retencaoCasa}%)</th>
                 <th className="py-3 px-4 text-right text-emerald-400">Comissão Líquida</th>
-                <th className="py-3 px-4 text-center">Ações</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${isWhite ? 'divide-slate-200' : 'divide-slate-800/60'}`}>
               {rateioGarcons.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-slate-500">
+                  <td colSpan={6} className="py-10 text-center text-slate-500">
                     Nenhuma venda com taxa de serviço registrada no período selecionado ({periodoFiltro}).
                   </td>
                 </tr>
@@ -552,20 +502,6 @@ export function SecaoComissoesGarcons({
                     <td className="py-3.5 px-4 text-right font-mono font-black text-sm text-emerald-500 dark:text-emerald-400">
                       R$ {g.comissaoLiquida.toFixed(2)}
                     </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleImprimirRecibo(g.garcomId)}
-                        title="Imprimir Recibo Térmico Individual para Assinatura"
-                        className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                          isWhite
-                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                        }`}
-                      >
-                        <Printer className="w-3.5 h-3.5 text-orange-400" />
-                      </button>
-                    </td>
                   </tr>
                 ))
               )}
@@ -591,7 +527,6 @@ export function SecaoComissoesGarcons({
                   <td className="py-3 px-4 text-right font-mono font-black text-emerald-500 text-base">
                     R$ {totalLiquidoGarcons.toFixed(2)}
                   </td>
-                  <td></td>
                 </tr>
               </tfoot>
             )}
@@ -648,18 +583,6 @@ export function SecaoComissoesGarcons({
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => impressaoTermicaService.imprimirReciboComissao({ fechamento: fech, nomeRestaurante })}
-                      title="Reimprimir Comprovante Térmico"
-                      className={`p-2 rounded-xl border transition-colors cursor-pointer ${
-                        isWhite
-                          ? 'bg-white hover:bg-slate-200 border-slate-300 text-slate-700'
-                          : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
-                      }`}
-                    >
-                      <Printer className="w-4 h-4 text-orange-400" />
-                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -770,7 +693,7 @@ export function SecaoComissoesGarcons({
                 className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Check className="w-4 h-4" />
-                <span>Confirmar & Imprimir Recibos</span>
+                <span>Confirmar Fechamento de Comissões</span>
               </button>
             </div>
           </div>

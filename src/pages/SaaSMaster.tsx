@@ -39,7 +39,6 @@ import {
   RotateCcw,
   ChefHat,
   Smartphone,
-  Printer,
   Package,
   FileText,
   BarChart3,
@@ -3338,26 +3337,6 @@ export default function SaaSMaster() {
                     </label>
 
                     <label className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
-                      formRegrasPlano.impressaoTermicaInclusa
-                        ? 'bg-emerald-950/30 border-emerald-500/50 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400'
-                    }`}>
-                      <div className="space-y-0.5 pr-2">
-                        <span className="font-bold block text-white flex items-center gap-1.5">
-                          <Printer className="w-4 h-4 text-amber-400" />
-                          <span>Impressão Automática Térmica (ESC/POS)</span>
-                        </span>
-                        <p className="text-[10px] text-slate-400">Cupom de fechamento e vias de produção</p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={formRegrasPlano.impressaoTermicaInclusa}
-                        onChange={(e) => setFormRegrasPlano({ ...formRegrasPlano, impressaoTermicaInclusa: e.target.checked })}
-                        className="w-5 h-5 accent-emerald-500 rounded cursor-pointer shrink-0"
-                      />
-                    </label>
-
-                    <label className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
                       formRegrasPlano.controleEstoqueIncluso
                         ? 'bg-emerald-950/30 border-emerald-500/50 text-white'
                         : 'bg-slate-950 border-slate-800 text-slate-400'
@@ -4071,15 +4050,6 @@ export default function SaaSMaster() {
                   >
                     <Download className="w-4 h-4 text-white" />
                     <span>Baixar Relatório (CSV)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Printer className="w-4 h-4 text-slate-400" />
-                    <span>Imprimir</span>
                   </button>
                 </div>
 

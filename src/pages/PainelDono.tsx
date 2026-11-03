@@ -11,7 +11,6 @@ import {
   ChefHat,
   Bot,
   Store,
-  Printer,
   ChevronLeft,
   ChevronRight,
   MoreVertical,
@@ -52,7 +51,6 @@ export default function PainelDono() {
   const [categoriaCardapio, setCategoriaCardapio] = useState<string>('todos');
   const [buscaItem, setBuscaItem] = useState<string>('');
   const [paginaPedidos, setPaginaPedidos] = useState<number>(1);
-  const [modalImprimir, setModalImprimir] = useState<boolean>(false);
 
   // Edição rápida de preço
   const [editandoPrecoId, setEditandoPrecoId] = useState<string | null>(null);
@@ -268,16 +266,6 @@ export default function PainelDono() {
             <DollarSign className="w-3.5 h-3.5" />
             <span>Financeiro & DRE</span>
           </Link>
-
-          {/* Imprimir Resumo */}
-          <button
-            type="button"
-            onClick={() => setModalImprimir(true)}
-            className="p-2 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
-            title="Imprimir Fechamento do Dia"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
 
           {/* Alternar White Color / Dark Mode */}
           <button
@@ -913,85 +901,6 @@ export default function PainelDono() {
           ))}
         </div>
       </div>
-
-      {/* MODAL: RESUMO / CUPOM DE FECHAMENTO DO DIA */}
-      {modalImprimir && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className={`border rounded-3xl max-w-sm w-full shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 ${
-            isWhite ? 'bg-white border-slate-200' : 'bg-[#141416] border-slate-800'
-          }`}>
-            <div className={`flex items-center justify-between border-b pb-3 ${
-              isWhite ? 'border-slate-200' : 'border-slate-800'
-            }`}>
-              <div className="flex items-center gap-2">
-                <Printer className="w-4 h-4 text-orange-500" />
-                <h3 className={`text-sm font-bold ${isWhite ? 'text-slate-900' : 'text-white'}`}>Resumo do Dia (Fechamento)</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalImprimir(false)}
-                className={`p-1 ${isWhite ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'}`}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Cupom Térmico */}
-            <div className="p-4 bg-white text-slate-950 font-mono text-xs rounded-2xl shadow-inner space-y-2">
-              <div className="text-center border-b border-dashed border-slate-400 pb-2">
-                <p className="font-black text-sm uppercase">{tenantAtual.nomeFantasia}</p>
-                <p className="text-[10px] text-slate-600">DEMONSTRATIVO DIÁRIO</p>
-                <p className="text-[9px] text-slate-500">
-                  {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}
-                </p>
-              </div>
-
-              <div className="space-y-1 text-[11px] py-1">
-                <div className="flex justify-between">
-                  <span>Vendas Hoje:</span>
-                  <strong>R$ 1.046,11</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Pedidos:</span>
-                  <strong>20 pedidos</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span>Ticket Médio:</span>
-                  <strong>R$ 52,31</strong>
-                </div>
-                <div className="flex justify-between font-black text-xs pt-1 border-t border-slate-300">
-                  <span>CLIENTES HOJE:</span>
-                  <span>17</span>
-                </div>
-              </div>
-
-              <div className="text-center pt-2 border-t border-dashed border-slate-400 text-[8px] text-slate-500">
-                EloServe • Sistema PDV
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="w-full py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs shadow-lg shadow-orange-500/30 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Imprimir Resumo (Ctrl+P)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setModalImprimir(false)}
-                className={`w-full py-2 rounded-xl text-xs font-semibold text-center cursor-pointer transition-colors ${
-                  isWhite ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Fechar janela
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

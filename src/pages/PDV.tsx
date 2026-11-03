@@ -27,10 +27,7 @@ import {
   MapPin,
   Phone,
   Pencil,
-  Printer,
 } from 'lucide-react';
-import { impressaoTermicaService } from '../services/impressaoTermicaService';
-import { ModalConfiguracaoImpressao } from '../components/impressao/ModalConfiguracaoImpressao';
 import { Link } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAppStore } from '../store/useAppStore';
@@ -45,7 +42,6 @@ import { VendaRealizada } from '../types';
 export default function PDV() {
   const [categoriaAtiva, setCategoriaAtiva] = useState('todas');
   const [busca, setBusca] = useState('');
-  const [modalImpressaoConfigAberto, setModalImpressaoConfigAberto] = useState(false);
   const [modalPagamentoAberto, setModalPagamentoAberto] = useState(false);
   const [comandaMobileAberta, setComandaMobileAberta] = useState(false);
   const [formaSelecionada, setFormaSelecionada] = useState<'dinheiro' | 'pix' | 'debito' | 'credito'>('pix');
@@ -275,20 +271,6 @@ export default function PDV() {
     audio.tocarSucessoVenda();
     setVendaSucesso(true);
 
-    // Dispara Impressão Automática e Silenciosa na Cozinha e no Bar se houver itens
-    impressaoTermicaService.imprimirTicketCozinhaEBar({
-      pedidoId: novaVenda.id,
-      numeroPedido: novaVenda.id.slice(-4),
-      tipo: tipoPedido === 'delivery' ? 'delivery' : 'balcao',
-      clienteNome: dadosEntrega.clienteNome || (tipoPedido === 'delivery' ? 'Cliente Delivery' : 'Balcão'),
-      garcomNome: operadorAtivo || 'Caixa',
-      itens: itens.map((it) => ({
-        nome: it.produto.nome,
-        quantidade: it.quantidade,
-        observacoes: it.produto.descricao,
-      })),
-      nomeRestaurante: tenantAtual?.nomeFantasia || 'EloGastrô',
-    });
     setTimeout(() => {
       setVendaSucesso(false);
       setModalPagamentoAberto(false);
@@ -656,14 +638,6 @@ export default function PDV() {
               <span className="hidden sm:inline">Vendas & Estorno ({vendas.length})</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setModalImpressaoConfigAberto(true)}
-              className="p-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-[#FF6B00] rounded-xl transition-all cursor-pointer shadow-sm shrink-0"
-              title="Configurações de Impressão Térmica Automática"
-            >
-              <Printer className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Categorias em pílulas deslizáveis com suporte a arrastar com o mouse e setas */}
@@ -879,7 +853,7 @@ export default function PDV() {
                   <CheckCircle2 className="w-10 h-10" />
                 </div>
                 <h4 className="text-lg font-bold text-white">Venda Concluída com Sucesso!</h4>
-                <p className="text-xs text-slate-400">Comprovante enviado para a fila de impressão e KDS atualizado.</p>
+                <p className="text-xs text-slate-400">Venda registrada digitalmente e enviada ao KDS e Caixa.</p>
               </div>
             ) : (
               <>
@@ -1470,13 +1444,6 @@ export default function PDV() {
           </div>
         </div>
       )}
-
-      {/* Modal de Configuração de Impressão Térmica */}
-      <ModalConfiguracaoImpressao
-        isOpen={modalImpressaoConfigAberto}
-        onClose={() => setModalImpressaoConfigAberto(false)}
-        nomeRestaurante={tenantAtual?.nomeFantasia || 'EloGastrô'}
-      />
     </div>
   );
 }

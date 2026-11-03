@@ -14,7 +14,7 @@ export const PLANOS_DISPONIVEIS: PlanoAssinatura[] = [
       'Limite de 1 terminal PDV frente de caixa por estabelecimento',
       'Até 10 mesas simultâneas com controle no salão',
       'Cardápio digital via QR Code interativo nas mesas',
-      'Impressão automática em impressora térmica (ESC/POS)',
+      'Operação 100% digital e sem papel com telas interativas',
       'Sem painel de cozinha KDS e sem automação de WhatsApp',
       'Tolerância de 3 dias de atraso na fatura antes da suspensão automática',
       'Período padrão de degustação: 7 dias grátis',

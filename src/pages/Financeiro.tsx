@@ -8,7 +8,6 @@ import {
   Filter,
   Plus,
   Trash2,
-  Printer,
   AlertCircle,
   CheckCircle2,
   Store,

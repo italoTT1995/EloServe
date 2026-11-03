@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Coins,
   FileText,
-  Printer,
   X,
   Check,
   MessageSquare,
@@ -28,7 +27,6 @@ import { useAppStore } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
 import { AdminAuthModal } from '../components/common/AdminAuthModal';
-import { ModalConfiguracaoImpressao } from '../components/impressao/ModalConfiguracaoImpressao';
 import { ContagemDinheiroFisico, QuestionarioFechamentoCaixa, VendaRealizada } from '../types';
 
 export default function Caixa() {
@@ -53,7 +51,6 @@ export default function Caixa() {
   // Modais
   const [modalAbertura, setModalAbertura] = useState(false);
   const [modalFechamento, setModalFechamento] = useState(false);
-  const [modalImpressaoAberto, setModalImpressaoAberto] = useState(false);
   const [comprovanteAbertura, setComprovanteAbertura] = useState<{ troco: number; horario: string; operador: string } | null>(null);
   const [comprovanteFechamento, setComprovanteFechamento] = useState<QuestionarioFechamentoCaixa | null>(null);
 
@@ -284,15 +281,6 @@ export default function Caixa() {
                 <Award className="w-4 h-4 text-emerald-400" />
                 <span>Rateio 10% (Garçom)</span>
               </Link>
-
-              <button
-                type="button"
-                onClick={() => setModalImpressaoAberto(true)}
-                title="Configuração de Impressão Térmica"
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
-              >
-                <Printer className="w-4 h-4 text-[#FF6B00]" />
-              </button>
             </>
           ) : (
             <button
@@ -355,7 +343,7 @@ export default function Caixa() {
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
             <h4 className="text-xs font-bold text-white flex items-center gap-2">
               <Receipt className="w-4 h-4 text-emerald-400" />
-              <span>Via de Abertura do Caixa (Impressão Emitida)</span>
+              <span>Comprovante Digital de Abertura do Caixa</span>
             </h4>
             <button onClick={() => setComprovanteAbertura(null)} className="text-slate-500 hover:text-white">
               <X className="w-4 h-4" />
@@ -1306,12 +1294,6 @@ export default function Caixa() {
         onClose={() => setModalAuthLimpeza(false)}
         onSuccess={handleAuthLimpezaSucesso}
         actionTitle="Apenas o Gerente ou Administrador pode autorizar a limpeza do histórico de vendas."
-      />
-
-      {/* Modal de Configuração de Impressão Térmica */}
-      <ModalConfiguracaoImpressao
-        isOpen={modalImpressaoAberto}
-        onClose={() => setModalImpressaoAberto(false)}
       />
     </div>
   );

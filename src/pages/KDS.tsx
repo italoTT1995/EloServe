@@ -18,15 +18,12 @@ import {
   CheckCheck,
   BellRing,
   Sparkles,
-  Printer,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useSaaSStore, PLANOS_DISPONIVEIS } from '../store/useSaaSStore';
 import { audio } from '../lib/audio';
 import { PedidoKDS, ItemPedidoKDS } from '../types';
 import { DoubleClickButton } from '../components/common/DoubleClickButton';
-import { impressaoTermicaService } from '../services/impressaoTermicaService';
-import { ModalConfiguracaoImpressao } from '../components/impressao/ModalConfiguracaoImpressao';
 
 export default function KDS() {
   const {
@@ -47,7 +44,6 @@ export default function KDS() {
 
   // Duas Abas Principais: Cozinha e Bar (com opção de Todas)
   const [abaAtiva, setAbaAtiva] = useState<'cozinha' | 'bar' | 'todas'>('cozinha');
-  const [modalImpressaoAberto, setModalImpressaoAberto] = useState(false);
 
   // Helper para verificar se um item pertence à aba selecionada
   function itemPertenceAba(item: ItemPedidoKDS, aba: 'cozinha' | 'bar' | 'todas'): boolean {
@@ -265,17 +261,6 @@ export default function KDS() {
             <Volume2 className="w-4 h-4 text-emerald-400" />
             <span className="hidden sm:inline">Som</span>
           </button>
-
-          {/* Configurar Impressão Térmica */}
-          <button
-            type="button"
-            onClick={() => setModalImpressaoAberto(true)}
-            title="Configurações de Impressão Térmica (Cozinha & Bar)"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-[#FF6B00] border border-[#FF6B00]/30 transition-colors cursor-pointer"
-          >
-            <Printer className="w-4 h-4 text-[#FF6B00]" />
-            <span className="hidden sm:inline">Impressoras</span>
-          </button>
         </div>
       </div>
 
@@ -433,13 +418,6 @@ export default function KDS() {
           </div>
         </div>
       </div>
-
-      {/* Modal de Configuração de Impressão Térmica (Cozinha & Bar) */}
-      <ModalConfiguracaoImpressao
-        isOpen={modalImpressaoAberto}
-        onClose={() => setModalImpressaoAberto(false)}
-        nomeRestaurante={tenantAtual?.nomeFantasia || 'EloGastrô'}
-      />
     </div>
   );
 }
@@ -538,32 +516,6 @@ function KdsCard({
 
         {/* Ações e SLA / Tempo com Cores */}
         <div className="flex items-center gap-1.5">
-          {/* Botão Imprimir / Reimprimir Ticket */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              impressaoTermicaService.imprimirTicketSetor({
-                pedidoId: pedido.id,
-                numeroPedido: pedido.numero,
-                tipo: pedido.tipo as any,
-                mesaNumero: pedido.mesaNumero,
-                clienteNome: pedido.nomeCliente,
-                setorAlvo: abaAtiva === 'bar' ? 'bar' : 'cozinha',
-                itens: (itensPertencentes.length > 0 ? itensPertencentes : itensComIndices).map(({ item }) => ({
-                  nome: item.nome,
-                  quantidade: item.quantidade,
-                  observacoes: item.observacoes,
-                  setorPreparo: item.setorPreparo,
-                })),
-              });
-            }}
-            title="Imprimir / Reimprimir Ticket na Impressora Térmica"
-            className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-orange-400 hover:text-orange-300 transition-colors cursor-pointer"
-          >
-            <Printer className="w-3.5 h-3.5" />
-          </button>
-
           <div
             className={`flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
               isCritico

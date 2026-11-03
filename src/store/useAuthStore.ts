@@ -448,7 +448,7 @@ export const useAuthStore = create<AuthState>()(
               cor: 'text-rose-400 bg-rose-950/60 border-rose-500/30',
               badgeCor: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
               icone: '🍳',
-              descricao: 'Painel KDS da cozinha e bar, controle de tempo de preparo de pratos, despacho e reimpressão de fichas de produção.',
+              descricao: 'Painel KDS 100% digital da cozinha e bar, controle de tempo de preparo de pratos, organização de filas e despacho em tempo real.',
               modulosPermitidos: ['Cozinha (KDS)'],
             };
           case 'entregador':

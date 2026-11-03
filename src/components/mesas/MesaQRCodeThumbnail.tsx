@@ -39,7 +39,7 @@ export function MesaQRCodeThumbnail({ numero, setor, size = 48, tenantId, onClic
       type="button"
       onClick={onClick}
       className="p-1 bg-white rounded-xl shadow-md border border-slate-200 hover:border-orange-500 hover:scale-105 transition-all cursor-pointer shrink-0 group relative"
-      title={`QR Code Real da Mesa #${numero} — Clique para ampliar / imprimir`}
+      title={`QR Code da Mesa #${numero} — Clique para ampliar e baixar`}
     >
       <img
         src={dataUrl}
