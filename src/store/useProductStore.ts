@@ -161,6 +161,7 @@ export const useProductStore = create<ProductState>()(
             produtos: tenantAlvo ? novosPorTenant[tenantAlvo] : state.produtos,
           };
         });
+        supabaseService.removerProduto(id);
         sincronizarComWhatsAppServer(tenantId);
       },
 
@@ -189,10 +190,12 @@ export const useProductStore = create<ProductState>()(
             produtos: tenantAlvo ? novosPorTenant[tenantAlvo] : state.produtos,
           };
         });
+        supabaseService.atualizarProduto(id, { precoVenda: Number(novoPreco.toFixed(2)) });
         sincronizarComWhatsAppServer(tenantId);
       },
 
       alternarDisponibilidade: (id, tenantId) => {
+        let novoStatus = true;
         set((state) => {
           const novosPorTenant: Record<string, Produto[]> = { ...state.produtosPorTenant };
           let tenantAlvo = tenantId && tenantId !== 'global' ? tenantId : null;
@@ -207,9 +210,13 @@ export const useProductStore = create<ProductState>()(
           }
 
           if (tenantAlvo && novosPorTenant[tenantAlvo]) {
-            novosPorTenant[tenantAlvo] = novosPorTenant[tenantAlvo].map((p) =>
-              p.id === id ? { ...p, disponivel: !p.disponivel } : p
-            );
+            novosPorTenant[tenantAlvo] = novosPorTenant[tenantAlvo].map((p) => {
+              if (p.id === id) {
+                novoStatus = !p.disponivel;
+                return { ...p, disponivel: novoStatus };
+              }
+              return p;
+            });
           }
 
           return {
@@ -217,6 +224,7 @@ export const useProductStore = create<ProductState>()(
             produtos: tenantAlvo ? novosPorTenant[tenantAlvo] : state.produtos,
           };
         });
+        supabaseService.atualizarProduto(id, { disponivel: novoStatus });
         sincronizarComWhatsAppServer(tenantId);
       },
 
@@ -252,6 +260,7 @@ export const useProductStore = create<ProductState>()(
             categoriasPorTenant: novasPorTenant,
           };
         });
+        supabaseService.removerCategoria(id);
       },
     }),
     {

@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     dre_habilitado BOOLEAN DEFAULT TRUE,
     couvert_artistico_ativo BOOLEAN DEFAULT FALSE,
     valor_couvert_por_pessoa NUMERIC(10,2) DEFAULT 0,
+    na_lixeira BOOLEAN DEFAULT FALSE,
+    deletado_em TIMESTAMPTZ,
     criado_em TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -37,6 +39,8 @@ CREATE TABLE IF NOT EXISTS public.usuarios (
     pin TEXT NOT NULL DEFAULT '1234',
     senha TEXT,
     ativo BOOLEAN DEFAULT TRUE,
+    na_lixeira BOOLEAN DEFAULT FALSE,
+    deletado_em TIMESTAMPTZ,
     criado_em TIMESTAMPTZ DEFAULT NOW(),
     ultimo_acesso TIMESTAMPTZ
 );

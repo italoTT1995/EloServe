@@ -439,10 +439,17 @@ export const useAppStore = create<AppState>()(
 
       atualizarStatusMesa: (numero, status, tenantId) => {
         const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        let mesaAlvo: Mesa | undefined;
         set((state) => {
           const map = state.mesasPorTenant || MESAS_POR_TENANT;
           const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
-          const novaLista = listaAtual.map((m) => (m.numero === numero ? { ...m, status } : m));
+          const novaLista = listaAtual.map((m) => {
+            if (m.numero === numero) {
+              mesaAlvo = { ...m, status };
+              return mesaAlvo;
+            }
+            return m;
+          });
           return {
             mesasPorTenant: {
               ...map,
@@ -451,6 +458,9 @@ export const useAppStore = create<AppState>()(
             mesas: novaLista,
           };
         });
+        if (mesaAlvo) {
+          supabaseService.salvarMesa(mesaAlvo, idAlvo);
+        }
       },
 
       adicionarMesa: (dados, tenantId) => {
@@ -479,6 +489,7 @@ export const useAppStore = create<AppState>()(
           },
           mesas: novaLista,
         });
+        supabaseService.salvarMesa(novaMesa, idAlvo);
         return { sucesso: true };
       },
 
@@ -505,15 +516,23 @@ export const useAppStore = create<AppState>()(
           },
           mesas: novaLista,
         });
+        supabaseService.removerMesa(mesa.id);
         return { sucesso: true };
       },
 
       editarMesa: (numero, dados, tenantId) => {
         const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        let mesaAtualizada: Mesa | undefined;
         set((state) => {
           const map = state.mesasPorTenant || MESAS_POR_TENANT;
           const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
-          const novaLista = listaAtual.map((m) => (m.numero === numero ? { ...m, ...dados } : m));
+          const novaLista = listaAtual.map((m) => {
+            if (m.numero === numero) {
+              mesaAtualizada = { ...m, ...dados };
+              return mesaAtualizada;
+            }
+            return m;
+          });
           return {
             mesasPorTenant: {
               ...map,
@@ -522,10 +541,14 @@ export const useAppStore = create<AppState>()(
             mesas: novaLista,
           };
         });
+        if (mesaAtualizada) {
+          supabaseService.salvarMesa(mesaAtualizada, idAlvo);
+        }
       },
 
       adicionarPessoaMesa: (numeroMesa, nomePessoa, tenantId) => {
         const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        let mesaAtualizada: Mesa | undefined;
         set((state) => {
           const map = state.mesasPorTenant || MESAS_POR_TENANT;
           const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
@@ -537,21 +560,26 @@ export const useAppStore = create<AppState>()(
             const nomeFormatado = nomePessoa.trim();
             if (!nomeFormatado || pessoasAtuais.includes(nomeFormatado)) return m;
             const novasPessoas = [...pessoasAtuais, nomeFormatado];
-            return {
+            mesaAtualizada = {
               ...m,
               pessoas: novasPessoas,
               quantidadePessoas: Math.max(m.quantidadePessoas || 1, novasPessoas.length),
             };
+            return mesaAtualizada;
           });
           return {
             mesasPorTenant: { ...map, [idAlvo]: novaLista },
             mesas: novaLista,
           };
         });
+        if (mesaAtualizada) {
+          supabaseService.salvarMesa(mesaAtualizada, idAlvo);
+        }
       },
 
       removerPessoaMesa: (numeroMesa, nomePessoa, tenantId) => {
         const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        let mesaAtualizada: Mesa | undefined;
         set((state) => {
           const map = state.mesasPorTenant || MESAS_POR_TENANT;
           const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
@@ -561,16 +589,20 @@ export const useAppStore = create<AppState>()(
               ? m.pessoas
               : [m.responsavelNome || `Mesa #${numeroMesa}`];
             const filtradas = pessoasAtuais.filter((p) => p !== nomePessoa);
-            return {
+            mesaAtualizada = {
               ...m,
               pessoas: filtradas.length > 0 ? filtradas : [m.responsavelNome || `Mesa #${numeroMesa}`],
             };
+            return mesaAtualizada;
           });
           return {
             mesasPorTenant: { ...map, [idAlvo]: novaLista },
             mesas: novaLista,
           };
         });
+        if (mesaAtualizada) {
+          supabaseService.salvarMesa(mesaAtualizada, idAlvo);
+        }
       },
 
       cancelarItemComandaMesa: (numeroMesa, itemId, motivo, gerenteNome, tenantId) => {
@@ -619,6 +651,11 @@ export const useAppStore = create<AppState>()(
           mesas: novaLista,
         });
 
+        const mesaAtualizada = novaLista.find((m) => m.numero === numeroMesa);
+        if (mesaAtualizada) {
+          supabaseService.salvarMesa(mesaAtualizada, idAlvo);
+        }
+
         return {
           sucesso: true,
           mensagem: `Item "${itemAlvo.nome}" cancelado com sucesso.`,
@@ -660,6 +697,11 @@ export const useAppStore = create<AppState>()(
           mesas: novaLista,
         });
 
+        const mesaAtualizada = novaLista.find((m) => m.numero === numeroMesa);
+        if (mesaAtualizada) {
+          supabaseService.salvarMesa(mesaAtualizada, idAlvo);
+        }
+
         return { sucesso: true, isenta };
       },
 
@@ -697,6 +739,11 @@ export const useAppStore = create<AppState>()(
           mesas: novaLista,
         });
 
+        const mesaAtualizada = novaLista.find((m) => m.numero === numeroMesa);
+        if (mesaAtualizada) {
+          supabaseService.salvarMesa(mesaAtualizada, idAlvo);
+        }
+
         return { sucesso: true, isento };
       },
 
@@ -728,6 +775,11 @@ export const useAppStore = create<AppState>()(
           mesasPorTenant: { ...map, [idAlvo]: novaLista },
           mesas: novaLista,
         });
+
+        const mesaAtualizada = novaLista.find((m) => m.numero === numeroMesa);
+        if (mesaAtualizada) {
+          supabaseService.salvarMesa(mesaAtualizada, idAlvo);
+        }
       },
 
       trocarMesa: (numeroOrigem, numeroDestino, modo = 'transferir', tenantId, motivo) => {
@@ -907,6 +959,11 @@ export const useAppStore = create<AppState>()(
           pedidosKDS: novosPedidosKDS,
         }));
 
+        const mOrigemAtualizada = novaLista.find((m) => m.numero === numeroOrigem);
+        const mDestinoAtualizada = novaLista.find((m) => m.numero === numeroDestino);
+        if (mOrigemAtualizada) supabaseService.salvarMesa(mOrigemAtualizada, idAlvo);
+        if (mDestinoAtualizada) supabaseService.salvarMesa(mDestinoAtualizada, idAlvo);
+
         const mensagem =
           modo === 'unificar'
             ? `Comanda da Mesa #${numeroOrigem} unificada com a Mesa #${numeroDestino} com sucesso!`
@@ -996,6 +1053,23 @@ export const useAppStore = create<AppState>()(
           mesas: novaLista,
           pedidosKDS: [novoPedidoKDS, ...s.pedidosKDS],
         }));
+
+        const mesaAtualizada = novaLista.find((m) => m.numero === numeroMesa);
+        if (mesaAtualizada) {
+          supabaseService.salvarMesa(mesaAtualizada, idAlvo);
+        }
+        supabaseService.salvarPedido({
+          id: novoPedidoKDS.id,
+          tenantId: idAlvo,
+          numero: novoPedidoKDS.numero,
+          tipo: 'mesa',
+          mesaNumero: numeroMesa,
+          clienteNome: novoPedidoKDS.nomeCliente,
+          status: 'aberto',
+          statusKDS: 'novo',
+          itens: novoPedidoKDS.itens,
+          total: totalAdicionado,
+        });
 
         return { sucesso: true, pedidoKDSId: novoPedidoKDS.id, totalAdicionado };
       },
@@ -1156,6 +1230,11 @@ export const useAppStore = create<AppState>()(
           mesasPorTenant: { ...map, [idAlvo]: novaLista },
           mesas: novaLista,
         });
+
+        const mesaAtualizada = novaLista.find((m) => m.numero === numeroMesa);
+        if (mesaAtualizada) {
+          supabaseService.salvarMesa(mesaAtualizada, idAlvo);
+        }
       },
 
       toggleItemConcluidoKDS: (pedidoId, itemIdx) => {
