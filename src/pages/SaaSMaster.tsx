@@ -2428,6 +2428,7 @@ export default function SaaSMaster() {
         <div className="space-y-6 animate-in fade-in duration-200">
           <SecaoLoginsEquipe
             tenantId="global"
+            isWhite={isWhite}
             onCadastrarRestauranteComLogin={() => setModalNovoTenant(true)}
           />
         </div>

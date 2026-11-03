@@ -50,10 +50,15 @@ html.theme-light .bg-slate-950\/20 {
 
 /* Cards, Tabelas, Modais e Containers Brancos */
 html.theme-light .bg-slate-900,
+html.theme-light .bg-slate-900\/95,
 html.theme-light .bg-slate-900\/90,
 html.theme-light .bg-slate-900\/80,
+html.theme-light .bg-slate-900\/70,
 html.theme-light .bg-slate-900\/60,
+html.theme-light .bg-slate-900\/50,
 html.theme-light .bg-slate-900\/40,
+html.theme-light .bg-slate-900\/30,
+html.theme-light .bg-slate-900\/20,
 html.theme-light .bg-\[\#141416\],
 html.theme-light .bg-\[\#0d0e12\] {
   background-color: #ffffff !important;
@@ -129,11 +134,14 @@ html.theme-light aside {
 
 /* Sub-superfícies, chips e botões secundários */
 html.theme-light .bg-slate-800,
+html.theme-light .bg-slate-800\/95,
 html.theme-light .bg-slate-800\/90,
 html.theme-light .bg-slate-800\/80,
+html.theme-light .bg-slate-800\/70,
 html.theme-light .bg-slate-800\/60,
 html.theme-light .bg-slate-800\/50,
 html.theme-light .bg-slate-800\/40,
+html.theme-light .bg-slate-800\/30,
 html.theme-light .bg-\[\#0e0e10\],
 html.theme-light .bg-\[\#0a0a0c\] {
   background-color: #f8fafc !important;

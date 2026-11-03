@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSaaSStore } from '../../store/useSaaSStore';
+import { useThemeStore } from '../../store/useThemeStore';
 import { Usuario, CargoUsuario } from '../../types';
 
 interface SecaoLoginsEquipeProps {
@@ -34,9 +35,11 @@ interface SecaoLoginsEquipeProps {
 
 export function SecaoLoginsEquipe({
   tenantId,
-  isWhite = false,
+  isWhite: propIsWhite,
   onCadastrarRestauranteComLogin,
 }: SecaoLoginsEquipeProps) {
+  const { tema } = useThemeStore();
+  const isWhite = propIsWhite !== undefined ? propIsWhite : tema === 'light';
   const {
     usuarios,
     usuarioLogado,
@@ -258,8 +261,12 @@ export function SecaoLoginsEquipe({
           <div
             className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
               isVisaoGlobalMaster
-                ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
-                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                ? isWhite
+                  ? 'bg-purple-100 border-purple-200 text-purple-700'
+                  : 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                : isWhite
+                  ? 'bg-amber-100 border-amber-200 text-amber-700'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
             }`}
           >
             <KeyRound className="w-6 h-6" />
@@ -274,14 +281,18 @@ export function SecaoLoginsEquipe({
               <span
                 className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border ${
                   isVisaoGlobalMaster
-                    ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-                    : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                    ? isWhite
+                      ? 'bg-purple-100 text-purple-800 border-purple-200'
+                      : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                    : isWhite
+                      ? 'bg-amber-100 text-amber-800 border-amber-200'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                 }`}
               >
                 {isVisaoGlobalMaster ? '👑 SaaS Master' : 'Segurança Ativa'}
               </span>
             </h3>
-            <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'} mt-0.5`}>
+            <p className={`text-xs ${isWhite ? 'text-slate-600' : 'text-slate-400'} mt-0.5`}>
               {isVisaoGlobalMaster
                 ? 'O Admin Master cria restaurantes com login integrado do gestor ou cria e administra credenciais de todas as lojas.'
                 : 'Crie logins com PIN de 4 dígitos ou senha para garçons, caixas, cozinheiros e gerentes com permissões isoladas.'}
@@ -295,10 +306,10 @@ export function SecaoLoginsEquipe({
             <button
               type="button"
               onClick={onCadastrarRestauranteComLogin}
-              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/25 transition-all cursor-pointer active:scale-95 shrink-0"
+              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 !text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/25 transition-all cursor-pointer active:scale-95 shrink-0"
             >
-              <Store className="w-4 h-4" />
-              <span>+ Criar Restaurante & Login</span>
+              <Store className="w-4 h-4 !text-white" />
+              <span className="!text-white">+ Criar Restaurante & Login</span>
             </button>
           )}
 
@@ -309,10 +320,10 @@ export function SecaoLoginsEquipe({
               setFormTenantId(isVisaoGlobalMaster ? (tenants[0]?.id || 'tenant-01') : tenantId);
               setModalNovoAberto(true);
             }}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-[#FF6B00]/25 transition-all cursor-pointer active:scale-95 shrink-0"
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 !text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-[#FF6B00]/25 transition-all cursor-pointer active:scale-95 shrink-0"
           >
-            <UserPlus className="w-4 h-4" />
-            <span>{isVisaoGlobalMaster ? '+ Criar Novo Login Avulso' : '+ Criar Login de Funcionário'}</span>
+            <UserPlus className="w-4 h-4 !text-white" />
+            <span className="!text-white">{isVisaoGlobalMaster ? '+ Criar Novo Login Avulso' : '+ Criar Login de Funcionário'}</span>
           </button>
         </div>
       </div>
@@ -320,72 +331,72 @@ export function SecaoLoginsEquipe({
       {/* Cards de Métricas de Acessos */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div
-          className={`p-4 rounded-2xl border ${
-            isWhite ? 'bg-white border-slate-200' : 'bg-slate-900/70 border-slate-800'
+          className={`p-4 rounded-2xl border transition-all ${
+            isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/90 border-slate-800 shadow-md'
           }`}
         >
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+            <span className={`text-xs font-bold uppercase tracking-wider ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
               Logins Ativos
             </span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
-          <div className="text-2xl font-black text-emerald-400 font-mono">
+          <div className={`text-2xl font-black font-mono ${isWhite ? 'text-emerald-700' : 'text-emerald-400'}`}>
             {totalAtivos}{' '}
-            <span className="text-xs text-slate-500 font-normal">
+            <span className={`text-xs font-normal ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
               / {usuariosDoRestaurante.length}
             </span>
           </div>
-          <span className="text-[11px] text-slate-500">
+          <span className={`text-[11px] font-medium ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
             {totalBloqueados > 0 ? `${totalBloqueados} bloqueado(s)` : 'Todos em operação'}
           </span>
         </div>
 
         <div
-          className={`p-4 rounded-2xl border ${
-            isWhite ? 'bg-white border-slate-200' : 'bg-slate-900/70 border-slate-800'
+          className={`p-4 rounded-2xl border transition-all ${
+            isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/90 border-slate-800 shadow-md'
           }`}
         >
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+            <span className={`text-xs font-bold uppercase tracking-wider ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
               Gestão (Nível 1 & 2)
             </span>
             <span className="text-xs">👔</span>
           </div>
-          <div className="text-2xl font-black text-purple-400 font-mono">{totalGerentes}</div>
-          <span className="text-[11px] text-slate-500">
+          <div className={`text-2xl font-black font-mono ${isWhite ? 'text-purple-700' : 'text-purple-400'}`}>{totalGerentes}</div>
+          <span className={`text-[11px] font-medium ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
             {isVisaoGlobalMaster ? 'Master & Donos de Lojas' : 'Gerentes e Administradores'}
           </span>
         </div>
 
         <div
-          className={`p-4 rounded-2xl border ${
-            isWhite ? 'bg-white border-slate-200' : 'bg-slate-900/70 border-slate-800'
+          className={`p-4 rounded-2xl border transition-all ${
+            isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/90 border-slate-800 shadow-md'
           }`}
         >
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+            <span className={`text-xs font-bold uppercase tracking-wider ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
               Salão & Caixa (Nível 3-4)
             </span>
             <span className="text-xs">📱</span>
           </div>
-          <div className="text-2xl font-black text-amber-400 font-mono">{totalFrente}</div>
-          <span className="text-[11px] text-slate-500">Garçons & Operadores PDV</span>
+          <div className={`text-2xl font-black font-mono ${isWhite ? 'text-amber-700' : 'text-amber-400'}`}>{totalFrente}</div>
+          <span className={`text-[11px] font-medium ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>Garçons & Operadores PDV</span>
         </div>
 
         <div
-          className={`p-4 rounded-2xl border ${
-            isWhite ? 'bg-white border-slate-200' : 'bg-slate-900/70 border-slate-800'
+          className={`p-4 rounded-2xl border transition-all ${
+            isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/90 border-slate-800 shadow-md'
           }`}
         >
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+            <span className={`text-xs font-bold uppercase tracking-wider ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
               Cozinha & Delivery (Nível 5)
             </span>
             <span className="text-xs">🍳</span>
           </div>
-          <div className="text-2xl font-black text-rose-400 font-mono">{totalCozinha}</div>
-          <span className="text-[11px] text-slate-500">Chef KDS & Entregadores</span>
+          <div className={`text-2xl font-black font-mono ${isWhite ? 'text-rose-700' : 'text-rose-400'}`}>{totalCozinha}</div>
+          <span className={`text-[11px] font-medium ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>Chef KDS & Entregadores</span>
         </div>
       </div>
 
@@ -415,22 +426,30 @@ export function SecaoLoginsEquipe({
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             {/* Se for Admin Master em visualização global: Filtro por Estabelecimento / Restaurante */}
             {isVisaoGlobalMaster && (
-              <div className="flex items-center gap-1.5 bg-purple-950/40 border border-purple-500/30 px-3 py-1.5 rounded-xl text-xs">
-                <Store className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                <span className="text-purple-300 font-bold shrink-0">Loja:</span>
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs border ${
+                  isWhite
+                    ? 'bg-purple-50 border-purple-200 text-purple-900'
+                    : 'bg-purple-950/40 border-purple-500/30 text-purple-300'
+                }`}
+              >
+                <Store className={`w-3.5 h-3.5 shrink-0 ${isWhite ? 'text-purple-600' : 'text-purple-400'}`} />
+                <span className={`font-bold shrink-0 ${isWhite ? 'text-purple-800' : 'text-purple-300'}`}>Loja:</span>
                 <select
                   value={filtroTenantId}
                   onChange={(e) => setFiltroTenantId(e.target.value)}
-                  className="bg-transparent text-slate-200 font-bold focus:outline-none cursor-pointer text-xs"
+                  className={`bg-transparent font-bold focus:outline-none cursor-pointer text-xs ${
+                    isWhite ? 'text-slate-800' : 'text-slate-200'
+                  }`}
                 >
-                  <option value="todos" className="bg-slate-900 text-white">
+                  <option value="todos" className={isWhite ? 'bg-white text-slate-800' : 'bg-slate-900 text-white'}>
                     🏪 Todos os Restaurantes ({tenants.length})
                   </option>
-                  <option value="global" className="bg-slate-900 text-white">
+                  <option value="global" className={isWhite ? 'bg-white text-slate-800' : 'bg-slate-900 text-white'}>
                     👑 EloServe Central (Master)
                   </option>
                   {tenants.map((t) => (
-                    <option key={t.id} value={t.id} className="bg-slate-900 text-white">
+                    <option key={t.id} value={t.id} className={isWhite ? 'bg-white text-slate-800' : 'bg-slate-900 text-white'}>
                       {t.nomeFantasia} ({t.planoId.toUpperCase()})
                     </option>
                   ))}
@@ -458,6 +477,8 @@ export function SecaoLoginsEquipe({
                       ? isWhite
                         ? 'bg-white text-slate-900 shadow-sm'
                         : 'bg-slate-800 text-white shadow-sm'
+                      : isWhite
+                      ? 'text-slate-600 hover:text-slate-900'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -470,7 +491,7 @@ export function SecaoLoginsEquipe({
 
         {/* Filtro por Cargos */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1">
-          <span className="text-xs font-bold text-slate-400 flex items-center gap-1 shrink-0 mr-1">
+          <span className={`text-xs font-bold flex items-center gap-1 shrink-0 mr-1 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
             <Filter className="w-3.5 h-3.5" />
             <span>Cargo:</span>
           </span>
@@ -489,9 +510,9 @@ export function SecaoLoginsEquipe({
               onClick={() => setCargoFiltro(item.id)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 cargoFiltro === item.id
-                  ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                  ? 'bg-amber-500 !text-white shadow-md shadow-amber-500/20'
                   : isWhite
-                  ? 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+                  ? 'bg-white text-slate-700 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                   : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
@@ -586,8 +607,10 @@ export function SecaoLoginsEquipe({
                     {/* Restaurante (quando for Master em visão global) */}
                     {isVisaoGlobalMaster && (
                       <td className="py-3 px-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800/80 border border-slate-700/60 text-slate-300">
-                          <Store className="w-3 h-3 text-purple-400 shrink-0" />
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                          isWhite ? 'bg-purple-50 border-purple-200 text-purple-800' : 'bg-slate-800/80 border-slate-700/60 text-slate-300'
+                        }`}>
+                          <Store className={`w-3 h-3 shrink-0 ${isWhite ? 'text-purple-600' : 'text-purple-400'}`} />
                           <span className="truncate max-w-[160px]">
                             {getNomeRestaurante(u.tenantId)}
                           </span>
@@ -612,13 +635,17 @@ export function SecaoLoginsEquipe({
                     {/* PIN */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold tracking-widest text-xs px-2 py-1 rounded-lg bg-black/40 border border-slate-700">
+                        <span className={`font-mono font-bold tracking-widest text-xs px-2 py-1 rounded-lg border ${
+                          isWhite ? 'bg-slate-100 border-slate-200 text-slate-800' : 'bg-black/40 border border-slate-700 text-white'
+                        }`}>
                           {pinVisivel ? u.pin : '••••'}
                         </span>
                         <button
                           type="button"
                           onClick={() => alternarRevelarPin(u.id)}
-                          className="text-slate-400 hover:text-white p-1 transition-colors cursor-pointer"
+                          className={`p-1 transition-colors cursor-pointer ${
+                            isWhite ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
+                          }`}
                           title={pinVisivel ? 'Ocultar PIN' : 'Ver PIN'}
                         >
                           {pinVisivel ? (
@@ -662,17 +689,25 @@ export function SecaoLoginsEquipe({
                             setNovaSenhaReset(u.senha || '');
                             setModalResetAberto(true);
                           }}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            isWhite
+                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white'
+                          }`}
                           title="Redefinir PIN / Senha"
                         >
-                          <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                          <RefreshCw className={`w-3.5 h-3.5 ${isWhite ? 'text-amber-600' : 'text-amber-400'}`} />
                         </button>
 
                         {u.id !== 'usr-master' && u.id !== usuarioLogado?.id && (
                           <button
                             type="button"
                             onClick={() => handleExcluir(u)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              isWhite
+                                ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+                                : 'bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400'
+                            }`}
                             title="Excluir Login"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -706,19 +741,19 @@ export function SecaoLoginsEquipe({
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <div
             className={`w-full max-w-lg rounded-3xl border p-6 space-y-4 shadow-2xl relative ${
-              isWhite ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-800 text-white'
+              isWhite ? 'bg-white border-slate-200 shadow-xl' : 'bg-slate-950 border-slate-800 text-white'
             }`}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className={`flex items-center justify-between pb-3 border-b ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-xl bg-[#FF6B00]/20 border border-[#FF6B00]/40 text-[#FF6B00] flex items-center justify-center">
                   <UserPlus className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black">
+                  <h3 className={`text-sm font-black ${isWhite ? 'text-slate-900' : 'text-white'}`}>
                     {isVisaoGlobalMaster ? 'Criar Novo Login (SaaS Master)' : 'Criar Novo Login para Equipe'}
                   </h3>
-                  <p className="text-[11px] text-slate-400">
+                  <p className={`text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                     Defina as credenciais e nível de acesso do colaborador.
                   </p>
                 </div>
@@ -726,7 +761,7 @@ export function SecaoLoginsEquipe({
               <button
                 type="button"
                 onClick={() => setModalNovoAberto(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className={`${isWhite ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'} p-1 cursor-pointer`}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -735,10 +770,14 @@ export function SecaoLoginsEquipe({
             <form onSubmit={handleCriarLogin} className="space-y-3.5">
               {/* Se for Master Global: Escolha da Loja */}
               {isVisaoGlobalMaster && (
-                <div className="p-3 rounded-2xl bg-purple-950/40 border border-purple-500/30 space-y-1.5">
+                <div className={`p-3 rounded-2xl border space-y-1.5 ${
+                  isWhite ? 'bg-purple-50 border-purple-200' : 'bg-purple-950/40 border-purple-500/30'
+                }`}>
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                      <Store className="w-3.5 h-3.5 text-purple-400" />
+                    <label className={`text-xs font-bold flex items-center gap-1.5 ${
+                      isWhite ? 'text-purple-800' : 'text-purple-300'
+                    }`}>
+                      <Store className={`w-3.5 h-3.5 ${isWhite ? 'text-purple-600' : 'text-purple-400'}`} />
                       <span>Vincular ao Estabelecimento / Loja *</span>
                     </label>
                     {onCadastrarRestauranteComLogin && (
@@ -748,9 +787,9 @@ export function SecaoLoginsEquipe({
                           setModalNovoAberto(false);
                           onCadastrarRestauranteComLogin();
                         }}
-                        className="text-[10px] text-purple-400 hover:text-purple-300 hover:underline cursor-pointer font-bold flex items-center gap-1"
+                        className={`text-[10px] ${isWhite ? 'text-purple-700 hover:text-purple-900' : 'text-purple-400 hover:text-purple-300'} hover:underline cursor-pointer font-bold flex items-center gap-1`}
                       >
-                        <Crown className="w-3 h-3 text-purple-400" />
+                        <Crown className="w-3 h-3" />
                         <span>Criar Nova Loja Completa</span>
                       </button>
                     )}
@@ -776,7 +815,7 @@ export function SecaoLoginsEquipe({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold block mb-1">Nome Completo *</label>
+                  <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>Nome Completo *</label>
                   <input
                     type="text"
                     required
@@ -784,13 +823,13 @@ export function SecaoLoginsEquipe({
                     onChange={(e) => setFormNome(e.target.value)}
                     placeholder="Ex: Matheus Lima"
                     className={`w-full px-3 py-2 rounded-xl text-xs border ${
-                      isWhite ? 'bg-slate-50 border-slate-300' : 'bg-slate-900 border-slate-700'
+                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400' : 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500'
                     } focus:outline-none focus:border-[#FF6B00]`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold block mb-1">E-mail Corporativo *</label>
+                  <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>E-mail Corporativo *</label>
                   <input
                     type="email"
                     required
@@ -798,7 +837,7 @@ export function SecaoLoginsEquipe({
                     onChange={(e) => setFormEmail(e.target.value)}
                     placeholder="matheus@restaurante.com"
                     className={`w-full px-3 py-2 rounded-xl text-xs border ${
-                      isWhite ? 'bg-slate-50 border-slate-300' : 'bg-slate-900 border-slate-700'
+                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400' : 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500'
                     } focus:outline-none focus:border-[#FF6B00]`}
                   />
                 </div>
@@ -806,7 +845,7 @@ export function SecaoLoginsEquipe({
 
               {/* Cargo & Nível */}
               <div>
-                <label className="text-xs font-bold block mb-1">Hierarquia & Permissão *</label>
+                <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>Hierarquia & Permissão *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {(
                     [
@@ -824,7 +863,8 @@ export function SecaoLoginsEquipe({
                       onClick={() => setFormCargo(c.cargo)}
                       className={`p-2 rounded-xl border text-left transition-all text-xs cursor-pointer ${
                         formCargo === c.cargo
-                          ? 'bg-[#FF6B00]/20 border-[#FF6B00] font-bold text-white ring-1 ring-[#FF6B00]'
+                          ? 'bg-[#FF6B00]/20 border-[#FF6B00] font-bold ring-1 ring-[#FF6B00] ' +
+                            (isWhite ? 'text-[#FF6B00]' : 'text-white')
                           : isWhite
                           ? 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
                           : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
@@ -837,7 +877,7 @@ export function SecaoLoginsEquipe({
                 </div>
 
                 <div className={`mt-2 p-2.5 rounded-xl border text-xs ${infoCargoForm.cor} space-y-1`}>
-                  <p className="text-[11px] text-slate-300">{infoCargoForm.descricao}</p>
+                  <p className={`text-[11px] ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>{infoCargoForm.descricao}</p>
                 </div>
               </div>
 
@@ -845,11 +885,11 @@ export function SecaoLoginsEquipe({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold">PIN de 4 Dígitos *</label>
+                    <label className={`text-xs font-bold ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>PIN de 4 Dígitos *</label>
                     <button
                       type="button"
                       onClick={gerarPinAleatorio}
-                      className="text-[10px] text-amber-400 hover:underline cursor-pointer font-bold"
+                      className="text-[10px] text-amber-500 hover:underline cursor-pointer font-bold"
                     >
                       Gerar Aleatório
                     </button>
@@ -862,36 +902,38 @@ export function SecaoLoginsEquipe({
                     onChange={(e) => setFormPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                     placeholder="1234"
                     className={`w-full px-3 py-2 rounded-xl text-xs font-mono tracking-widest border ${
-                      isWhite ? 'bg-slate-50 border-slate-300' : 'bg-slate-900 border-slate-700'
+                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
                     } focus:outline-none focus:border-[#FF6B00]`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold block mb-1">Senha (Opcional)</label>
+                  <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>Senha (Opcional)</label>
                   <input
                     type="text"
                     value={formSenha}
                     onChange={(e) => setFormSenha(e.target.value)}
                     placeholder="Caso não queira usar PIN"
                     className={`w-full px-3 py-2 rounded-xl text-xs border ${
-                      isWhite ? 'bg-slate-50 border-slate-300' : 'bg-slate-900 border-slate-700'
+                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
                     } focus:outline-none focus:border-[#FF6B00]`}
                   />
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-800">
+              <div className={`pt-2 flex items-center justify-end gap-2 border-t ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
                 <button
                   type="button"
                   onClick={() => setModalNovoAberto(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-bold cursor-pointer"
+                  className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer ${
+                    isWhite ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 text-white text-xs font-bold shadow-lg shadow-[#FF6B00]/25 cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 !text-white text-xs font-bold shadow-lg shadow-[#FF6B00]/25 cursor-pointer"
                 >
                   Salvar e Criar Login
                 </button>
@@ -908,30 +950,30 @@ export function SecaoLoginsEquipe({
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <div
             className={`w-full max-w-sm rounded-3xl border p-6 space-y-4 shadow-2xl relative ${
-              isWhite ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-800 text-white'
+              isWhite ? 'bg-white border-slate-200 shadow-xl' : 'bg-slate-950 border-slate-800 text-white'
             }`}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className={`flex items-center justify-between pb-3 border-b ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
               <div className="flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-amber-400" />
-                <h3 className="text-sm font-black">Redefinir PIN / Senha</h3>
+                <RefreshCw className="w-5 h-5 text-amber-500" />
+                <h3 className={`text-sm font-black ${isWhite ? 'text-slate-900' : 'text-white'}`}>Redefinir PIN / Senha</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setModalResetAberto(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className={`${isWhite ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'} p-1 cursor-pointer`}
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-400">
-              Atualize as credenciais de acesso para <strong className="text-white">{usuarioAlvo.nome}</strong>:
+            <p className={`text-xs ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
+              Atualize as credenciais de acesso para <strong className={isWhite ? 'text-slate-900 font-bold' : 'text-white'}>{usuarioAlvo.nome}</strong>:
             </p>
 
             <form onSubmit={handleConfirmarReset} className="space-y-3">
               <div>
-                <label className="text-xs font-bold block mb-1">Novo PIN (4 dígitos) *</label>
+                <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>Novo PIN (4 dígitos) *</label>
                 <input
                   type="text"
                   maxLength={4}
@@ -939,35 +981,37 @@ export function SecaoLoginsEquipe({
                   value={novoPinReset}
                   onChange={(e) => setNovoPinReset(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   className={`w-full px-3 py-2 rounded-xl text-xs font-mono tracking-widest border ${
-                    isWhite ? 'bg-slate-50 border-slate-300' : 'bg-slate-900 border-slate-700'
+                    isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
                   } focus:outline-none focus:border-amber-400`}
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold block mb-1">Nova Senha (Opcional)</label>
+                <label className={`text-xs font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>Nova Senha (Opcional)</label>
                 <input
                   type="text"
                   value={novaSenhaReset}
                   onChange={(e) => setNovaSenhaReset(e.target.value)}
                   placeholder="Deixe em branco para manter a atual"
                   className={`w-full px-3 py-2 rounded-xl text-xs border ${
-                    isWhite ? 'bg-slate-50 border-slate-300' : 'bg-slate-900 border-slate-700'
+                    isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
                   } focus:outline-none focus:border-amber-400`}
                 />
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-800">
+              <div className={`pt-2 flex items-center justify-end gap-2 border-t ${isWhite ? 'border-slate-200' : 'border-slate-800'}`}>
                 <button
                   type="button"
                   onClick={() => setModalResetAberto(false)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold cursor-pointer"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer ${
+                    isWhite ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-md shadow-amber-500/20 cursor-pointer"
+                  className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 !text-white text-xs font-bold shadow-md shadow-amber-500/20 cursor-pointer"
                 >
                   Atualizar Credenciais
                 </button>
