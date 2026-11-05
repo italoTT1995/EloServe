@@ -1,0 +1,91 @@
+{
+  "tenants": [
+    {
+      "id": "global",
+      "nome_fantasia": "EloServe Global (SaaS Master)",
+      "razao_social": "EloServe Tecnologia",
+      "documento": "00.000.000/0001-00",
+      "responsavel_nome": "Ítalo Silva",
+      "telefone_whatsapp": "",
+      "email": "master@eloserve.com.br",
+      "cidade_uf": "Brasil",
+      "plano_id": "enterprise",
+      "status_assinatura": "ativo",
+      "valor_mensalidade": 0,
+      "data_inicio": "2026-01-01",
+      "proximo_vencimento": "2030-01-01",
+      "dias_restantes_trial": 7,
+      "instancia_whatsapp_conectada": false,
+      "dre_habilitado": true,
+      "couvert_artistico_ativo": false,
+      "valor_couvert_por_pessoa": 0,
+      "criado_em": "2026-10-30T18:51:20.090768+00:00"
+    },
+    {
+      "id": "tenant-8038",
+      "nome_fantasia": "Resenha da Naty",
+      "razao_social": "Resenha da Naty",
+      "documento": "59474915000181",
+      "responsavel_nome": "Natália Hoffmann",
+      "telefone_whatsapp": "31999284873",
+      "email": "resenhadanatycdb@gmail.com",
+      "cidade_uf": "Belo Horizonte / MG",
+      "plano_id": "pro",
+      "status_assinatura": "trial",
+      "valor_mensalidade": 199,
+      "data_inicio": "04/11/2026",
+      "proximo_vencimento": "04/12/2026",
+      "dias_restantes_trial": 7,
+      "instancia_whatsapp_conectada": false,
+      "dre_habilitado": true,
+      "couvert_artistico_ativo": false,
+      "valor_couvert_por_pessoa": 0,
+      "criado_em": "2026-11-04T15:38:48.623852+00:00"
+    }
+  ],
+  "usuarios": [
+    {
+      "id": "usr-master",
+      "nome": "Ítalo Silva (Admin Master)",
+      "email": "master@eloserve.com.br",
+      "cargo": "super_admin",
+      "tenant_id": "global",
+      "avatar": null,
+      "pin": "8899",
+      "senha": "EloMaster@2026",
+      "ativo": true,
+      "criado_em": "2026-10-30T18:51:20.090768+00:00",
+      "ultimo_acesso": null
+    },
+    {
+      "id": "usr-547207",
+      "nome": "wendel",
+      "email": "wendelteixera@gmail.com",
+      "cargo": "super_admin",
+      "tenant_id": "global",
+      "avatar": null,
+      "pin": "1234",
+      "senha": "1234",
+      "ativo": true,
+      "criado_em": "2026-11-03T12:55:47.781308+00:00",
+      "ultimo_acesso": null
+    },
+    {
+      "id": "usr-604152",
+      "nome": "clara",
+      "email": "claraprudencio@gmail.com",
+      "cargo": "super_admin",
+      "tenant_id": "global",
+      "avatar": null,
+      "pin": "1234",
+      "senha": "1234",
+      "ativo": true,
+      "criado_em": "2026-11-03T12:56:44.716837+00:00",
+      "ultimo_acesso": null
+    }
+  ],
+  "categorias": [],
+  "produtos": [],
+  "mesas": [],
+  "pedidos": []
+}
