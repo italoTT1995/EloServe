@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   CreditCard,
+  X,
   QrCode,
   CheckCircle2,
   AlertTriangle,
@@ -193,18 +194,30 @@ export default function MinhaAssinatura() {
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>{plano.limites.maxCaixasSimultaneos > 10 ? 'Caixas ilimitados' : `${plano.limites.maxCaixasSimultaneos} Caixa PDV`}</span>
+                      <span>{plano.limites.maxCaixasSimultaneos > 10 ? 'Caixas ilimitados' : `Até ${plano.limites.maxCaixasSimultaneos} Caixa(s) PDV`}</span>
                     </li>
-                    <li className="flex items-center gap-2">
-                      <Check className={`w-3.5 h-3.5 ${plano.limites.kdsIncluso ? 'text-emerald-400' : 'text-slate-600'}`} />
-                      <span className={plano.limites.kdsIncluso ? 'text-slate-200' : 'text-slate-500'}>Cozinha KDS em tempo real</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Check className={`w-3.5 h-3.5 ${plano.limites.whatsappIAIncluso ? 'text-emerald-400' : 'text-slate-600'}`} />
-                      <span className={plano.limites.whatsappIAIncluso ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
-                        EloBot WhatsApp IA 24h
-                      </span>
-                    </li>
+                    {plano.limites.kdsIncluso ? (
+                      <li className="flex items-center gap-2 text-slate-200">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Cozinha KDS em tempo real</span>
+                      </li>
+                    ) : (
+                      <li className="flex items-center gap-2 text-slate-500 line-through opacity-70">
+                        <X className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Sem Cozinha KDS</span>
+                      </li>
+                    )}
+                    {plano.limites.whatsappIAIncluso ? (
+                      <li className="flex items-center gap-2 text-purple-400 font-bold">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>EloBot WhatsApp IA 24h</span>
+                      </li>
+                    ) : (
+                      <li className="flex items-center gap-2 text-slate-500 line-through opacity-70">
+                        <X className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Sem WhatsApp IA</span>
+                      </li>
+                    )}
                   </ul>
                 </div>
 
