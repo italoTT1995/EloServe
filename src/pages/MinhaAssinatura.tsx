@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuthStore';
 import {
   CreditCard,
   X,
@@ -17,7 +19,13 @@ import {
 import { useSaaSStore } from '../store/useSaaSStore';
 
 export default function MinhaAssinatura() {
-  const { getTenantAtivo, planos, mudarPlanoTenant } = useSaaSStore();
+  const { usuarioLogado } = useAuthStore();
+  const { getTenantAtivo, planos, tenants } = useSaaSStore();
+
+  // O Admin Master é o Franqueador (dono do SaaS) e não possui assinatura de cliente
+  if (usuarioLogado?.cargo === 'super_admin') {
+    return <Navigate to="/saas?aba=config" replace />;
+  }
   const tenant = getTenantAtivo();
   const planoAtual = planos.find((p) => p.id === tenant.planoId) || planos[1];
 
@@ -25,6 +33,17 @@ export default function MinhaAssinatura() {
   const [modalPixAberto, setModalPixAberto] = useState(false);
 
   const chavePixSimulada = '00020126580014br.gov.bcb.pix0136financeiro@eloserve.com.br520400005303986540' + tenant.valorMensalidade.toFixed(2) + '5802BR5913ELOSERVE SAAS6009SAO PAULO62070503***6304';
+
+  
+  function handleSolicitarMudancaPlano(planoAlvo: typeof planos[0]) {
+    const zapFranqueador = (tenants.find((t) => t.id === 'global')?.telefoneWhatsApp || '+55 (31) 97182-6083').replace(/\D/g, '');
+    const mensagem = encodeURIComponent(
+      `Olá! Sou do restaurante *${tenant.nomeFantasia}* (CNPJ/CPF: ${tenant.documento}).\n\n` +
+      `Gostaria de solicitar a alteração da minha assinatura do plano atual (*${planoAtual.nome}*) para o plano *${planoAlvo.nome}* (R$ ${planoAlvo.precoMensal.toFixed(2)}/mês).\n\n` +
+      `Pode me auxiliar na alteração?`
+    );
+    window.open(`https://wa.me/${zapFranqueador}?text=${mensagem}`, '_blank');
+  }
 
   function copiarChavePix() {
     navigator.clipboard.writeText(chavePixSimulada);
@@ -142,7 +161,7 @@ export default function MinhaAssinatura() {
       <div>
         <div className="mb-4">
           <h3 className="text-base font-extrabold text-white">Compare os Planos de Assinatura EloServe</h3>
-          <p className="text-xs text-slate-400">Faça upgrade a qualquer momento com ativação instantânea sem perder nenhum dado do restaurante.</p>
+          <p className="text-xs text-slate-400">Deseja fazer upgrade de plano ou liberar novos recursos? Entre em contato direto com o Franqueador no WhatsApp para solicitar a alteração.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -231,13 +250,11 @@ export default function MinhaAssinatura() {
                     </button>
                   ) : (
                     <button
-                      onClick={() => {
-                        mudarPlanoTenant(tenant.id, plano.id);
-                        alert(`Parabéns! Plano alterado com sucesso para ${plano.nome}.`);
-                      }}
-                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+                      onClick={() => handleSolicitarMudancaPlano(plano)}
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/25 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                     >
-                      Mudar para este Plano
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Falar no WhatsApp para Mudar</span>
                     </button>
                   )}
                 </div>

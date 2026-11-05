@@ -71,7 +71,7 @@ const menuItemsConfiguracoes: MenuItemDef[] = [
   { path: '/cardapio', label: 'Cardápio & Preços', icon: BookOpen, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/estoque', label: 'Estoque Inteligente', icon: Package, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/funcionarios', label: 'Funcionários & RH', icon: Users, cargos: ['super_admin', 'admin_restaurante'] },
-  { path: '/minha-assinatura', label: 'Minha Assinatura', icon: CreditCard, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/minha-assinatura', label: 'Minha Assinatura', icon: CreditCard, cargos: ['admin_restaurante'] },
 ];
 
 const menuItemsSaaS: MenuItemDef[] = [
@@ -365,26 +365,49 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Configurações & White Color (Aparência) */}
       <div className={`px-3 py-1.5 border-t ${isWhite ? 'border-slate-200' : 'border-slate-800/80'} space-y-1`}>
-        <NavLink
-          to="/minha-assinatura"
-          onClick={() => {
-            if (window.innerWidth < 1024) onClose();
-          }}
-          className={({ isActive }) =>
-            `flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-              isActive
-                ? isWhite
-                  ? 'bg-slate-100 text-slate-900 font-bold'
-                  : 'bg-slate-800 text-white font-bold'
-                : isWhite
-                ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 font-medium'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-            }`
-          }
-        >
-          <Settings className={`w-4 h-4 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`} />
-          <span>Configurações</span>
-        </NavLink>
+        {usuarioLogado?.cargo === 'super_admin' ? (
+          <NavLink
+            to="/saas?aba=config"
+            onClick={() => {
+              if (window.innerWidth < 1024) onClose();
+            }}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                isActive && location.search.includes('aba=config')
+                  ? isWhite
+                    ? 'bg-slate-100 text-slate-900 font-bold'
+                    : 'bg-slate-800 text-white font-bold'
+                  : isWhite
+                  ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 font-medium'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`
+            }
+          >
+            <Settings className={`w-4 h-4 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`} />
+            <span>Configurações Master</span>
+          </NavLink>
+        ) : (
+          <NavLink
+            to="/minha-assinatura"
+            onClick={() => {
+              if (window.innerWidth < 1024) onClose();
+            }}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                isActive
+                  ? isWhite
+                    ? 'bg-slate-100 text-slate-900 font-bold'
+                    : 'bg-slate-800 text-white font-bold'
+                  : isWhite
+                  ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 font-medium'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`
+            }
+          >
+            <Settings className={`w-4 h-4 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`} />
+            <span>Minha Assinatura</span>
+          </NavLink>
+        )}
 
         <button
           type="button"
