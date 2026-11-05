@@ -74,9 +74,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   }, []);
 
   return (
-    <header className={`h-16 px-4 sm:px-6 ${
-      isWhite ? 'bg-[#F8FAFC] border-b border-slate-200' : 'bg-[#0F172A] border-b border-[#1E293B]'
-    } flex items-center justify-between select-none`}>
+    <header className={`h-16 px-4 sm:px-6 sticky top-0 z-30 transition-all ${
+      isWhite ? 'bg-white/95 border-b border-slate-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.03)]' : 'bg-slate-900/95 border-b border-slate-800'
+    } backdrop-blur-md flex items-center justify-between select-none`}>
       {/* Left: Mobile Menu Toggle & Store Switcher */}
       <div className="flex items-center gap-3">
         {/* Botão Menu Hambúrguer Mobile */}
@@ -95,65 +95,57 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <div className="relative">
             <button
               onClick={() => setMenuTenantAberto(!menuTenantAberto)}
-              className={`flex items-center gap-1.5 sm:gap-2.5 text-left text-xs sm:text-sm font-bold transition-all px-2.5 py-1.5 rounded-xl border cursor-pointer ${
-                isModoGlobal
-                  ? isWhite
-                    ? 'bg-orange-50 border-orange-200 hover:border-orange-300 text-slate-900 shadow-sm'
-                    : 'bg-[#1E293B] border-slate-700 hover:border-[#FF6B00]/60 text-white'
-                  : isWhite
-                  ? 'bg-amber-50 border-amber-300 hover:border-amber-400 text-amber-950 shadow-sm'
-                  : 'bg-amber-950/40 border-amber-500/30 hover:border-amber-400 text-white'
+              className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                isWhite
+                  ? 'bg-slate-50/90 hover:bg-slate-100/90 border-slate-200 text-slate-800 shadow-xs'
+                  : 'bg-slate-800/60 hover:bg-slate-800 border-slate-700/80 text-white'
               }`}
             >
               {isModoGlobal ? (
                 <>
-                  <Globe className="w-4 h-4 text-[#FF6B00] shrink-0" />
+                  <div className="w-6 h-6 rounded-lg bg-orange-500/10 text-[#FF6B00] flex items-center justify-center shrink-0 border border-orange-500/20">
+                    <Globe className="w-3.5 h-3.5" />
+                  </div>
                   <div className="flex flex-col text-left">
-                    <span className={`truncate max-w-[130px] sm:max-w-[220px] font-extrabold ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                      <span className="text-[#FF6B00] font-black italic">elo</span>Gastrô
-                    </span>
-                    <span className={`text-[9px] font-medium ${isWhite ? 'text-slate-600' : 'text-slate-400'}`}>
-                      {tenants.length === 0 ? '0 Restaurantes Assinantes' : `${tenants.length} Restaurantes Assinantes`}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-black tracking-tight text-slate-900 dark:text-white">
+                        <span className="text-[#FF6B00] italic">elo</span>Gastrô
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded-md font-bold uppercase tracking-wider bg-orange-100 dark:bg-orange-950/60 text-[#FF6B00] border border-orange-200 dark:border-orange-500/30">
+                        MASTER
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      {tenants.length === 0 ? '0 Restaurantes' : `${tenants.length} ${tenants.length === 1 ? 'Restaurante' : 'Restaurantes Assinantes'}`}
                     </span>
                   </div>
-                  <ChevronDown className="w-3 h-3 opacity-70 shrink-0 text-[#FF6B00]" />
-                  <span className={`hidden md:inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
-                    isWhite
-                      ? 'bg-orange-100 text-[#FF6B00] border border-orange-200'
-                      : 'bg-[#FF6B00]/20 text-[#FF6B00] border border-[#FF6B00]/40'
-                  }`}>
-                    MASTER
-                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0 text-slate-400 ml-0.5" />
                 </>
               ) : (
                 <>
-                  <Store className={`w-4 h-4 ${isWhite ? 'text-amber-700' : 'text-amber-400'} shrink-0`} />
+                  <div className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
+                    <Store className="w-3.5 h-3.5" />
+                  </div>
                   <div className="flex flex-col text-left">
-                    <span className={`text-[9px] font-bold uppercase tracking-wider ${isWhite ? 'text-amber-800' : 'text-amber-400'}`}>
-                      Inspecionando Loja:
-                    </span>
-                    <span className={`truncate max-w-[130px] sm:max-w-[190px] font-extrabold ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                      {tenantAtual.nomeFantasia}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-black tracking-tight truncate max-w-[130px] sm:max-w-[180px] text-slate-900 dark:text-white">
+                        {tenantAtual.nomeFantasia}
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-md font-bold uppercase tracking-wider ${
+                        tenantAtual.statusAssinatura === 'ativo'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-500/30'
+                          : tenantAtual.statusAssinatura === 'trial'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-500/30'
+                          : 'bg-rose-100 text-rose-800 border border-rose-200 dark:bg-rose-950 dark:text-rose-400 dark:border-rose-500/30'
+                      }`}>
+                        {tenantAtual.statusAssinatura}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                      Inspecionando Loja
                     </span>
                   </div>
-                  <ChevronDown className={`w-3 h-3 opacity-70 shrink-0 ${isWhite ? 'text-amber-700' : 'text-amber-300'}`} />
-                  <span
-                    className={`hidden md:inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
-                      tenantAtual.statusAssinatura === 'ativo'
-                        ? isWhite
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          : 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
-                        : tenantAtual.statusAssinatura === 'trial'
-                        ? isWhite
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-amber-950 text-amber-400 border border-amber-500/30'
-                        : isWhite
-                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                        : 'bg-rose-950 text-rose-400 border border-rose-500/30'
-                    }`}
-                  >
-                    {tenantAtual.statusAssinatura}
-                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0 text-slate-400 ml-0.5" />
                 </>
               )}
             </button>
@@ -322,33 +314,26 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         )}
       </div>
 
-      {/* Right Indicators */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Botão Rápido de Acesso Direto ao Financeiro no Topo do Header */}
-        <Link
-          to="/financeiro"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black transition-all cursor-pointer shadow-sm ${
-            location.pathname === '/financeiro'
-              ? 'bg-[#FF6B00] !text-white border-[#FF6B00] shadow-md shadow-[#FF6B00]/30'
-              : isWhite
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-          }`}
-          title="Abrir Nova Aba de Gestão Financeira Completa & DRE"
-        >
-          <DollarSign className="w-3.5 h-3.5" />
-          <span>Financeiro</span>
-          <span className="text-[9px] px-1 py-0.2 rounded font-black uppercase bg-emerald-500/20 text-emerald-400">
-            NOVO
-          </span>
-        </Link>
+      {/* Right Indicators & Toolbar Moderna */}
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Alerta de Chamados de Suporte para o Master */}
+        {isSuperAdmin && useSaaSStore.getState().getChamadosAbertos().length > 0 && (
+          <Link
+            to="/saas?aba=suporte_ao_vivo"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 text-xs font-black shadow-md shadow-rose-600/25 animate-pulse transition-all"
+            title="Clique para atender o chamado de suporte do restaurante!"
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span className="text-[11px]">{useSaaSStore.getState().getChamadosAbertos().length} Suporte</span>
+          </Link>
+        )}
 
         {/* Botão de Solicitar Suporte ao Admin Master para Restaurantes */}
         {usuarioLogado?.cargo !== 'super_admin' && (
           <button
             type="button"
             onClick={() => setModalSuporteAberto(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
               isWhite
                 ? 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100'
                 : 'bg-purple-950/40 text-purple-300 border-purple-500/30 hover:bg-purple-900/50'
@@ -356,18 +341,18 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             title="Precisa de suporte? Clique para chamar o Franqueador Master!"
           >
             <Headphones className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
-            <span className="hidden sm:inline">Suporte Master</span>
+            <span className="hidden sm:inline text-[11px]">Suporte</span>
           </button>
         )}
 
         {/* Alternador Rápido de Visão: Painel do Dono vs Frente de Caixa */}
         {usuarioLogado?.cargo === 'admin_restaurante' && (
-          <div className={`hidden md:flex items-center ${isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'} p-1 rounded-xl border text-xs`}>
+          <div className={`hidden md:flex items-center ${isWhite ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'} p-0.5 rounded-xl border text-xs`}>
             <Link
               to="/painel-dono"
-              className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 location.pathname === '/painel-dono' || location.pathname === '/'
-                  ? 'bg-emerald-600 !text-white shadow-sm'
+                  ? 'bg-emerald-600 !text-white shadow-xs'
                   : isWhite
                   ? 'text-slate-700 hover:text-slate-900'
                   : 'text-slate-400 hover:text-white'
@@ -375,13 +360,13 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               title="Abrir Painel de Gestão do Dono"
             >
               <span>📊</span>
-              <span>Painel do Dono</span>
+              <span>Painel</span>
             </Link>
             <Link
               to="/pdv"
-              className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 location.pathname === '/pdv'
-                  ? 'bg-emerald-600 !text-white shadow-sm'
+                  ? 'bg-emerald-600 !text-white shadow-xs'
                   : isWhite
                   ? 'text-slate-700 hover:text-slate-900'
                   : 'text-slate-400 hover:text-white'
@@ -389,80 +374,139 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               title="Abrir Frente de Caixa (PDV)"
             >
               <Store className="w-3.5 h-3.5" />
-              <span>Caixa / PDV</span>
+              <span>PDV</span>
             </Link>
           </div>
         )}
 
-        {/* Status de Foco do Sistema (Verifica se fica fora do foco) */}
+        {/* Métrica MRR do SaaS (Master) ou Total do Caixa (Restaurante) */}
+        {isSuperAdmin && isModoGlobal ? (
+          <div
+            title="Receita Recorrente Mensal (MRR) de todos os restaurantes clientes"
+            className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-all ${
+              isWhite
+                ? 'bg-emerald-50/70 border-emerald-200/80 text-emerald-900'
+                : 'bg-emerald-950/30 border-emerald-500/20 text-emerald-300'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            <div className="flex items-baseline gap-1">
+              <span className="font-sans text-[10px] text-slate-500 dark:text-slate-400 font-medium">MRR:</span>
+              <span className="font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                R$ {mrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+              <span className="font-sans text-[10px] text-slate-400">/mês</span>
+            </div>
+          </div>
+        ) : (
+          <div
+            title="Total de vendas do caixa atual"
+            className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-all ${
+              isWhite
+                ? 'bg-slate-50 border-slate-200 text-slate-800'
+                : 'bg-slate-800/50 border-slate-700 text-slate-200'
+            }`}
+          >
+            <DollarSign className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            <div className="flex items-baseline gap-1">
+              <span className="font-sans text-[10px] text-slate-500 font-medium">Caixa:</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                R$ {caixaAtual.totalVendas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Divisor vertical sutil */}
+        <div className="hidden sm:block h-4 w-px bg-slate-200 dark:bg-slate-800 mx-0.5" />
+
+        {/* Status de Foco (Ponto Moderno Pulsante) */}
         <div
           title={
             isFocused
-              ? 'Sistema em foco: Teclado, atalhos e leitor de código de barras respondem imediatamente.'
-              : 'Sistema fora de foco: Você está navegando em outra janela/aplicativo. O sistema continua ativo em segundo plano.'
+              ? 'Sistema conectado e em foco: Teclado e leitor de código de barras ativos.'
+              : 'Sistema em segundo plano.'
           }
-          className={`hidden md:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
-            isFocused
-              ? isWhite
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold'
-                : 'bg-emerald-950/60 border-emerald-500/30 text-emerald-400'
-              : isWhite
-              ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold animate-pulse'
-              : 'bg-amber-950/60 border-amber-500/30 text-amber-400 animate-pulse'
-          }`}
+          className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-slate-500 dark:text-slate-400"
         >
-          {isFocused ? (
-            <Eye className={`w-3.5 h-3.5 ${isWhite ? 'text-emerald-700' : 'text-emerald-400'}`} />
-          ) : (
-            <EyeOff className={`w-3.5 h-3.5 ${isWhite ? 'text-amber-700' : 'text-amber-400'}`} />
-          )}
-          <span className="text-[11px] font-semibold">
-            {isFocused ? 'Em Foco' : 'Fora de Foco'}
+          <span className="relative flex h-2 w-2">
+            {isFocused && (
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            )}
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${isFocused ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+          </span>
+          <span className="text-[11px] font-medium hidden xl:inline">
+            {isFocused ? 'Em Foco' : 'Segundo Plano'}
           </span>
         </div>
+
+        {/* Relógio Digital Monospace */}
+        <div className="hidden lg:flex items-center gap-1.5 text-xs font-mono font-medium px-2 py-1 text-slate-500 dark:text-slate-400">
+          <Clock className="w-3.5 h-3.5 text-slate-400" />
+          <span>{time}</span>
+        </div>
+
+        {/* Divisor vertical sutil */}
+        <div className="hidden sm:block h-4 w-px bg-slate-200 dark:bg-slate-800 mx-0.5" />
 
         {/* Botão de Instalação do App PWA */}
         <BotaoInstalarPWA />
 
-        {/* Botão Rápido White Color / Dark Mode */}
+        {/* Botão Tema Claro / Escuro Minimalista */}
         <button
           onClick={alternarTema}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all text-xs font-bold cursor-pointer shadow-sm ${
-            tema === 'light'
-              ? 'bg-amber-100/90 text-amber-900 border-amber-300 hover:bg-amber-200'
-              : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white hover:bg-slate-700'
+          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer active:scale-95 ${
+            isWhite
+              ? 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 shadow-xs'
+              : 'bg-slate-800/60 hover:bg-slate-800 border-slate-700/80'
           }`}
-          title={tema === 'light' ? 'Mudar para Dark Mode (Tema Escuro)' : 'Mudar para White Color (Tema Claro)'}
+          title={tema === 'light' ? 'Mudar para Modo Escuro' : 'Mudar para Modo Claro'}
         >
           {tema === 'light' ? (
-            <>
-              <Sun className="w-3.5 h-3.5 text-amber-600" />
-              <span className="hidden sm:inline text-[11px]">Tema Claro</span>
-            </>
+            <Sun className="w-4 h-4 text-amber-500 transition-transform hover:rotate-45" />
           ) : (
-            <>
-              <Moon className="w-3.5 h-3.5 text-slate-300" />
-              <span className="hidden sm:inline text-[11px]">White Color</span>
-            </>
+            <Moon className="w-4 h-4 text-slate-300 transition-transform hover:-rotate-12" />
           )}
         </button>
+
+        {/* Botão Atalhos de Teclado */}
+        <button
+          onClick={() => setModalAtalhosAberto(true)}
+          title="Ver Atalhos do Teclado"
+          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer active:scale-95 ${
+            isWhite
+              ? 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 shadow-xs'
+              : 'bg-slate-800/60 hover:bg-slate-800 border-slate-700/80'
+          }`}
+        >
+          <HelpCircle className="w-4 h-4" />
+        </button>
+
+        {/* Divisor vertical antes do perfil */}
+        <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 mx-0.5" />
 
         {/* Seletor de Perfil / Usuário Logado */}
         <div className="relative">
           <button
             onClick={() => setMenuPerfilAberto(!menuPerfilAberto)}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border transition-all text-xs font-bold cursor-pointer ${
-              isWhite ? 'bg-slate-100 border-slate-300 text-slate-800' : infoCargo.cor
+            className={`flex items-center gap-2 px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl border transition-all text-xs cursor-pointer ${
+              isWhite
+                ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-xs'
+                : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700 text-slate-200'
             }`}
           >
-            <span>{infoCargo.icone}</span>
-            <span className="hidden sm:inline">
-              {usuarioLogado?.nome.split(' ')[0]} ({infoCargo.titulo.split('(')[0].trim()})
-            </span>
-            <span className="sm:hidden uppercase text-[10px]">
-              {usuarioLogado?.cargo.replace('_', ' ')}
-            </span>
-            <ChevronDown className="w-3 h-3 opacity-60" />
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#FF6B00] to-purple-600 text-white flex items-center justify-center text-[11px] font-black shadow-xs shrink-0">
+              {usuarioLogado?.nome ? usuarioLogado.nome.charAt(0).toUpperCase() : 'U'}
+            </div>
+            <div className="hidden sm:flex flex-col text-left">
+              <span className="text-xs font-bold leading-tight truncate max-w-[110px] text-slate-900 dark:text-white">
+                {usuarioLogado?.nome ? usuarioLogado.nome.split(' ')[0] : 'Usuário'}
+              </span>
+              <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium leading-none">
+                {isSuperAdmin ? 'Dono do SaaS' : infoCargo.titulo.split('(')[0].trim()}
+              </span>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-0.5" />
           </button>
 
           {menuPerfilAberto && (
@@ -521,7 +565,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 </div>
               )}
 
-<div className={`pt-2 mt-1 border-t ${isWhite ? 'border-slate-100' : 'border-slate-800'}`}>
+              <div className={`pt-2 mt-1 border-t ${isWhite ? 'border-slate-100' : 'border-slate-800'}`}>
                 <button
                   onClick={() => {
                     logout();
@@ -538,74 +582,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             </div>
           )}
         </div>
-
-        {/* Alerta de Chamados de Suporte para o Master */}
-        {isSuperAdmin && useSaaSStore.getState().getChamadosAbertos().length > 0 && (
-          <Link
-            to="/saas?aba=suporte_ao_vivo"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 text-xs font-black shadow-lg shadow-rose-600/30 animate-bounce transition-all"
-            title="Clique para atender o chamado de suporte do restaurante!"
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>🚨 {useSaaSStore.getState().getChamadosAbertos().length} Chamado de Suporte</span>
-          </Link>
-        )}
-
-        {/* Total do Caixa Atual ou MRR do SaaS */}
-        {isSuperAdmin && isModoGlobal ? (
-          <div
-            title="Receita Recorrente Mensal (MRR) de todos os restaurantes clientes do EloServe"
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${
-              isWhite
-                ? 'bg-emerald-50 border border-emerald-300'
-                : 'bg-emerald-950/40 border border-emerald-500/30'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5 text-[#10B981]" />
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-[10px] font-medium ${isWhite ? 'text-emerald-800' : 'text-emerald-400'}`}>MRR SaaS:</span>
-              <span className={`text-xs font-bold font-mono ${isWhite ? 'text-emerald-700' : 'text-[#10B981]'}`}>
-                R$ {mrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${
-            isWhite
-              ? 'bg-emerald-50 border border-emerald-300'
-              : 'bg-slate-800/80 border border-slate-700/60'
-          }`}>
-            <DollarSign className={`w-3.5 h-3.5 ${isWhite ? 'text-emerald-700' : 'text-emerald-400'}`} />
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-[10px] font-medium ${isWhite ? 'text-emerald-800' : 'text-slate-400'}`}>Vendas Caixa:</span>
-              <span className={`text-xs font-bold font-mono ${isWhite ? 'text-emerald-800' : 'text-emerald-400'}`}>
-                R$ {caixaAtual.totalVendas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Live Clock */}
-        <div className={`hidden lg:flex items-center gap-1.5 text-xs font-mono font-medium px-2.5 py-1 rounded-lg border ${
-          isWhite
-            ? 'bg-slate-100 text-slate-700 border-slate-200'
-            : 'text-slate-200 bg-slate-800/40 border-slate-700/30'
-        }`}>
-          <Clock className={`w-3.5 h-3.5 ${isWhite ? 'text-slate-600' : 'text-slate-400'}`} />
-          <span>{time}</span>
-        </div>
-
-        {/* Botão Atalhos */}
-        <button
-          onClick={() => setModalAtalhosAberto(true)}
-          title="Ver Atalhos do Teclado"
-          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-        >
-          <HelpCircle className="w-4 h-4" />
-        </button>
       </div>
 
-      {/* Modal de Atalhos do Teclado */}
+    {/* Modal de Atalhos do Teclado */}
       {modalAtalhosAberto && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">

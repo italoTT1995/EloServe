@@ -55,11 +55,11 @@ export function BotaoInstalarPWA() {
     <button
       onClick={handleInstalar}
       type="button"
-      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95"
+      className="hidden sm:flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 transition-all cursor-pointer active:scale-95"
       title="Instalar EloServe como aplicativo nativo no seu tablet ou computador"
     >
-      <Smartphone className="w-3.5 h-3.5" />
-      <span>Instalar App</span>
+      <Smartphone className="w-4 h-4 text-orange-500" />
+      
     </button>
   );
 }
