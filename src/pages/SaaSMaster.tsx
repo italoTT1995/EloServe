@@ -438,6 +438,44 @@ export default function SaaSMaster() {
     atualizarAssinantes: false,
   });
 
+  const REGRAS_CATALOGO_SUGESTOES = [
+  'Mesas ilimitadas no salão e até 5 caixas PDV simultâneos',
+  'Gestão e Controle de Reserva de Mesas integrado',
+  'Painel KDS de Cozinha e Bar habilitado em tempo real',
+  'Comanda Mobile para Garçons atenderem direto nas mesas',
+  'Controle de Estoque e Ficha Técnica de insumos e pratos',
+  'Relatórios gerenciais avançados de faturamento e vendas',
+  'Tolerância de 5 dias de atraso na fatura com aviso amigável no WhatsApp',
+  'Período padrão de degustação: 7 dias grátis',
+  'EloBot Inteligência Artificial no WhatsApp oficial 24 horas por dia',
+  'Cardápio digital via QR Code interativo nas mesas',
+  'Operação 100% digital e sem papel com telas interativas',
+  'Limite de 1 terminal PDV frente de caixa por estabelecimento',
+  'Até 10 mesas simultâneas com controle no salão',
+  'Relatórios DRE completos e cálculo de lucratividade em tempo real',
+  'Suporte VIP Prioritário 24/7 com canal direto com o Franqueador',
+  'Treinamento operacional remoto de equipe incluso sem taxa adicional',
+  'Sem taxa percentual sobre pedidos ou faturamento',
+  'Backup diário automático e segurança dos dados em nuvem',
+  'Impressão térmica automática para cozinha, bar e balcão (80mm/58mm)',
+  'Cancelamento sem fidelidade ou carência a qualquer momento',
+];
+
+  const [bancoRegras, setBancoRegras] = useState<string[]>(() => {
+    try {
+      const salvas = localStorage.getItem('eloserve_catalogo_regras');
+      if (salvas) {
+        const parsed = JSON.parse(salvas);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    const conjunto = new Set<string>();
+    planos.forEach((p) => (p.regrasTexto || []).forEach((r) => conjunto.add(r)));
+    REGRAS_CATALOGO_SUGESTOES.forEach((r) => conjunto.add(r));
+    return Array.from(conjunto);
+  });
+
+  const [filtroRegras, setFiltroRegras] = useState<'todas' | 'selecionadas' | 'nao_selecionadas'>('todas');
   const [novaRegraInput, setNovaRegraInput] = useState('');
   const [sucessoSalvarRegras, setSucessoSalvarRegras] = useState<string | null>(null);
 
@@ -472,20 +510,64 @@ export default function SaaSMaster() {
     }
   }, [planoIdRegrasEmEdicao, planos]);
 
-  function handleAdicionarRegraTexto() {
-    if (!novaRegraInput.trim()) return;
+  function handleAlternarSelecaoRegra(regra: string) {
+    setFormRegrasPlano((prev) => {
+      const jaExiste = prev.regrasTexto.includes(regra);
+      const novas = jaExiste
+        ? prev.regrasTexto.filter((r) => r !== regra)
+        : [...prev.regrasTexto, regra];
+      return { ...prev, regrasTexto: novas };
+    });
+  }
+
+  function handleMarcarTodasRegras() {
     setFormRegrasPlano((prev) => ({
       ...prev,
-      regrasTexto: [...prev.regrasTexto, novaRegraInput.trim()],
+      regrasTexto: [...bancoRegras],
     }));
+  }
+
+  function handleDesmarcarTodasRegras() {
+    setFormRegrasPlano((prev) => ({
+      ...prev,
+      regrasTexto: [],
+    }));
+  }
+
+  function handleAdicionarRegraTexto() {
+    const textoLimpo = novaRegraInput.trim();
+    if (!textoLimpo) return;
+
+    if (!bancoRegras.includes(textoLimpo)) {
+      const novoBanco = [textoLimpo, ...bancoRegras];
+      setBancoRegras(novoBanco);
+      try {
+        localStorage.setItem('eloserve_catalogo_regras', JSON.stringify(novoBanco));
+      } catch {}
+    }
+
+    if (!formRegrasPlano.regrasTexto.includes(textoLimpo)) {
+      setFormRegrasPlano((prev) => ({
+        ...prev,
+        regrasTexto: [...prev.regrasTexto, textoLimpo],
+      }));
+    }
+
     setNovaRegraInput('');
   }
 
-  function handleRemoverRegraTexto(indexRemover: number) {
-    setFormRegrasPlano((prev) => ({
-      ...prev,
-      regrasTexto: prev.regrasTexto.filter((_, idx) => idx !== indexRemover),
-    }));
+  function handleRemoverRegraDefinitiva(regraParaRemover: string) {
+    if (confirm(`Deseja excluir a regra "${regraParaRemover}" do catálogo definitivo de regras?`)) {
+      const novoBanco = bancoRegras.filter((r) => r !== regraParaRemover);
+      setBancoRegras(novoBanco);
+      try {
+        localStorage.setItem('eloserve_catalogo_regras', JSON.stringify(novoBanco));
+      } catch {}
+      setFormRegrasPlano((prev) => ({
+        ...prev,
+        regrasTexto: prev.regrasTexto.filter((r) => r !== regraParaRemover),
+      }));
+    }
   }
 
   function handleSalvarRegrasPlano(e: React.FormEvent) {
@@ -3774,25 +3856,100 @@ export default function SaaSMaster() {
                       </div>
                     </div>
 
-                    {/* BLOCO 4: REGRAS & TERMOS DE USO DO PLANO (CLÁUSULAS TEXTUAIS) */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    {/* BLOCO 4: REGRAS & TERMOS DE USO DO PLANO (SELEÇÃO INTELIGENTE DE REGRAS) */}
+                    <div className={`${isWhite ? 'bg-white border-slate-200 shadow-md' : 'bg-slate-900 border-slate-800 shadow-xl'} border rounded-3xl p-6 space-y-4`}>
+                      <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b ${isWhite ? 'border-slate-100' : 'border-slate-800'}`}>
                         <div>
-                          <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-purple-400" />
+                          <h4 className={`text-sm font-extrabold flex items-center gap-2 ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                            <FileText className="w-4 h-4 text-purple-500" />
                             <span>Cláusulas & Regras de Uso Visíveis para o Restaurante</span>
                           </h4>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            Benefícios contratuais exibidos para os restaurantes no painel "Minha Assinatura" e na proposta.
+                          <p className={`text-xs mt-0.5 ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                            Selecione as regras e benefícios contratuais que estarão ativos para o <strong>Plano {formRegrasPlano.nome}</strong>. Clique na regra para marcar ou desmarcar.
                           </p>
                         </div>
-                        <span className="text-xs font-mono font-bold text-slate-400">
-                          {formRegrasPlano.regrasTexto.length} regras cadastradas
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-xs font-mono font-bold px-3 py-1 rounded-xl border ${
+                            isWhite
+                              ? 'bg-purple-50 text-purple-900 border-purple-200'
+                              : 'bg-purple-950/80 text-purple-300 border-purple-500/30'
+                          }`}>
+                            {formRegrasPlano.regrasTexto.length} regras selecionadas
+                          </span>
+                        </div>
                       </div>
 
-                      {/* Input para adicionar nova regra */}
-                      <div className="flex gap-2">
+                      {/* Barra de Filtros e Ações Rápidas */}
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+                        {/* Filtros por status */}
+                        <div className="flex items-center gap-1 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => setFiltroRegras('todas')}
+                            className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+                              filtroRegras === 'todas'
+                                ? 'bg-purple-600 text-white shadow-sm'
+                                : isWhite
+                                ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            Todas ({bancoRegras.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFiltroRegras('selecionadas')}
+                            className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+                              filtroRegras === 'selecionadas'
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : isWhite
+                                ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            Selecionadas ({formRegrasPlano.regrasTexto.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFiltroRegras('nao_selecionadas')}
+                            className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+                              filtroRegras === 'nao_selecionadas'
+                                ? 'bg-slate-700 text-white shadow-sm'
+                                : isWhite
+                                ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            Não Selecionadas ({bancoRegras.length - formRegrasPlano.regrasTexto.length})
+                          </button>
+                        </div>
+
+                        {/* Botões Marcar/Desmarcar todas */}
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={handleMarcarTodasRegras}
+                            className={`font-bold transition-colors cursor-pointer ${
+                              isWhite ? 'text-purple-700 hover:text-purple-900' : 'text-purple-400 hover:text-purple-300'
+                            }`}
+                          >
+                            Selecionar Todas
+                          </button>
+                          <span className="text-slate-400">•</span>
+                          <button
+                            type="button"
+                            onClick={handleDesmarcarTodasRegras}
+                            className={`font-bold transition-colors cursor-pointer ${
+                              isWhite ? 'text-slate-500 hover:text-slate-700' : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            Desmarcar Todas
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Input para cadastrar nova regra no catálogo */}
+                      <div className="flex gap-2 pt-1">
                         <input
                           type="text"
                           value={novaRegraInput}
@@ -3804,45 +3961,118 @@ export default function SaaSMaster() {
                             }
                           }}
                           placeholder="Ex: Treinamento remoto de garçons incluso; Cancelamento sem multa..."
-                          className="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
+                          className={`flex-1 px-4 py-2.5 rounded-2xl text-xs focus:outline-none transition-colors ${
+                            isWhite
+                              ? 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500'
+                              : 'bg-slate-950 border border-slate-800 text-white placeholder:text-slate-600 focus:border-purple-500'
+                          }`}
                         />
                         <button
                           type="button"
                           onClick={handleAdicionarRegraTexto}
-                          className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/30 flex items-center gap-1.5 cursor-pointer shrink-0"
+                          className="px-4 py-2.5 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shadow-md shadow-orange-600/25 flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95 transition-all"
                         >
                           <Plus className="w-4 h-4" />
-                          <span>Adicionar Regra</span>
+                          <span>+ Adicionar Regra</span>
                         </button>
                       </div>
 
-                      {/* Lista de regras cadastradas com exclusão */}
-                      <div className="space-y-2 pt-1">
-                        {formRegrasPlano.regrasTexto.length === 0 ? (
-                          <p className="text-xs text-slate-500 italic p-3 text-center">
-                            Nenhuma cláusula textual adicionada. Digite acima para cadastrar benefícios contratuais.
-                          </p>
-                        ) : (
-                          formRegrasPlano.regrasTexto.map((regra, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-950 border border-slate-800/80 text-xs hover:border-slate-700 transition-colors"
-                            >
-                              <div className="flex items-center gap-2.5 text-slate-200">
-                                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                                <span>{regra}</span>
+                      {/* Lista de Regras Interativas (Checklist Selecionável) */}
+                      <div className="space-y-2 pt-2 max-h-[500px] overflow-y-auto pr-1">
+                        {(() => {
+                          const regrasFiltradas = bancoRegras.filter((regra) => {
+                            const isChecked = formRegrasPlano.regrasTexto.includes(regra);
+                            if (filtroRegras === 'selecionadas') return isChecked;
+                            if (filtroRegras === 'nao_selecionadas') return !isChecked;
+                            return true;
+                          });
+
+                          if (regrasFiltradas.length === 0) {
+                            return (
+                              <div className={`p-6 text-center rounded-2xl border text-xs italic ${
+                                isWhite ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-950 border-slate-800 text-slate-500'
+                              }`}>
+                                Nenhuma regra encontrada para o filtro selecionado. Digite acima para adicionar novas regras.
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoverRegraTexto(idx)}
-                                title="Remover esta regra"
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-colors shrink-0"
+                            );
+                          }
+
+                          return regrasFiltradas.map((regra, idx) => {
+                            const isChecked = formRegrasPlano.regrasTexto.includes(regra);
+                            return (
+                              <div
+                                key={idx}
+                                onClick={() => handleAlternarSelecaoRegra(regra)}
+                                className={`group flex items-center justify-between gap-3 p-3.5 rounded-2xl border text-xs cursor-pointer transition-all select-none ${
+                                  isChecked
+                                    ? isWhite
+                                      ? 'bg-purple-50/70 border-purple-400/80 shadow-sm ring-1 ring-purple-500/20'
+                                      : 'bg-gradient-to-r from-purple-950/40 to-slate-900 border-purple-500/50 shadow-md shadow-purple-500/10'
+                                    : isWhite
+                                    ? 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700 hover:bg-slate-900/60'
+                                }`}
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))
-                        )}
+                                <div className="flex items-center gap-3 flex-1">
+                                  {/* Checkbox circular / arredondado com efeito visual */}
+                                  <div
+                                    className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+                                      isChecked
+                                        ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
+                                        : isWhite
+                                        ? 'border-2 border-slate-300 group-hover:border-purple-400 bg-white'
+                                        : 'border-2 border-slate-700 group-hover:border-purple-500 bg-slate-900'
+                                    }`}
+                                  >
+                                    {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                  </div>
+
+                                  <span
+                                    className={`text-xs leading-relaxed ${
+                                      isChecked
+                                        ? isWhite
+                                          ? 'text-slate-900 font-bold'
+                                          : 'text-white font-bold'
+                                        : isWhite
+                                        ? 'text-slate-500 line-through opacity-70'
+                                        : 'text-slate-500 line-through opacity-70'
+                                    }`}
+                                  >
+                                    {regra}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span
+                                    className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                                      isChecked
+                                        ? isWhite
+                                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                        : isWhite
+                                        ? 'bg-slate-100 text-slate-500'
+                                        : 'bg-slate-900 text-slate-600'
+                                    }`}
+                                  >
+                                    {isChecked ? 'Selecionada' : 'Não Selecionada'}
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoverRegraDefinitiva(regra);
+                                    }}
+                                    title="Remover regra permanentemente do catálogo"
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
                   </div>
