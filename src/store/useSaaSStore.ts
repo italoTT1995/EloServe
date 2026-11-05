@@ -182,6 +182,8 @@ interface SaaSState {
   alternarStatusAviso: (id: string) => void;
   removerAviso: (id: string) => void;
   alternarPermissaoDRE: (tenantId: string, habilitado?: boolean, operadorNome?: string) => void;
+  alternarWhatsAppIA: (tenantId: string, habilitado?: boolean, operadorNome?: string) => void;
+  isWhatsAppIALiberado: (tenantId?: string) => boolean;
   registrarLogAuditoria: (acao: string, categoria: LogAuditoriaSaaS['categoria'], detalhes: string) => void;
   getAvisosAtivosParaTenant: (tenantId: string) => AvisoGlobalSaaS[];
   getTenantAtivo: () => TenantRestaurante;
@@ -591,6 +593,58 @@ export const useSaaSStore = create<SaaSState>()(
           'seguranca',
           `O acesso ao DRE Básico do cliente foi ${novoValor ? 'LIBERADO' : 'REVOGADO / BLOQUEADO'} para a loja "${tenant.nomeFantasia}" (${tenant.id}) pelo operador "${operadorNome}".`
         );
+      },
+
+      alternarWhatsAppIA: (tenantId, habilitado, operadorNome = 'Super Admin (Dono do SaaS)') => {
+        const state = get();
+        const tenant = state.tenants.find((t) => t.id === tenantId);
+        if (!tenant) return;
+
+        const plano = PLANOS_DISPONIVEIS.find((p) => p.id === tenant.planoId);
+        const valorPadraoPlano = !!plano?.limites.whatsappIAIncluso;
+        const statusAtual = typeof tenant.whatsappIAHabilitado === 'boolean' ? tenant.whatsappIAHabilitado : valorPadraoPlano;
+        const novoValor = habilitado !== undefined ? habilitado : !statusAtual;
+        const agoraTexto = new Date().toLocaleString('pt-BR');
+
+        set((s) => ({
+          tenants: s.tenants.map((t) =>
+            t.id === tenantId
+              ? {
+                  ...t,
+                  whatsappIAHabilitado: novoValor,
+                  whatsappIAModificadoPor: operadorNome,
+                  whatsappIAModificadoEm: agoraTexto,
+                }
+              : t
+          ),
+        }));
+
+        supabaseService.atualizarTenant(tenantId, {
+          whatsappIAHabilitado: novoValor,
+        });
+
+        get().registrarLogAuditoria(
+          `Módulo WhatsApp IA ${novoValor ? 'Liberado' : 'Bloqueado'}`,
+          'seguranca',
+          `O Atendente WhatsApp IA foi ${novoValor ? 'LIBERADO' : 'BLOQUEADO'} para a loja "${tenant.nomeFantasia}" (${tenant.id}) pelo operador "${operadorNome}".`
+        );
+      },
+
+      isWhatsAppIALiberado: (tenantId?: string) => {
+        const state = get();
+        const idAlvo = tenantId || state.tenantAtivoId;
+        if (idAlvo === 'global') return true;
+        const tenant = state.tenants.find((t) => t.id === idAlvo);
+        if (!tenant) return false;
+
+        // Se houver liberação explícita configurada pelo franqueador no SaaS Master:
+        if (typeof tenant.whatsappIAHabilitado === 'boolean') {
+          return tenant.whatsappIAHabilitado;
+        }
+
+        // Senão, baseia-se no plano configurado
+        const plano = PLANOS_DISPONIVEIS.find((p) => p.id === tenant.planoId);
+        return !!plano?.limites.whatsappIAIncluso;
       },
 
       registrarLogAuditoria: (acao, categoria, detalhes) => {

@@ -65,6 +65,7 @@ export const supabaseService = {
         dias_restantes_trial: tenant.diasRestantesTrial ?? 7,
         instancia_whatsapp_conectada: tenant.instanciaWhatsAppConectada ?? false,
         dre_habilitado: tenant.dreHabilitado ?? true,
+        whatsapp_ia_habilitado: tenant.whatsappIAHabilitado ?? (tenant.planoId === 'enterprise'),
         couvert_artistico_ativo: tenant.couvertArtisticoAtivo ?? false,
         valor_couvert_por_pessoa: tenant.valorCouvertPorPessoa ?? 0,
       };
@@ -91,6 +92,7 @@ export const supabaseService = {
       if (dados.statusAssinatura !== undefined) payload.status_assinatura = dados.statusAssinatura;
       if (dados.valorMensalidade !== undefined) payload.valor_mensalidade = dados.valorMensalidade;
       if (dados.proximoVencimento !== undefined) payload.proximo_vencimento = dados.proximoVencimento;
+      if (dados.whatsappIAHabilitado !== undefined) payload.whatsapp_ia_habilitado = dados.whatsappIAHabilitado;
 
       const { error } = await supabase.from('tenants').update(payload).eq('id', tenantId);
       if (error) console.error('Erro ao atualizar tenant no Supabase:', error);
@@ -365,6 +367,7 @@ export const supabaseService = {
       instanciaWhatsAppConectada: !!row.instancia_whatsapp_conectada,
       criadoEm: row.criado_em || new Date().toISOString(),
       dreHabilitado: row.dre_habilitado ?? true,
+      whatsappIAHabilitado: row.whatsapp_ia_habilitado ?? (row.plano_id === 'enterprise'),
       couvertArtisticoAtivo: !!row.couvert_artistico_ativo,
       valorCouvertPorPessoa: Number(row.valor_couvert_por_pessoa || 0),
       naLixeira: !!row.na_lixeira || !!row.naLixeira,

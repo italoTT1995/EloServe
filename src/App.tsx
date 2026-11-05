@@ -16,6 +16,7 @@ import Estoque from './pages/Estoque';
 import Delivery from './pages/Delivery';
 import Funcionarios from './pages/Funcionarios';
 import PainelDono from './pages/PainelDono';
+import ChatbotWhatsApp from './pages/ChatbotWhatsApp';
 import AutoatendimentoMesa from './pages/AutoatendimentoMesa';
 import CardapioDigitalPublico from './pages/CardapioDigitalPublico';
 import { useAuthStore } from './store/useAuthStore';
@@ -237,6 +238,24 @@ export default function App() {
                     element={
                       <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
                         <MinhaAssinatura />
+                      </RotaProtegida>
+                    }
+                  />
+
+                  {/* Atendente WhatsApp IA (Anota AI Style) */}
+                  <Route
+                    path="/chatbot"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <ChatbotWhatsApp />
+                      </RotaProtegida>
+                    }
+                  />
+                  <Route
+                    path="/whatsapp"
+                    element={
+                      <RotaProtegida cargosPermitidos={['super_admin', 'admin_restaurante']}>
+                        <ChatbotWhatsApp />
                       </RotaProtegida>
                     }
                   />

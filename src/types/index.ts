@@ -281,6 +281,9 @@ export interface TenantRestaurante {
   dreHabilitado?: boolean;
   drePermissaoModificadoPor?: string;
   drePermissaoModificadoEm?: string;
+  whatsappIAHabilitado?: boolean;
+  whatsappIAModificadoPor?: string;
+  whatsappIAModificadoEm?: string;
   couvertArtisticoAtivo?: boolean;
   valorCouvertPorPessoa?: number;
   valorCouvertPorComanda?: number;

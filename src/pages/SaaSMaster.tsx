@@ -101,6 +101,8 @@ export default function SaaSMaster() {
     alternarStatusAviso,
     removerAviso,
     alternarPermissaoDRE,
+    alternarWhatsAppIA,
+    isWhatsAppIALiberado,
     registrarLogAuditoria,
     chamadosSuporte,
     getChamadosAbertos,
@@ -2071,6 +2073,7 @@ export default function SaaSMaster() {
                   <th className="py-3.5 px-4">Mensalidade</th>
                   <th className="py-3.5 px-4">Status Assinatura</th>
                   <th className="py-3.5 px-4 text-center">Relatório & Métricas</th>
+                  <th className="py-3.5 px-4 text-center">WhatsApp IA</th>
                   <th className="py-3.5 px-4">Vencimento</th>
                   <th className="py-3.5 px-5 text-right">Ações Rápidas</th>
                 </tr>
@@ -2078,7 +2081,7 @@ export default function SaaSMaster() {
               <tbody className="divide-y divide-slate-800/60 font-medium">
                 {tenantsFiltrados.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-500 text-xs">
+                    <td colSpan={9} className="py-12 text-center text-slate-500 text-xs">
                       Nenhum restaurante encontrado com o filtro atual.
                     </td>
                   </tr>
@@ -2197,6 +2200,31 @@ export default function SaaSMaster() {
                             <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
                             <span>Ver Métricas</span>
                           </button>
+                        </td>
+
+                        {/* Controle de WhatsApp IA (Anota AI Style) */}
+                        <td className="py-3.5 px-4 text-center">
+                          {isWhatsAppIALiberado(tenant.id) ? (
+                            <button
+                              type="button"
+                              onClick={() => alternarWhatsAppIA(tenant.id, false, 'Ítalo Silva (Super Admin)')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold cursor-pointer hover:bg-rose-950/80 hover:text-rose-400 hover:border-rose-500/40 transition-colors shadow-sm"
+                              title="WhatsApp IA Liberado! Clique para bloquear."
+                            >
+                              <Bot className="w-3 h-3 text-emerald-400" />
+                              <span>Liberado</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => alternarWhatsAppIA(tenant.id, true, 'Ítalo Silva (Super Admin)')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-bold cursor-pointer hover:bg-emerald-950/80 hover:text-emerald-400 hover:border-emerald-500/40 transition-colors shadow-sm"
+                              title="Bloqueado pelo plano. Clique para liberar este módulo para o restaurante."
+                            >
+                              <Lock className="w-3 h-3 text-slate-400" />
+                              <span>Bloqueado</span>
+                            </button>
+                          )}
                         </td>
 
                         {/* Vencimento */}

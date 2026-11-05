@@ -46,6 +46,7 @@ interface MenuItemDef {
 
 const menuItemsDonoSimples: MenuItemDef[] = [
   { path: '/painel-dono', label: 'Dashboard', icon: LayoutDashboard, cargos: ['super_admin', 'admin_restaurante'] },
+  { path: '/chatbot', label: 'Atendente WhatsApp (IA)', icon: Bot, badge: 'IA', highlight: true, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/cardapio', label: 'Cardápio', icon: BookOpen, cargos: ['super_admin', 'admin_restaurante'] },
   { path: '/pdv', label: 'Pedidos', icon: Store, badge: '1', cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
   { path: '/mesas', label: 'Mesas', icon: LayoutGrid, cargos: ['super_admin', 'admin_restaurante', 'caixa', 'garcom'] },
