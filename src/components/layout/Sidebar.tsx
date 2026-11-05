@@ -163,12 +163,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 { id: 'editor_loja', label: 'Ambiente de Edição das Lojas', icon: Sliders, badge: 'Editar' },
                 { id: 'faturamento', label: 'Faturamento & MRR', icon: TrendingUp },
                 { id: 'logins', label: 'Gestão de Logins & Acessos', icon: KeyRound, badge: 'Acessos' },
-                { id: 'planos', label: 'Planos & Mensalidades', icon: Layers },
                 { id: 'avisos_globais', label: 'Central de Avisos (Broadcast)', icon: Megaphone, badge: 'Avisos' },
                 { id: 'auditoria', label: 'Logs de Auditoria SaaS', icon: History, badge: 'Logs' },
-                { id: 'config', label: 'Configuração Franqueador', icon: ShieldCheck },
+                { id: 'config', label: 'Configurações & Planos', icon: ShieldCheck, badge: 'Master' },
               ].map((item) => {
-                const isTabActive = location.pathname === '/saas' && abaAtual === item.id;
+                const isTabActive = location.pathname === '/saas' && (
+                  abaAtual === item.id ||
+                  (item.id === 'config' && (abaAtual === 'planos' || abaAtual === 'regras_planos'))
+                );
                 return (
                   <NavLink
                     key={item.id}
