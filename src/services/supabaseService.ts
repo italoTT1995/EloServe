@@ -244,6 +244,7 @@ export const supabaseService = {
         disponivel: produto.disponivel ?? true,
         destaque: produto.destaque ?? false,
         ficha_tecnica: produto.fichaTecnica ?? [],
+        item_estoque_id: produto.itemEstoqueId || null,
       };
       const { error } = await supabase.from('produtos').upsert(payload);
       if (error) console.error('Erro ao salvar produto no Supabase:', error);
@@ -261,6 +262,11 @@ export const supabaseService = {
       if (dados.precoCusto !== undefined) payload.preco_custo = dados.precoCusto;
       if (dados.disponivel !== undefined) payload.disponivel = dados.disponivel;
       if (dados.categoriaId !== undefined) payload.categoria_id = dados.categoriaId;
+      if (dados.fotoUrl !== undefined) payload.foto_url = dados.fotoUrl;
+      if (dados.destaque !== undefined) payload.destaque = dados.destaque;
+      if (dados.setorPreparo !== undefined) payload.setor_preparo = dados.setorPreparo;
+      if (dados.fichaTecnica !== undefined) payload.ficha_tecnica = dados.fichaTecnica;
+      if (dados.itemEstoqueId !== undefined) payload.item_estoque_id = dados.itemEstoqueId;
 
       const { error } = await supabase.from('produtos').update(payload).eq('id', id);
       if (error) console.error('Erro ao atualizar produto no Supabase:', error);
@@ -434,6 +440,7 @@ export const supabaseService = {
   converterCategoriaDoBanco(row: any): Categoria {
     return {
       id: row.id,
+      tenantId: row.tenant_id || row.tenantId,
       nome: row.nome,
       icone: row.icone,
       cor: row.cor,
@@ -443,6 +450,7 @@ export const supabaseService = {
   converterProdutoDoBanco(row: any): Produto {
     return {
       id: row.id,
+      tenantId: row.tenant_id || row.tenantId,
       categoriaId: row.categoria_id,
       nome: row.nome,
       descricao: row.descricao,
@@ -453,6 +461,7 @@ export const supabaseService = {
       setorPreparo: row.setor_preparo || 'cozinha',
       disponivel: row.disponivel ?? true,
       destaque: !!row.destaque,
+      itemEstoqueId: row.item_estoque_id || row.itemEstoqueId,
       fichaTecnica: Array.isArray(row.ficha_tecnica) ? row.ficha_tecnica : [],
     };
   },

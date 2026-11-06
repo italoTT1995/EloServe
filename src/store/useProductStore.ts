@@ -24,7 +24,14 @@ interface ProductState {
   alternarDisponibilidade: (id: string, tenantId?: string) => void;
   adicionarCategoria: (nome: string, tenantId?: string) => Categoria;
   removerCategoria: (id: string, tenantId?: string) => void;
+  restaurarCategoriasPadrao: (tenantId: string) => void;
 }
+
+export const getCategoriasPadrao = (tenantId: string): Categoria[] => [
+  { id: `c-${tenantId}-pratos`, tenantId, nome: 'Pratos Principais', icone: 'Utensils', cor: '#FF6B00' },
+  { id: `c-${tenantId}-bebidas`, tenantId, nome: 'Bebidas & Drinks', icone: 'Wine', cor: '#00A3FF' },
+  { id: `c-${tenantId}-sobremesas`, tenantId, nome: 'Sobremesas', icone: 'Cake', cor: '#E040FB' },
+];
 
 function sincronizarComWhatsAppServer(_tenantId?: string) {}
 
@@ -124,11 +131,7 @@ export const useProductStore = create<ProductState>()(
         if (CATEGORIAS_POR_TENANT[tenantId] && CATEGORIAS_POR_TENANT[tenantId].length > 0) {
           return CATEGORIAS_POR_TENANT[tenantId];
         }
-        return [
-          { id: `c-${tenantId}-pratos`, nome: 'Pratos Principais', icone: 'Utensils', cor: '#FF6B00' },
-          { id: `c-${tenantId}-bebidas`, nome: 'Bebidas & Drinks', icone: 'Wine', cor: '#00A3FF' },
-          { id: `c-${tenantId}-sobremesas`, nome: 'Sobremesas', icone: 'Cake', cor: '#E040FB' },
-        ];
+        return getCategoriasPadrao(tenantId);
       },
 
       adicionarProduto: (novo, tenantId) => {
@@ -286,11 +289,16 @@ export const useProductStore = create<ProductState>()(
         }
         const novaCat: Categoria = {
           id: `c-${idAlvo}-${Date.now()}`,
+          tenantId: idAlvo,
           nome: nome.trim(),
         };
 
         set((state) => {
-          const listaAtual = state.categoriasPorTenant[idAlvo] || CATEGORIAS_POR_TENANT[idAlvo] || [];
+          const listaExistente = state.categoriasPorTenant && state.categoriasPorTenant[idAlvo];
+          const listaAtual = listaExistente && listaExistente.length > 0
+            ? listaExistente
+            : getCategoriasPadrao(idAlvo);
+
           return {
             categoriasPorTenant: {
               ...state.categoriasPorTenant,
@@ -307,15 +315,31 @@ export const useProductStore = create<ProductState>()(
         if (!idAlvo) return;
         set((state) => {
           const novasPorTenant: Record<string, Categoria[]> = { ...state.categoriasPorTenant };
-          if (novasPorTenant[idAlvo]) {
-            novasPorTenant[idAlvo] = novasPorTenant[idAlvo].filter((c) => c.id !== id);
-          }
+          const listaExistente = novasPorTenant[idAlvo];
+          const listaAtual = listaExistente && listaExistente.length > 0
+            ? listaExistente
+            : getCategoriasPadrao(idAlvo);
+
+          novasPorTenant[idAlvo] = listaAtual.filter((c) => c.id !== id);
 
           return {
             categoriasPorTenant: novasPorTenant,
           };
         });
         supabaseService.removerCategoria(id);
+      },
+
+      restaurarCategoriasPadrao: (tenantId: string) => {
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) return;
+        const padroes = getCategoriasPadrao(idAlvo);
+        set((state) => ({
+          categoriasPorTenant: {
+            ...state.categoriasPorTenant,
+            [idAlvo]: padroes,
+          },
+        }));
+        padroes.forEach((cat) => supabaseService.salvarCategoria(cat, idAlvo));
       },
     }),
     {

@@ -26,6 +26,7 @@ export type PerfilUsuario = CargoUsuario;
 
 export interface Categoria {
   id: string;
+  tenantId?: string;
   nome: string;
   icone?: string;
   cor?: string;

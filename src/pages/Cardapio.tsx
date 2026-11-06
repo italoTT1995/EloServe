@@ -63,15 +63,16 @@ const FOTOS_SUGERIDAS = [
 ];
 
 export default function Cardapio() {
-  const { tenantAtivoId, getTenantAtivo, tenants } = useSaaSStore();
+  const { tenantAtivoId, getTenantAtivo, tenants, selecionarTenant } = useSaaSStore();
   const { usuarioLogado } = useAuthStore();
+  const isSuperAdmin = usuarioLogado?.cargo === 'super_admin';
   const idLoja =
     usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global' && usuarioLogado.tenantId !== 'tenant-01'
       ? usuarioLogado.tenantId
       : tenantAtivoId && tenantAtivoId !== 'global' && tenantAtivoId !== 'tenant-01'
       ? tenantAtivoId
       : tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
-  const tenantAtual = getTenantAtivo();
+  const tenantAtual = tenants.find((t) => t.id === idLoja) || getTenantAtivo();
   const { tema } = useThemeStore();
   const isWhite = tema === 'light';
 
@@ -85,6 +86,7 @@ export default function Cardapio() {
     alternarDisponibilidade,
     adicionarCategoria,
     removerCategoria,
+    restaurarCategoriasPadrao,
   } = useProductStore();
 
   const { getItensPorTenant, salvarFichaTecnica } = useEstoqueStore();
@@ -318,16 +320,20 @@ export default function Cardapio() {
   }
 
   // Abertura do Modal de Novo Produto
-  function abrirNovoProduto() {
+  function abrirNovoProduto(categoriaIdPre?: string) {
+    const catPadrao = categoriaIdPre || categorias[0]?.id || '';
+    const catObj = categorias.find((c) => c.id === catPadrao);
+    const isBebida = catObj?.nome.toLowerCase().includes('bebida') || catObj?.nome.toLowerCase().includes('drink');
+
     setProdutoEditando(null);
     setFormProduto({
       nome: '',
-      categoriaId: categorias[0]?.id || '',
+      categoriaId: catPadrao,
       descricao: '',
       precoVenda: '',
       precoCusto: '',
       fotoUrl: '',
-      setorPreparo: 'cozinha',
+      setorPreparo: isBebida ? 'bar' : 'cozinha',
       destaque: false,
       itemEstoqueId: '',
       fichaTecnica: [],
@@ -345,8 +351,8 @@ export default function Cardapio() {
       nome: prod.nome,
       categoriaId: prod.categoriaId,
       descricao: prod.descricao || '',
-      precoVenda: prod.precoVenda.toString(),
-      precoCusto: (prod.precoCusto || 0).toString(),
+      precoVenda: prod.precoVenda.toString().replace('.', ','),
+      precoCusto: prod.precoCusto ? prod.precoCusto.toString().replace('.', ',') : '',
       fotoUrl: prod.fotoUrl || '',
       setorPreparo: prod.setorPreparo,
       destaque: !!prod.destaque,
@@ -496,119 +502,148 @@ export default function Cardapio() {
 
   function salvarProduto(e: React.FormEvent) {
     e.preventDefault();
-    if (!formProduto.nome.trim() || !formProduto.precoVenda) return;
 
-    const precoVendaNum = parseFloat(formProduto.precoVenda);
-    const precoCustoNum = parseFloat(formProduto.precoCusto) || custoTotalFicha || 0;
-
-    if (produtoEditando) {
-      editarProduto(
-        produtoEditando.id,
-        {
-          nome: formProduto.nome.trim(),
-          categoriaId: formProduto.categoriaId,
-          descricao: formProduto.descricao.trim(),
-          precoVenda: precoVendaNum,
-          precoCusto: precoCustoNum,
-          fotoUrl: formProduto.fotoUrl.trim(),
-          setorPreparo: formProduto.setorPreparo,
-          destaque: formProduto.destaque,
-          itemEstoqueId: formProduto.itemEstoqueId ? formProduto.itemEstoqueId : undefined,
-          fichaTecnica: formProduto.fichaTecnica,
-        },
-        idLoja
-      );
-
-      // Sincroniza também com o módulo de estoque se houver ingredientes
-      if (formProduto.fichaTecnica.length > 0) {
-        salvarFichaTecnica({
-          id: `ft-${produtoEditando.id}`,
-          tenantId: idLoja,
-          produtoId: produtoEditando.id,
-          nomePrato: formProduto.nome.trim(),
-          componentes: formProduto.fichaTecnica.map((ing) => {
-            const itemEst = itensEstoque.find((i) => i.id === ing.ingredienteId);
-            const custoPorGrama = itemEst
-              ? itemEst.precoCusto / (itemEst.unidadeMedida === 'kg' ? 1000 : 1)
-              : 0;
-            return {
-              ingredienteId: ing.ingredienteId,
-              ingredienteNome: ing.ingredienteNome,
-              pesoGramas: ing.quantidade,
-              custoPorGrama,
-              custoTotalComponente: ing.custoUnitarioEstimado || 0,
-            };
-          }),
-          custoTotalEstimado: custoTotalFicha,
-          precoVenda: precoVendaNum,
-          margemBrutaPercentual:
-            precoVendaNum > 0
-              ? Number((((precoVendaNum - custoTotalFicha) / precoVendaNum) * 100).toFixed(1))
-              : 0,
-        });
-      }
-
-      exibirToast(`Produto "${formProduto.nome}" atualizado com sucesso!`);
-    } else {
-      const novoProduto = adicionarProduto(
-        {
-          nome: formProduto.nome.trim(),
-          categoriaId: formProduto.categoriaId || categorias[0]?.id || 'c1',
-          descricao: formProduto.descricao.trim(),
-          precoVenda: precoVendaNum,
-          precoCusto: precoCustoNum,
-          fotoUrl: formProduto.fotoUrl.trim(),
-          setorPreparo: formProduto.setorPreparo,
-          disponivel: true,
-          destaque: formProduto.destaque,
-          itemEstoqueId: formProduto.itemEstoqueId ? formProduto.itemEstoqueId : undefined,
-          fichaTecnica: formProduto.fichaTecnica,
-        },
-        idLoja
-      );
-
-      if (formProduto.fichaTecnica.length > 0) {
-        salvarFichaTecnica({
-          id: `ft-${novoProduto.id}`,
-          tenantId: idLoja,
-          produtoId: novoProduto.id,
-          nomePrato: novoProduto.nome,
-          componentes: formProduto.fichaTecnica.map((ing) => {
-            const itemEst = itensEstoque.find((i) => i.id === ing.ingredienteId);
-            const custoPorGrama = itemEst
-              ? itemEst.precoCusto / (itemEst.unidadeMedida === 'kg' ? 1000 : 1)
-              : 0;
-            return {
-              ingredienteId: ing.ingredienteId,
-              ingredienteNome: ing.ingredienteNome,
-              pesoGramas: ing.quantidade,
-              custoPorGrama,
-              custoTotalComponente: ing.custoUnitarioEstimado || 0,
-            };
-          }),
-          custoTotalEstimado: custoTotalFicha,
-          precoVenda: precoVendaNum,
-          margemBrutaPercentual:
-            precoVendaNum > 0
-              ? Number((((precoVendaNum - custoTotalFicha) / precoVendaNum) * 100).toFixed(1))
-              : 0,
-        });
-      }
-
-      exibirToast(`Item "${formProduto.nome}" cadastrado com sucesso!`);
+    const nome = formProduto.nome.trim();
+    if (!nome) {
+      exibirToast('Por favor, informe o nome do item.');
+      return;
     }
 
-    setModalProdutoAberto(false);
+    if (!idLoja) {
+      exibirToast('Nenhum estabelecimento ativo selecionado.');
+      return;
+    }
+
+    const catId = formProduto.categoriaId || categorias[0]?.id;
+    if (!catId) {
+      exibirToast('Cadastre ao menos uma categoria antes de adicionar itens.');
+      return;
+    }
+
+    const precoVendaRaw = String(formProduto.precoVenda).replace(',', '.').trim();
+    const precoVendaNum = parseFloat(precoVendaRaw);
+    if (isNaN(precoVendaNum) || precoVendaNum <= 0) {
+      exibirToast('Informe um preço de venda válido maior que zero (ex: 25,00).');
+      return;
+    }
+
+    const precoCustoRaw = formProduto.precoCusto ? String(formProduto.precoCusto).replace(',', '.').trim() : '';
+    const precoCustoNum = !isNaN(parseFloat(precoCustoRaw)) ? parseFloat(precoCustoRaw) : (custoTotalFicha || 0);
+
+    try {
+      if (produtoEditando) {
+        editarProduto(
+          produtoEditando.id,
+          {
+            nome,
+            categoriaId: catId,
+            descricao: formProduto.descricao.trim(),
+            precoVenda: precoVendaNum,
+            precoCusto: precoCustoNum,
+            fotoUrl: formProduto.fotoUrl.trim(),
+            setorPreparo: formProduto.setorPreparo,
+            destaque: formProduto.destaque,
+            itemEstoqueId: formProduto.itemEstoqueId ? formProduto.itemEstoqueId : undefined,
+            fichaTecnica: formProduto.fichaTecnica,
+          },
+          idLoja
+        );
+
+        if (formProduto.fichaTecnica.length > 0) {
+          salvarFichaTecnica({
+            id: `ft-${produtoEditando.id}`,
+            tenantId: idLoja,
+            produtoId: produtoEditando.id,
+            nomePrato: nome,
+            componentes: formProduto.fichaTecnica.map((ing) => {
+              const itemEst = itensEstoque.find((i) => i.id === ing.ingredienteId);
+              const custoPorGrama = itemEst
+                ? itemEst.precoCusto / (itemEst.unidadeMedida === 'kg' ? 1000 : 1)
+                : 0;
+              return {
+                ingredienteId: ing.ingredienteId,
+                ingredienteNome: ing.ingredienteNome,
+                pesoGramas: ing.quantidade,
+                custoPorGrama,
+                custoTotalComponente: ing.custoUnitarioEstimado || 0,
+              };
+            }),
+            custoTotalEstimado: custoTotalFicha,
+            precoVenda: precoVendaNum,
+            margemBrutaPercentual:
+              precoVendaNum > 0
+                ? Number((((precoVendaNum - custoTotalFicha) / precoVendaNum) * 100).toFixed(1))
+                : 0,
+          });
+        }
+
+        exibirToast(`Produto "${nome}" atualizado com sucesso!`);
+      } else {
+        const novoProduto = adicionarProduto(
+          {
+            nome,
+            categoriaId: catId,
+            descricao: formProduto.descricao.trim(),
+            precoVenda: precoVendaNum,
+            precoCusto: precoCustoNum,
+            fotoUrl: formProduto.fotoUrl.trim(),
+            setorPreparo: formProduto.setorPreparo,
+            disponivel: true,
+            destaque: formProduto.destaque,
+            itemEstoqueId: formProduto.itemEstoqueId ? formProduto.itemEstoqueId : undefined,
+            fichaTecnica: formProduto.fichaTecnica,
+          },
+          idLoja
+        );
+
+        if (formProduto.fichaTecnica.length > 0) {
+          salvarFichaTecnica({
+            id: `ft-${novoProduto.id}`,
+            tenantId: idLoja,
+            produtoId: novoProduto.id,
+            nomePrato: novoProduto.nome,
+            componentes: formProduto.fichaTecnica.map((ing) => {
+              const itemEst = itensEstoque.find((i) => i.id === ing.ingredienteId);
+              const custoPorGrama = itemEst
+                ? itemEst.precoCusto / (itemEst.unidadeMedida === 'kg' ? 1000 : 1)
+                : 0;
+              return {
+                ingredienteId: ing.ingredienteId,
+                ingredienteNome: ing.ingredienteNome,
+                pesoGramas: ing.quantidade,
+                custoPorGrama,
+                custoTotalComponente: ing.custoUnitarioEstimado || 0,
+              };
+            }),
+            custoTotalEstimado: custoTotalFicha,
+            precoVenda: precoVendaNum,
+            margemBrutaPercentual:
+              precoVendaNum > 0
+                ? Number((((precoVendaNum - custoTotalFicha) / precoVendaNum) * 100).toFixed(1))
+                : 0,
+          });
+        }
+
+        exibirToast(`Item "${nome}" cadastrado com sucesso!`);
+      }
+
+      setModalProdutoAberto(false);
+    } catch (err: any) {
+      console.error('Erro ao salvar produto:', err);
+      exibirToast('Erro ao salvar item: ' + (err?.message || 'Verifique os dados informados.'));
+    }
   }
 
   function salvarNovoPreco(e: React.FormEvent) {
     e.preventDefault();
     if (!produtoAjustePreco || !novoPrecoInput) return;
-    const preco = parseFloat(novoPrecoInput);
+    const preco = parseFloat(novoPrecoInput.replace(',', '.'));
     if (!isNaN(preco) && preco >= 0) {
       atualizarPreco(produtoAjustePreco.id, preco, idLoja);
-      exibirToast(`Preço de "${produtoAjustePreco.nome}" atualizado para R$ ${preco.toFixed(2)}`);
+      exibirToast(`Preço de "${produtoAjustePreco.nome}" atualizado para R$ ${preco.toFixed(2).replace('.', ',')}`);
       setModalPrecoAberto(false);
+    } else {
+      exibirToast('Informe um preço válido.');
     }
   }
 
@@ -638,8 +673,8 @@ export default function Cardapio() {
 
       {/* TOP HEADER: CARDÁPIO (Modelo Exato do Print) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        {/* Título + Botões de Link / Compartilhar */}
-        <div className="flex items-center gap-2.5">
+        {/* Título + Botões de Link / Compartilhar + Contexto do Estabelecimento */}
+        <div className="flex flex-wrap items-center gap-2.5">
           <h1 className={`text-2xl font-black tracking-tight ${isWhite ? 'text-slate-900' : 'text-white'}`}>
             Cardápio
           </h1>
@@ -667,6 +702,30 @@ export default function Cardapio() {
           >
             <Copy className="w-4 h-4" />
           </button>
+
+          {/* Identificação / Seletor do Restaurante */}
+          {isSuperAdmin ? (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400">
+              <span className="text-[11px] font-bold">Loja:</span>
+              <select
+                value={idLoja}
+                onChange={(e) => selecionarTenant(e.target.value)}
+                className="bg-transparent text-xs font-bold focus:outline-none cursor-pointer text-white"
+              >
+                {tenants.filter((t) => t.id !== 'global' && t.id !== 'tenant-01').map((t) => (
+                  <option key={t.id} value={t.id} className="bg-slate-900 text-white">
+                    {t.nomeFantasia || t.razaoSocial}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
+              isWhite ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-slate-900 border-slate-800 text-slate-300'
+            }`}>
+              {tenantAtual?.nomeFantasia || tenantAtual?.razaoSocial || 'Restaurante'}
+            </span>
+          )}
         </div>
 
         {/* Botões de Ação Topo Direito (Categorias, Acréscimos, Importar Planilha, + Novo Produto) */}
@@ -712,7 +771,7 @@ export default function Cardapio() {
 
           <button
             type="button"
-            onClick={abrirNovoProduto}
+            onClick={() => abrirNovoProduto()}
             className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs shadow-lg shadow-orange-500/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
             <Plus className="w-4 h-4" />
@@ -891,6 +950,35 @@ export default function Cardapio() {
         }`}
       >
         <div className="flex gap-4 min-w-max p-1">
+          {/* Se não houver categorias cadastradas, exibir convite de início */}
+          {categorias.length === 0 && (
+            <div className={`p-8 rounded-3xl border border-dashed text-center max-w-md my-4 space-y-3 ${
+              isWhite ? 'bg-white border-slate-300 text-slate-700' : 'bg-[#141416] border-slate-800 text-slate-300'
+            }`}>
+              <UtensilsCrossed className="w-10 h-10 mx-auto text-orange-500" />
+              <h3 className="font-extrabold text-base">Nenhuma categoria criada ainda</h3>
+              <p className="text-xs text-slate-400">
+                Comece criando categorias como "Pratos", "Bebidas" e "Sobremesas" ou carregue as categorias padrão com um clique.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => restaurarCategoriasPadrao(idLoja)}
+                  className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-md cursor-pointer"
+                >
+                  Carregar Categorias Padrão
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalCategoriasAberto(true)}
+                  className="px-4 py-2 rounded-xl border text-xs font-bold hover:bg-slate-800 cursor-pointer"
+                >
+                  + Nova Categoria
+                </button>
+              </div>
+            </div>
+          )}
+
           {(categoriaFiltro === 'todas'
             ? categorias
             : categorias.filter((c) => c.id === categoriaFiltro)
@@ -914,14 +1002,24 @@ export default function Cardapio() {
               >
                 {/* Cabeçalho da Coluna de Categoria */}
                 <div className="flex items-center justify-between pb-1 px-1">
-                  <h3 className={`font-black text-sm tracking-tight ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                    {cat.nome}
-                  </h3>
-                  <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                    isWhite ? 'bg-slate-200 text-slate-700' : 'bg-[#141416] text-slate-400 border border-slate-800'
-                  }`}>
-                    {itensDestaCategoria.length}
-                  </span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <h3 className={`font-black text-sm tracking-tight truncate ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                      {cat.nome}
+                    </h3>
+                    <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                      isWhite ? 'bg-slate-200 text-slate-700' : 'bg-[#141416] text-slate-400 border border-slate-800'
+                    }`}>
+                      {itensDestaCategoria.length}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => abrirNovoProduto(cat.id)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 transition-colors cursor-pointer"
+                    title={`Adicionar item em ${cat.nome}`}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
 
                 {/* Feedback Visual de Drop Alvo quando arrastando produto */}
@@ -934,10 +1032,18 @@ export default function Cardapio() {
                 {/* Lista de Cards da Coluna */}
                 <div className="space-y-2.5">
                   {itensDestaCategoria.length === 0 ? (
-                    <div className={`p-6 rounded-2xl border text-center text-xs ${
-                      isWhite ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-[#0e0e10]/60 border-slate-800/60 text-slate-600'
+                    <div className={`p-5 rounded-2xl border border-dashed text-center space-y-2 text-xs ${
+                      isWhite ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-[#0e0e10]/60 border-slate-800/60 text-slate-500'
                     }`}>
-                      Nenhum item nesta categoria. Arraste pratos para cá!
+                      <p>Nenhum item em {cat.nome}.</p>
+                      <button
+                        type="button"
+                        onClick={() => abrirNovoProduto(cat.id)}
+                        className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Cadastrar 1º Item</span>
+                      </button>
                     </div>
                   ) : (
                     itensDestaCategoria.map((prod) => {
@@ -1149,10 +1255,40 @@ export default function Cardapio() {
                       );
                     })
                   )}
+
+                  {itensDestaCategoria.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => abrirNovoProduto(cat.id)}
+                      className={`w-full py-2 px-3 rounded-xl border border-dashed text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        isWhite
+                          ? 'border-orange-200 hover:border-orange-500 bg-orange-50/40 hover:bg-orange-100 text-orange-900'
+                          : 'border-orange-500/30 hover:border-orange-500 bg-orange-500/5 hover:bg-orange-500/15 text-orange-400'
+                      }`}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Adicionar item em {cat.nome}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })}
+
+          {/* Botão rápido para criar nova categoria no final do quadro */}
+          <button
+            type="button"
+            onClick={() => setModalCategoriasAberto(true)}
+            className={`w-72 shrink-0 flex flex-col items-center justify-center p-6 rounded-3xl border-2 border-dashed transition-all cursor-pointer group min-h-[160px] ${
+              isWhite
+                ? 'border-slate-300 hover:border-orange-500 bg-slate-50/50 hover:bg-orange-50/50 text-slate-500 hover:text-orange-600'
+                : 'border-slate-800 hover:border-orange-500 bg-[#141416]/30 hover:bg-orange-500/5 text-slate-500 hover:text-orange-400'
+            }`}
+          >
+            <PlusCircle className="w-8 h-8 mb-2 group-hover:scale-110 transition-transform text-orange-500" />
+            <span className="font-bold text-xs">+ Nova Categoria</span>
+            <span className="text-[11px] opacity-70">Ex: Lanches, Pizzas, Sobremesas</span>
+          </button>
         </div>
       </div>
 
@@ -1418,9 +1554,18 @@ export default function Cardapio() {
               {/* Categoria & Setor KDS */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={`font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
-                    Categoria *
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`font-bold block ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                      Categoria *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setModalCategoriasAberto(true)}
+                      className="text-[10px] text-orange-500 hover:underline font-bold cursor-pointer"
+                    >
+                      + Nova
+                    </button>
+                  </div>
                   <select
                     value={formProduto.categoriaId}
                     onChange={(e) => setFormProduto({ ...formProduto, categoriaId: e.target.value })}
@@ -1472,12 +1617,12 @@ export default function Cardapio() {
                   <div className="relative">
                     <DollarSign className="w-4 h-4 text-orange-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       required
                       value={formProduto.precoVenda}
                       onChange={(e) => setFormProduto({ ...formProduto, precoVenda: e.target.value })}
-                      placeholder="0.00"
+                      placeholder="0,00"
                       className={`w-full pl-9 pr-3.5 py-2.5 rounded-xl font-mono text-xs border focus:outline-none focus:border-orange-500 ${
                         isWhite
                           ? 'bg-slate-50 border-slate-200 text-slate-900'
@@ -1494,11 +1639,11 @@ export default function Cardapio() {
                   <div className="relative">
                     <DollarSign className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={formProduto.precoCusto}
                       onChange={(e) => setFormProduto({ ...formProduto, precoCusto: e.target.value })}
-                      placeholder="0.00"
+                      placeholder="0,00"
                       className={`w-full pl-9 pr-3.5 py-2.5 rounded-xl font-mono text-xs border focus:outline-none focus:border-orange-500 ${
                         isWhite
                           ? 'bg-slate-50 border-slate-200 text-slate-900'
