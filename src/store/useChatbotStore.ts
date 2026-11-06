@@ -63,9 +63,9 @@ const CONFIG_PADRAO: Omit<ConfiguracaoChatbotTenant, 'tenantId'> = {
   provedorIA: 'gemini',
   apiKeyIA: '',
   nomeRobo: 'EloBot Atendente',
-  statusConexao: 'conectado',
-  numeroConectado: '+55 (31) 99928-4873',
-  bateriaCelular: 92,
+  statusConexao: 'desconectado',
+  numeroConectado: undefined,
+  bateriaCelular: undefined,
   mensagemBoasVindas:
     'Olá! Seja muito bem-vindo! 🍔\nEu sou o atendente virtual inteligente. Como posso te ajudar hoje?\n\nVocê pode pedir diretamente pelo nosso cardápio digital ou me dizer por aqui mesmo o que você gostaria de comer!',
   mensagemForaHorario:
@@ -79,21 +79,23 @@ const CONFIG_PADRAO: Omit<ConfiguracaoChatbotTenant, 'tenantId'> = {
   enviarLinkCardapioAutomatico: true,
   tempoMedioEntregaMin: 40,
   taxaEntregaPadrao: 7.0,
-  chavePix: '59.474.915/0001-81',
+  chavePix: '',
   tipoChavePix: 'cnpj',
   formasPagamento: ['pix', 'cartao_credito', 'cartao_debito', 'dinheiro'],
   horarioAbertura: '18:00',
   horarioFechamento: '23:30',
   diasFuncionamento: ['ter', 'qua', 'qui', 'sex', 'sab', 'dom'],
   palavrasChaveTransbordo: ['atendente', 'humano', 'falar com humano', 'ajuda', 'reclamação', 'garçom', 'moça'],
-  totalConversas: 142,
-  pedidosGerados: 38,
-  tempoEconomizadoHoras: 19.5,
+  totalConversas: 0,
+  pedidosGerados: 0,
+  tempoEconomizadoHoras: 0,
 };
 
 interface ChatbotState {
   configuracoes: Record<string, ConfiguracaoChatbotTenant>;
   mensagensSimulador: MensagemSimulador[];
+  mensagensPorTenant: Record<string, MensagemSimulador[]>;
+  getMensagensSimulador: (tenantId: string) => MensagemSimulador[];
   estaDigitandoSimulador: boolean;
   transbordoAtivo: boolean;
 
@@ -115,17 +117,46 @@ export const useChatbotStore = create<ChatbotState>()(
     (set, get) => ({
       configuracoes: {},
       mensagensSimulador: [],
+      mensagensPorTenant: {},
       estaDigitandoSimulador: false,
       transbordoAtivo: false,
+
+      getMensagensSimulador: (tenantId: string) => {
+        const { mensagensPorTenant } = get();
+        if (mensagensPorTenant && mensagensPorTenant[tenantId] && mensagensPorTenant[tenantId].length > 0) {
+          return mensagensPorTenant[tenantId];
+        }
+        const config = get().getConfig(tenantId);
+        const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const mensagemInicial: MensagemSimulador = {
+          id: `msg-init-${tenantId}`,
+          remetente: 'bot',
+          texto: config.mensagemBoasVindas,
+          horario: agora,
+          status: 'lido',
+          linkCardapio: `${window.location.origin}/cardapio/${tenantId}`,
+        };
+        return [mensagemInicial];
+      },
 
       getConfig: (tenantId: string) => {
         const { configuracoes } = get();
         if (configuracoes[tenantId]) {
-          return configuracoes[tenantId];
+          const cfg = configuracoes[tenantId];
+          // Remove número de teste legado caso presente no localStorage
+          if (cfg.numeroConectado === '+55 (31) 99928-4873') {
+            cfg.numeroConectado = undefined;
+            cfg.statusConexao = 'desconectado';
+            cfg.bateriaCelular = undefined;
+          }
+          return cfg;
         }
         const nova: ConfiguracaoChatbotTenant = {
           ...CONFIG_PADRAO,
           tenantId,
+          statusConexao: 'desconectado',
+          numeroConectado: undefined,
+          bateriaCelular: undefined,
         };
         set((state) => ({
           configuracoes: { ...state.configuracoes, [tenantId]: nova },
@@ -180,10 +211,12 @@ export const useChatbotStore = create<ChatbotState>()(
         });
       },
 
-      simularConexaoSucesso: (tenantId, numero = '+55 (31) 99928-4873') => {
+      simularConexaoSucesso: (tenantId, numero) => {
+        const config = get().getConfig(tenantId);
+        const numeroFinal = numero || config.numeroConectado || '';
         get().atualizarConfig(tenantId, {
           statusConexao: 'conectado',
-          numeroConectado: numero,
+          numeroConectado: numeroFinal || undefined,
           qrCodeBase64: undefined,
           bateriaCelular: 95,
         });
@@ -200,7 +233,14 @@ export const useChatbotStore = create<ChatbotState>()(
           status: 'lido',
           linkCardapio: `${window.location.origin}/cardapio/${tenantId}`,
         };
-        set({ mensagensSimulador: [mensagemInicial], transbordoAtivo: false });
+        set((state) => ({
+          mensagensPorTenant: {
+            ...state.mensagensPorTenant,
+            [tenantId]: [mensagemInicial],
+          },
+          mensagensSimulador: [mensagemInicial],
+          transbordoAtivo: false,
+        }));
       },
 
       enviarMensagemSimulador: async (tenantId, textoCliente) => {
@@ -213,10 +253,18 @@ export const useChatbotStore = create<ChatbotState>()(
           status: 'lido',
         };
 
-        set((s) => ({
-          mensagensSimulador: [...s.mensagensSimulador, msgCliente],
-          estaDigitandoSimulador: true,
-        }));
+        set((s) => {
+          const listaAtual = s.mensagensPorTenant?.[tenantId] || s.getMensagensSimulador(tenantId);
+          const novaLista = [...listaAtual, msgCliente];
+          return {
+            mensagensPorTenant: {
+              ...s.mensagensPorTenant,
+              [tenantId]: novaLista,
+            },
+            mensagensSimulador: novaLista,
+            estaDigitandoSimulador: true,
+          };
+        });
 
         const config = get().getConfig(tenantId);
         const textoLower = textoCliente.toLowerCase();
@@ -344,10 +392,18 @@ export const useChatbotStore = create<ChatbotState>()(
             pedidoRascunho: rascunho,
           };
 
-          set((s) => ({
-            mensagensSimulador: [...s.mensagensSimulador, respostaBot],
-            estaDigitandoSimulador: false,
-          }));
+          set((s) => {
+            const listaAtual = s.mensagensPorTenant?.[tenantId] || s.getMensagensSimulador(tenantId);
+            const novaLista = [...listaAtual, respostaBot];
+            return {
+              mensagensPorTenant: {
+                ...s.mensagensPorTenant,
+                [tenantId]: novaLista,
+              },
+              mensagensSimulador: novaLista,
+              estaDigitandoSimulador: false,
+            };
+          });
         }, 1100);
       },
 
@@ -362,7 +418,7 @@ export const useChatbotStore = create<ChatbotState>()(
           numero: Math.floor(100 + Math.random() * 900),
           tipo: 'delivery' as const,
           clienteNome: 'Cliente WhatsApp (Simulação)',
-          clienteTelefone: config.numeroConectado || '(31) 99928-4873',
+          clienteTelefone: config.numeroConectado || '',
           status: 'pendente' as const,
           statusKDS: 'novo' as const,
           itens: rascunho.itens.map((it, idx) => ({
@@ -431,7 +487,7 @@ export const useChatbotStore = create<ChatbotState>()(
       },
     }),
     {
-      name: 'eloserve-chatbot-store',
+      name: 'eloserve-chatbot-store-v3',
     }
   )
 );

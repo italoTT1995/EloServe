@@ -33,13 +33,19 @@ import { useProductStore } from '../store/useProductStore';
 import { useThemeStore } from '../store/useThemeStore';
 
 export default function ChatbotWhatsApp() {
-  const { tenantAtivoId, getTenantAtivo, isWhatsAppIALiberado, alternarWhatsAppIA } = useSaaSStore();
+  const { tenantAtivoId, getTenantAtivo, tenants, selecionarTenant, isWhatsAppIALiberado, alternarWhatsAppIA, atualizarDadosTenant } = useSaaSStore();
   const { usuarioLogado } = useAuthStore();
   const { tema } = useThemeStore();
   const isWhite = tema === 'light';
 
-  const tenantAtual = getTenantAtivo();
-  const tenantId = tenantAtivoId === 'global' ? 'tenant-8038' : tenantAtivoId;
+  const idLoja =
+    usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global' && usuarioLogado.tenantId !== 'tenant-01'
+      ? usuarioLogado.tenantId
+      : tenantAtivoId && tenantAtivoId !== 'global' && tenantAtivoId !== 'tenant-01'
+      ? tenantAtivoId
+      : tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
+  const tenantAtual = tenants.find((t) => t.id === idLoja) || getTenantAtivo();
+  const tenantId = idLoja;
   const isLiberado = isWhatsAppIALiberado(tenantId);
   const isMaster = usuarioLogado?.cargo === 'super_admin';
 
@@ -49,7 +55,7 @@ export default function ChatbotWhatsApp() {
     gerarQRCodeConexao,
     desconectarWhatsApp,
     simularConexaoSucesso,
-    mensagensSimulador,
+    getMensagensSimulador,
     estaDigitandoSimulador,
     enviarMensagemSimulador,
     confirmarPedidoSimulador,
@@ -58,13 +64,31 @@ export default function ChatbotWhatsApp() {
   } = useChatbotStore();
 
   const config = getConfig(tenantId);
+  const mensagensSimulador = getMensagensSimulador(tenantId);
 
   // Estados locais das abas e inputs
   const [abaAtiva, setAbaAtiva] = useState<'robo' | 'cardapio' | 'delivery' | 'transbordo' | 'conexao'>('robo');
   const [textoInputSimulador, setTextoInputSimulador] = useState('');
+  const [numeroManualInput, setNumeroManualInput] = useState('');
+  const [erroNumero, setErroNumero] = useState<string | null>(null);
   const [copiadoLink, setCopiadoLink] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [sucessoSalvar, setSucessoSalvar] = useState(false);
+
+  function handleVincularNumeroManual() {
+    const limpo = numeroManualInput.trim();
+    if (!limpo || limpo.length < 8) {
+      setErroNumero('Informe um número válido com DDD (ex: (31) 98765-4321).');
+      return;
+    }
+    setErroNumero(null);
+    simularConexaoSucesso(tenantId, limpo);
+    atualizarDadosTenant(tenantId, {
+      telefoneWhatsApp: limpo,
+      instanciaWhatsAppConectada: true,
+    });
+    setNumeroManualInput('');
+  }
 
   const fimChatRef = useRef<HTMLDivElement>(null);
 
@@ -227,9 +251,27 @@ export default function ChatbotWhatsApp() {
                 Anota AI Style
               </span>
             </div>
-            <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-              Restaurante ativo: <strong className={isWhite ? 'text-slate-800' : 'text-slate-200'}>{tenantAtual.nomeFantasia}</strong> • Automação de Pedidos 24h
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <span className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                Restaurante ativo: <strong className={isWhite ? 'text-slate-800' : 'text-slate-200'}>{tenantAtual?.nomeFantasia || 'Restaurante'}</strong> • Automação de Pedidos 24h
+              </span>
+              {isMaster && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 ml-1">
+                  <span className="text-[10px] font-bold">Trocar Loja:</span>
+                  <select
+                    value={tenantId}
+                    onChange={(e) => selecionarTenant(e.target.value)}
+                    className="bg-transparent text-xs font-bold focus:outline-none cursor-pointer text-slate-800 dark:text-white"
+                  >
+                    {tenants.filter((t) => t.id !== 'global' && t.id !== 'tenant-01').map((t) => (
+                      <option key={t.id} value={t.id} className="bg-slate-900 text-white">
+                        {t.nomeFantasia || t.razaoSocial}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -241,7 +283,7 @@ export default function ChatbotWhatsApp() {
               : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
           }`}>
             <span className={`w-2 h-2 rounded-full ${config.statusConexao === 'conectado' ? 'bg-emerald-400 animate-ping' : 'bg-rose-400'}`} />
-            {config.statusConexao === 'conectado' ? (
+            {config.statusConexao === 'conectado' && config.numeroConectado ? (
               <span>Conectado: {config.numeroConectado}</span>
             ) : (
               <span>WhatsApp Desconectado</span>
@@ -702,88 +744,150 @@ export default function ChatbotWhatsApp() {
               </div>
             )}
 
-            {/* ABA 5: CONEXÃO WHATSAPP (QR CODE) */}
+            {/* ABA 5: CONEXÃO WHATSAPP (QR CODE OU NÚMERO MANUAL) */}
             {abaAtiva === 'conexao' && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div>
                   <h3 className={`text-sm font-bold mb-1 ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                    Conexão com o WhatsApp Oficial da Loja
+                    Conexão Individual do WhatsApp • {tenantAtual?.nomeFantasia || 'Restaurante'}
                   </h3>
                   <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Conecte o número do seu restaurante lendo o QR Code no seu WhatsApp (igual ao WhatsApp Web).
+                    Cada restaurante possui sua própria conexão isolada. Nenhum número ou mensagem é compartilhado entre lojas.
                   </p>
                 </div>
 
-                <div className={`p-6 rounded-2xl border text-center ${
+                <div className={`p-6 rounded-2xl border text-center space-y-6 ${
                   isWhite ? 'bg-slate-50 border-slate-200' : 'bg-slate-900 border-slate-800'
                 }`}>
-                  {config.statusConexao === 'conectado' ? (
+                  {config.statusConexao === 'conectado' && config.numeroConectado ? (
                     <div className="space-y-3">
-                      <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-inner">
                         <CheckCheck className="w-8 h-8" />
                       </div>
                       <div className="space-y-1">
                         <h4 className={`font-bold text-sm ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                          Instância WhatsApp Conectada e Online
+                          Instância WhatsApp Vinculada e Online
                         </h4>
-                        <p className="text-xs text-emerald-400 font-mono font-bold">
-                          {config.numeroConectado} • Bateria: {config.bateriaCelular}%
+                        <p className="text-base text-emerald-500 font-mono font-black">
+                          {config.numeroConectado}
                         </p>
                         <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-                          O robô está escutando mensagens 24 horas por dia e enviando pedidos direto para a cozinha KDS.
+                          O robô deste restaurante está escutando mensagens e enviando pedidos diretamente para a cozinha KDS.
                         </p>
                       </div>
 
                       <div className="flex items-center justify-center gap-3 pt-2">
                         <button
                           type="button"
-                          onClick={() => desconectarWhatsApp(tenantId)}
-                          className="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 font-bold text-xs border border-rose-500/30 cursor-pointer"
+                          onClick={() => {
+                            desconectarWhatsApp(tenantId);
+                            atualizarDadosTenant(tenantId, { instanciaWhatsAppConectada: false });
+                          }}
+                          className="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 font-bold text-xs border border-rose-500/30 cursor-pointer transition-all active:scale-95"
                         >
                           Desconectar este Número
                         </button>
                       </div>
                     </div>
-                  ) : config.qrCodeBase64 ? (
-                    <div className="space-y-4">
-                      <div className="p-3 bg-white inline-block rounded-2xl shadow-xl border border-slate-300">
-                        <img src={config.qrCodeBase64} alt="QR Code WhatsApp" className="w-56 h-56 mx-auto" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className={`font-bold text-sm ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                          Abra o WhatsApp no seu Celular
-                        </h4>
-                        <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                          Vá em <strong>Aparelhos Conectados</strong> ➔ <strong>Conectar Aparelho</strong> e aponte a câmera para o QR Code acima.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => simularConexaoSucesso(tenantId)}
-                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-md"
-                      >
-                        ✓ Simular Leitura e Conexão Imediata
-                      </button>
-                    </div>
                   ) : (
-                    <div className="space-y-4 py-4">
-                      <QrCode className="w-14 h-14 mx-auto text-slate-500" />
-                      <div>
+                    <div className="space-y-6">
+                      <div className="space-y-1">
+                        <div className="w-12 h-12 mx-auto rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 mb-2">
+                          <QrCode className="w-6 h-6" />
+                        </div>
                         <h4 className={`font-bold text-sm ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                          Nenhum número conectado no momento
+                          Nenhum número vinculado a este restaurante
                         </h4>
-                        <p className="text-xs text-slate-400">
-                          Clique no botão abaixo para gerar um novo QR Code de autenticação.
+                        <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                          Escolha abaixo como deseja vincular o WhatsApp oficial de {tenantAtual?.nomeFantasia}:
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => gerarQRCodeConexao(tenantId)}
-                        className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        Gerar QR Code de Conexão
-                      </button>
+
+                      {/* Opção 1: Vincular Número do WhatsApp Diretamente */}
+                      <div className={`p-4 rounded-2xl border text-left space-y-3 max-w-md mx-auto ${
+                        isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-950 border-slate-800'
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <div>
+                            <label className={`text-xs font-bold block ${isWhite ? 'text-slate-800' : 'text-slate-200'}`}>
+                              Vincular Número de WhatsApp (Individual da Loja)
+                            </label>
+                            <p className={`text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                              Digite o número com DDD que atenderá os pedidos deste restaurante.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={numeroManualInput}
+                            onChange={(e) => {
+                              setNumeroManualInput(e.target.value);
+                              if (erroNumero) setErroNumero(null);
+                            }}
+                            placeholder="Ex: (31) 98765-4321"
+                            className={`flex-1 px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-emerald-500 ${
+                              isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleVincularNumeroManual}
+                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md cursor-pointer shrink-0 active:scale-95 transition-all"
+                          >
+                            Salvar Número
+                          </button>
+                        </div>
+                        {erroNumero && (
+                          <p className="text-[11px] text-rose-500 font-bold">{erroNumero}</p>
+                        )}
+                      </div>
+
+                      {/* Opção 2: QR Code */}
+                      <div className="pt-2 border-t border-dashed border-slate-700/40">
+                        {config.qrCodeBase64 ? (
+                          <div className="space-y-4 pt-3">
+                            <div className="p-3 bg-white inline-block rounded-2xl shadow-xl border border-slate-300">
+                              <img src={config.qrCodeBase64} alt="QR Code WhatsApp" className="w-56 h-56 mx-auto" />
+                            </div>
+                            <div className="space-y-1">
+                              <h5 className={`font-bold text-xs ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                                Aponte a câmera do WhatsApp para o QR Code acima
+                              </h5>
+                              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                                No celular da loja, abra <strong>Aparelhos Conectados</strong> ➔ <strong>Conectar Aparelho</strong>.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const num = tenantAtual?.telefoneWhatsApp || '(31) 98888-0000';
+                                simularConexaoSucesso(tenantId, num);
+                                atualizarDadosTenant(tenantId, { instanciaWhatsAppConectada: true });
+                              }}
+                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-md"
+                            >
+                              ✓ Confirmar Leitura do QR Code
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 pt-2">
+                            <p className="text-xs text-slate-400">
+                              Ou se preferir, gere um QR Code para conectar direto pelo celular:
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => gerarQRCodeConexao(tenantId)}
+                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-md"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>Gerar QR Code de Conexão</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -818,25 +922,41 @@ export default function ChatbotWhatsApp() {
         <div className="lg:col-span-5">
           <div className="sticky top-6">
             {/* Moldura do Celular */}
-            <div className="w-full max-w-[380px] mx-auto rounded-[36px] p-3.5 bg-slate-950 border-4 border-slate-800 shadow-2xl relative">
+            <div className={`w-full max-w-[380px] mx-auto rounded-[36px] p-3.5 shadow-2xl relative border-4 transition-colors ${
+              isWhite ? 'bg-slate-200 border-slate-300 shadow-slate-300/60' : 'bg-slate-950 border-slate-800'
+            }`}>
               {/* Speaker / Notch */}
-              <div className="w-28 h-4 bg-slate-900 rounded-full mx-auto mb-2 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-slate-950" />
+              <div className={`w-28 h-4 rounded-full mx-auto mb-2 flex items-center justify-center ${
+                isWhite ? 'bg-slate-300' : 'bg-slate-900'
+              }`}>
+                <div className={`w-3 h-3 rounded-full ${isWhite ? 'bg-slate-400' : 'bg-slate-950'}`} />
               </div>
 
-              {/* TELA DO WHATSAPP */}
-              <div className="rounded-[24px] overflow-hidden bg-[#0B141A] flex flex-col h-[560px] border border-slate-900">
+              {/* TELA DO WHATSAPP (Ajustada com Cores Claras e Nítidas no Tema Claro) */}
+              <div className={`rounded-[24px] overflow-hidden flex flex-col h-[560px] border transition-colors ${
+                isWhite
+                  ? 'bg-[#EFEAE2] border-slate-300 text-slate-900'
+                  : 'bg-[#0B141A] border-slate-900 text-white'
+              }`}>
                 {/* Header do WhatsApp */}
-                <div className="bg-[#1F2C34] px-3.5 py-2.5 flex items-center justify-between border-b border-slate-800 text-white">
+                <div className={`px-3.5 py-2.5 flex items-center justify-between border-b text-white ${
+                  isWhite
+                    ? 'bg-[#008069] border-[#00705B]'
+                    : 'bg-[#1F2C34] border-slate-800'
+                }`}>
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center font-bold text-xs shadow-inner">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-inner ${
+                      isWhite ? 'bg-emerald-800 text-white' : 'bg-emerald-600 text-white'
+                    }`}>
                       🍔
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold truncate max-w-[170px] leading-tight">
-                        {tenantAtual.nomeFantasia}
+                      <h4 className="text-xs font-bold truncate max-w-[170px] leading-tight text-white">
+                        {tenantAtual?.nomeFantasia || 'Restaurante'}
                       </h4>
-                      <span className="text-[10px] text-emerald-400 font-medium block">
+                      <span className={`text-[10px] font-medium block ${
+                        isWhite ? 'text-emerald-100' : 'text-emerald-400'
+                      }`}>
                         {estaDigitandoSimulador ? 'digitando...' : 'online'}
                       </span>
                     </div>
@@ -846,7 +966,9 @@ export default function ChatbotWhatsApp() {
                     type="button"
                     onClick={() => limparConversaSimulador(tenantId)}
                     title="Reiniciar conversa de teste"
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 cursor-pointer"
+                    className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                      isWhite ? 'text-emerald-100 hover:text-white hover:bg-emerald-800/40' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                    }`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -854,14 +976,20 @@ export default function ChatbotWhatsApp() {
 
                 {/* Mensagens do Chat (Fundo com padrão WhatsApp) */}
                 <div
-                  className="flex-1 p-3 overflow-y-auto space-y-2.5 text-xs text-white"
+                  className="flex-1 p-3 overflow-y-auto space-y-2.5 text-xs"
                   style={{
-                    backgroundImage: `radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)`,
+                    backgroundImage: isWhite
+                      ? `radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px)`
+                      : `radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)`,
                     backgroundSize: '16px 16px',
                   }}
                 >
                   {/* Aviso do WhatsApp de criptografia */}
-                  <div className="bg-[#182229] border border-amber-500/20 text-amber-200/80 p-2 rounded-lg text-[10px] text-center max-w-[90%] mx-auto leading-tight shadow-sm">
+                  <div className={`p-2 rounded-lg text-[10px] text-center max-w-[90%] mx-auto leading-tight shadow-sm border ${
+                    isWhite
+                      ? 'bg-[#FFF5C4] border-amber-300 text-amber-900 font-medium'
+                      : 'bg-[#182229] border-amber-500/20 text-amber-200/80'
+                  }`}>
                     🔒 Simulação Oficial: As mensagens são processadas pela IA usando o cardápio real do restaurante.
                   </div>
 
@@ -871,36 +999,60 @@ export default function ChatbotWhatsApp() {
                       className={`flex flex-col ${msg.remetente === 'cliente' ? 'items-end' : 'items-start'}`}
                     >
                       <div
-                        className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed shadow-md ${
+                        className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed shadow-sm ${
                           msg.remetente === 'cliente'
-                            ? 'bg-[#005C4B] text-white rounded-tr-none'
+                            ? isWhite
+                              ? 'bg-[#D9FDD3] text-[#111B21] rounded-tr-none border border-emerald-200/60'
+                              : 'bg-[#005C4B] text-white rounded-tr-none'
                             : msg.remetente === 'humano'
-                            ? 'bg-blue-900/90 text-white rounded-tl-none border border-blue-500/30'
-                            : 'bg-[#202C33] text-slate-100 rounded-tl-none'
+                            ? isWhite
+                              ? 'bg-blue-50 text-blue-950 rounded-tl-none border border-blue-200'
+                              : 'bg-blue-900/90 text-white rounded-tl-none border border-blue-500/30'
+                            : isWhite
+                            ? 'bg-white text-[#111B21] rounded-tl-none border border-slate-200/90'
+                            : 'bg-[#202C33] text-white rounded-tl-none'
                         }`}
                       >
                         {/* Nome do emissor se for bot/humano */}
                         {msg.remetente === 'bot' && (
-                          <div className="text-[9.5px] font-extrabold text-emerald-400 mb-0.5 flex items-center gap-1">
+                          <div className={`text-[9.5px] font-extrabold mb-0.5 flex items-center gap-1 ${
+                            isWhite ? 'text-emerald-700' : 'text-emerald-400'
+                          }`}>
                             <Bot className="w-3 h-3" /> {config.nomeRobo}
                           </div>
                         )}
                         {msg.remetente === 'humano' && (
-                          <div className="text-[9.5px] font-extrabold text-blue-300 mb-0.5 flex items-center gap-1">
+                          <div className={`text-[9.5px] font-extrabold mb-0.5 flex items-center gap-1 ${
+                            isWhite ? 'text-blue-700' : 'text-blue-300'
+                          }`}>
                             👤 Atendente Humano
                           </div>
                         )}
 
-                        <div className="whitespace-pre-wrap">{msg.texto}</div>
+                        {/* Texto da mensagem com cor garantida 100% nítida e legível */}
+                        <div
+                          className="whitespace-pre-wrap font-medium"
+                          style={{
+                            color: msg.remetente === 'cliente'
+                              ? isWhite ? '#111B21' : '#FFFFFF'
+                              : isWhite ? '#111B21' : '#F8FAFC',
+                          }}
+                        >
+                          {msg.texto}
+                        </div>
 
                         {/* Botão de Link do Cardápio Interativo (Anota AI Style) */}
                         {msg.linkCardapio && (
-                          <div className="mt-2 pt-2 border-t border-slate-700/60">
+                          <div className={`mt-2 pt-2 border-t ${isWhite ? 'border-slate-200' : 'border-slate-700/60'}`}>
                             <a
                               href={msg.linkCardapio}
                               target="_blank"
                               rel="noreferrer"
-                              className="w-full py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-sm text-center"
+                              className={`w-full py-2 px-3 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-sm text-center transition-all ${
+                                isWhite
+                                  ? 'bg-[#008069] hover:bg-[#00705B] text-white'
+                                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                              }`}
                             >
                               <span>📖 Abrir Cardápio Digital</span>
                               <ExternalLink className="w-3 h-3" />
@@ -910,26 +1062,34 @@ export default function ChatbotWhatsApp() {
 
                         {/* Card de Confirmação de Pedido Rascunho */}
                         {msg.pedidoRascunho && (
-                          <div className="mt-2 p-2 bg-slate-900/80 rounded-xl border border-emerald-500/30 space-y-1.5">
-                            <div className="text-[10px] font-bold text-emerald-400 uppercase">Resumo do Pedido</div>
+                          <div className={`mt-2 p-2.5 rounded-xl border space-y-1.5 ${
+                            isWhite ? 'bg-slate-50 border-emerald-300' : 'bg-slate-900/80 border-emerald-500/30'
+                          }`}>
+                            <div className={`text-[10px] font-bold uppercase ${isWhite ? 'text-emerald-800' : 'text-emerald-400'}`}>
+                              Resumo do Pedido
+                            </div>
                             {msg.pedidoRascunho.itens.map((it, i) => (
-                              <div key={i} className="flex justify-between text-[11px]">
+                              <div key={i} className={`flex justify-between text-[11px] ${isWhite ? 'text-slate-800' : 'text-slate-200'}`}>
                                 <span>{it.quantidade}x {it.nome}</span>
                                 <strong>R$ {(it.quantidade * it.preco).toFixed(2).replace('.', ',')}</strong>
                               </div>
                             ))}
-                            <div className="flex justify-between text-[10px] text-slate-400">
+                            <div className={`flex justify-between text-[10px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                               <span>Taxa de Entrega</span>
                               <span>R$ {msg.pedidoRascunho.taxaEntrega.toFixed(2).replace('.', ',')}</span>
                             </div>
-                            <div className="flex justify-between text-xs font-black text-white pt-1 border-t border-slate-800">
+                            <div className={`flex justify-between text-xs font-black pt-1 border-t ${
+                              isWhite ? 'border-slate-200 text-slate-900' : 'border-slate-800 text-white'
+                            }`}>
                               <span>Total</span>
-                              <span className="text-emerald-400">R$ {msg.pedidoRascunho.total.toFixed(2).replace('.', ',')}</span>
+                              <span className={isWhite ? 'text-emerald-700' : 'text-emerald-400'}>
+                                R$ {msg.pedidoRascunho.total.toFixed(2).replace('.', ',')}
+                              </span>
                             </div>
                             <button
                               type="button"
                               onClick={() => confirmarPedidoSimulador(tenantId, msg.pedidoRascunho!)}
-                              className="w-full mt-1.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[11px] flex items-center justify-center gap-1 shadow-md cursor-pointer transition-transform hover:scale-[1.02]"
+                              className="w-full mt-1.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[11px] flex items-center justify-center gap-1 shadow-md cursor-pointer transition-transform hover:scale-[1.02]"
                             >
                               ✓ Confirmar & Enviar para Cozinha KDS
                             </button>
@@ -937,10 +1097,12 @@ export default function ChatbotWhatsApp() {
                         )}
 
                         {/* Horário e Check Azul */}
-                        <div className="flex items-center justify-end gap-1 mt-1 text-[9px] text-slate-400">
+                        <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${
+                          isWhite ? 'text-slate-500' : 'text-slate-400'
+                        }`}>
                           <span>{msg.horario}</span>
                           {msg.remetente === 'cliente' && (
-                            <CheckCheck className="w-3.5 h-3.5 text-cyan-400" />
+                            <CheckCheck className="w-3.5 h-3.5 text-cyan-500" />
                           )}
                         </div>
                       </div>
@@ -949,10 +1111,12 @@ export default function ChatbotWhatsApp() {
 
                   {/* Indicador de digitando */}
                   {estaDigitandoSimulador && (
-                    <div className="flex items-center gap-1.5 p-2 bg-[#202C33] rounded-2xl rounded-tl-none max-w-[100px] text-slate-400">
-                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" />
-                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:0.2s]" />
-                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+                    <div className={`flex items-center gap-1.5 p-2 rounded-2xl rounded-tl-none max-w-[100px] ${
+                      isWhite ? 'bg-white border border-slate-200 text-slate-600 shadow-sm' : 'bg-[#202C33] text-slate-400'
+                    }`}>
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" />
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.4s]" />
                     </div>
                   )}
 
@@ -962,18 +1126,26 @@ export default function ChatbotWhatsApp() {
                 {/* Campo de Envio de Mensagem */}
                 <form
                   onSubmit={handleEnviarSimulador}
-                  className="bg-[#1F2C34] p-2 flex items-center gap-2 border-t border-slate-800"
+                  className={`p-2 flex items-center gap-2 border-t ${
+                    isWhite ? 'bg-[#F0F2F5] border-slate-200' : 'bg-[#1F2C34] border-slate-800'
+                  }`}
                 >
                   <input
                     type="text"
                     value={textoInputSimulador}
                     onChange={(e) => setTextoInputSimulador(e.target.value)}
                     placeholder="Envie uma mensagem de teste..."
-                    className="flex-1 bg-[#2A3942] text-white placeholder-slate-400 text-xs px-3 py-2 rounded-xl focus:outline-none"
+                    className={`flex-1 text-xs px-3 py-2 rounded-xl focus:outline-none border ${
+                      isWhite
+                        ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'
+                        : 'bg-[#2A3942] border-slate-700 text-white placeholder:text-slate-400'
+                    }`}
                   />
                   <button
                     type="submit"
-                    className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition-colors shadow-md"
+                    className={`p-2 rounded-xl text-white cursor-pointer transition-colors shadow-md ${
+                      isWhite ? 'bg-[#008069] hover:bg-[#00705B]' : 'bg-emerald-600 hover:bg-emerald-500'
+                    }`}
                   >
                     <Send className="w-4 h-4" />
                   </button>
@@ -985,21 +1157,33 @@ export default function ChatbotWhatsApp() {
                 <button
                   type="button"
                   onClick={() => enviarMensagemSimulador(tenantId, 'Olá, qual o cardápio de vocês?')}
-                  className="px-2 py-0.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300 cursor-pointer"
+                  className={`px-2 py-0.5 rounded-full border text-[10px] cursor-pointer transition-colors ${
+                    isWhite
+                      ? 'bg-white hover:bg-slate-100 border-slate-300 text-slate-700 shadow-sm'
+                      : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300'
+                  }`}
                 >
                   "Ver cardápio"
                 </button>
                 <button
                   type="button"
                   onClick={() => enviarMensagemSimulador(tenantId, 'Qual o valor da taxa de entrega?')}
-                  className="px-2 py-0.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300 cursor-pointer"
+                  className={`px-2 py-0.5 rounded-full border text-[10px] cursor-pointer transition-colors ${
+                    isWhite
+                      ? 'bg-white hover:bg-slate-100 border-slate-300 text-slate-700 shadow-sm'
+                      : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300'
+                  }`}
                 >
                   "Taxa de entrega"
                 </button>
                 <button
                   type="button"
                   onClick={() => enviarMensagemSimulador(tenantId, 'Quero falar com atendente')}
-                  className="px-2 py-0.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300 cursor-pointer"
+                  className={`px-2 py-0.5 rounded-full border text-[10px] cursor-pointer transition-colors ${
+                    isWhite
+                      ? 'bg-white hover:bg-slate-100 border-slate-300 text-slate-700 shadow-sm'
+                      : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300'
+                  }`}
                 >
                   "Chamar atendente"
                 </button>
