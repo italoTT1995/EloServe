@@ -740,7 +740,7 @@ export const useSaaSStore = create<SaaSState>()(
       },
     }),
     {
-      name: 'eloserve_saas_store_v7',
+      name: 'eloserve_saas_store_v6',
       partialize: (state) => {
         const { masterDesbloqueado, tentativasFalhasMaster, bloqueadoAte, ...rest } = state;
         return {
@@ -759,6 +759,19 @@ export const useSaaSStore = create<SaaSState>()(
       },
       onRehydrateStorage: () => (state) => {
         if (state) {
+          // Recuperação inteligente caso o navegador tenha salvado em v7
+          if (!state.tenants || state.tenants.length === 0) {
+            try {
+              const rawV7 = typeof window !== 'undefined' ? localStorage.getItem('eloserve_saas_store_v7') : null;
+              if (rawV7) {
+                const parsedV7 = JSON.parse(rawV7);
+                if (parsedV7?.state?.tenants?.length > 0) {
+                  state.tenants = parsedV7.state.tenants;
+                }
+              }
+            } catch (e) {}
+          }
+
           state.tenants = (state.tenants || [])
             .map((t) => (t.id === 'global' ? { ...t, telefoneWhatsApp: t.telefoneWhatsApp === '+55 (31) 97182-6083' ? '' : t.telefoneWhatsApp, documento: t.documento === '45.123.890/0001-12' ? '' : t.documento } : t))
             .filter(

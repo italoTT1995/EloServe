@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Clock,
@@ -33,6 +33,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useWindowFocus } from '../../hooks/useWindowFocus';
 import { BotaoInstalarPWA } from '../common/BotaoInstalarPWA';
+import { TenantRestaurante } from '../../types';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -57,6 +58,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const { caixaAtual } = useAppStore();
   const { getTenantAtivo, tenants, selecionarTenant, tenantAtivoId, getMRR } = useSaaSStore();
   const tenantAtual = getTenantAtivo();
+  const lojasClientes: TenantRestaurante[] = useMemo(() => tenants.filter((t: TenantRestaurante) => t.id !== 'global' && !t.naLixeira), [tenants]);
   const { isFocused } = useWindowFocus();
   const { usuarioLogado, logout, getDescricaoCargo } = useAuthStore();
   const infoCargo = getDescricaoCargo(usuarioLogado?.cargo);
@@ -92,7 +94,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
         {/* Seletor de Loja / Tenant */}
         {isSuperAdmin ? (
-          <div className="relative">
+          <div className="relative flex items-center gap-2">
             <button
               onClick={() => setMenuTenantAberto(!menuTenantAberto)}
               className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
@@ -116,7 +118,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                       </span>
                     </div>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                      {tenants.length === 0 ? '0 Restaurantes' : `${tenants.length} ${tenants.length === 1 ? 'Restaurante' : 'Restaurantes Assinantes'}`}
+                      {lojasClientes.length === 0 ? '0 Restaurantes' : `${lojasClientes.length} ${lojasClientes.length === 1 ? 'Restaurante' : 'Restaurantes Assinantes'}`}
                     </span>
                   </div>
                   <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0 text-slate-400 ml-0.5" />
@@ -149,6 +151,26 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 </>
               )}
             </button>
+
+            {/* Botão de Acesso Rápido para Operar a Loja diretamente */}
+            {isModoGlobal && lojasClientes.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  selecionarTenant(lojasClientes[0].id);
+                  navigate('/painel-dono');
+                }}
+                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                  isWhite
+                    ? 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900'
+                    : 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/40 text-amber-300'
+                }`}
+                title={`Acessar ${lojasClientes[0].nomeFantasia} no modo de gestão do restaurante`}
+              >
+                <Store className="w-3.5 h-3.5 text-amber-500" />
+                <span>Operar {lojasClientes[0].nomeFantasia}</span>
+              </button>
+            )}
 
             {menuTenantAberto && (
               <div className={`absolute left-0 mt-2 w-72 ${
@@ -230,14 +252,14 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 </div>
 
                 <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                  {tenants.length === 0 ? (
+                  {lojasClientes.length === 0 ? (
                     <div className="py-4 px-3 text-center">
                       <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                         Nenhum restaurante cliente cadastrado ainda.
                       </p>
                     </div>
                   ) : (
-                    tenants.map((t) => (
+                    lojasClientes.map((t) => (
                       <button
                         key={t.id}
                         onClick={() => {

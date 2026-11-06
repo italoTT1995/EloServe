@@ -1113,11 +1113,12 @@ export default function SaaSMaster() {
   const totalTrials = getTotalTrials();
   const totalAtrasados = getTotalAtrasados();
 
-  const tenantsNaLixeira = tenants.filter((t) => t.naLixeira);
-  const tenantsAtivos = tenants.filter((t) => !t.naLixeira);
-  const tenantsCancelados = tenants.filter((t) => t.statusAssinatura === 'cancelado' || Boolean(t.naLixeira));
+  const lojasClientes = tenants.filter((t) => t.id !== 'global');
+  const tenantsNaLixeira = lojasClientes.filter((t) => t.naLixeira);
+  const tenantsAtivos = lojasClientes.filter((t) => !t.naLixeira);
+  const tenantsCancelados = lojasClientes.filter((t) => t.statusAssinatura === 'cancelado' || Boolean(t.naLixeira));
 
-  const tenantsFiltrados = tenants.filter((t) => {
+  const tenantsFiltrados = lojasClientes.filter((t) => {
     const matchBusca =
       t.nomeFantasia.toLowerCase().includes(busca.toLowerCase()) ||
       t.responsavelNome.toLowerCase().includes(busca.toLowerCase()) ||
@@ -1215,6 +1216,44 @@ export default function SaaSMaster() {
 
   return (
     <div className="space-y-6 select-none max-w-7xl mx-auto pb-10">
+      {/* Banner de Atalho para o Dono Operar sua Loja */}
+      {lojasClientes.length > 0 && (
+        <div className="p-4 rounded-3xl bg-gradient-to-r from-amber-500/15 via-purple-950/40 to-indigo-950/40 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl shrink-0 shadow-inner">
+              🏪
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 uppercase tracking-wider">
+                  Loja Vinculada
+                </span>
+                <span className="text-xs text-slate-400 font-mono">
+                  {lojasClientes[0].cidadeUf} • {lojasClientes[0].planoId.toUpperCase()}
+                </span>
+              </div>
+              <h3 className="text-base font-black text-white mt-0.5">
+                {lojasClientes[0].nomeFantasia}
+              </h3>
+              <p className="text-xs text-slate-300">
+                Você está no painel do <strong>Franqueador (SaaS Master)</strong>. Deseja gerenciar o <strong>Cardápio, Mesas, PDV e Estoque</strong> desta loja?
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              selecionarTenant(lojasClientes[0].id);
+              navigate('/painel-dono');
+            }}
+            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-transform hover:scale-105 cursor-pointer shrink-0"
+          >
+            <Store className="w-4 h-4" />
+            <span>Operar {lojasClientes[0].nomeFantasia} como Dono</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
       {/* Abas Administrativas do Super Admin */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto scrollbar-none">
         <button
@@ -1260,7 +1299,7 @@ export default function SaaSMaster() {
           }`}
         >
           <Store className="w-4 h-4" />
-          <span>Restaurantes Assinantes ({tenants.length})</span>
+          <span>Restaurantes Assinantes ({lojasClientes.length})</span>
         </button>
 
         <button
