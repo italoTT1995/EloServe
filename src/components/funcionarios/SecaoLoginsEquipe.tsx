@@ -59,7 +59,7 @@ export function SecaoLoginsEquipe({
   const lojasValidas = useMemo(() => tenants.filter((t) => t.id !== 'global' && !t.naLixeira), [tenants]);
   const lojaPadraoId = (tenantId && tenantId !== 'global')
     ? tenantId
-    : ((tenantAtivoId && tenantAtivoId !== 'global') ? tenantAtivoId : (lojasValidas[0]?.id || 'tenant-8038'));
+    : ((tenantAtivoId && tenantAtivoId !== 'global') ? tenantAtivoId : (lojasValidas[0]?.id || ''));
 
   const isMaster = usuarioLogado?.cargo === 'super_admin';
   const isVisaoGlobalMaster = isMaster && tenantId === 'global';
@@ -157,9 +157,9 @@ export function SecaoLoginsEquipe({
       if (isVisaoGlobalMaster) {
         if (filtroTenantId === 'todos') return true;
         if (filtroTenantId === 'global') return u.tenantId === 'global' || u.cargo === 'super_admin';
-        return u.tenantId === filtroTenantId || (filtroTenantId === 'tenant-8038' && u.tenantId === 'tenant-01');
+        return u.tenantId === filtroTenantId;
       }
-      const isDestaLoja = u.tenantId === tenantId || (tenantId === 'tenant-8038' && (!u.tenantId || u.tenantId === 'tenant-01'));
+      const isDestaLoja = u.tenantId === tenantId;
       return isDestaLoja || (isMaster && u.cargo === 'super_admin');
     });
   }, [usuarios, tenantId, isVisaoGlobalMaster, isMaster, filtroTenantId]);

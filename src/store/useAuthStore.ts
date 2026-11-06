@@ -96,7 +96,7 @@ export const useAuthStore = create<AuthState>()(
         if (dados.cargo === 'super_admin') {
           tenantIdFinal = 'global';
         } else if (!tenantIdFinal || tenantIdFinal === 'global' || tenantIdFinal === 'tenant-01') {
-          tenantIdFinal = 'tenant-8038';
+          tenantIdFinal = (dados.tenantId && dados.tenantId !== 'global' && dados.tenantId !== 'tenant-01') ? dados.tenantId : '';
         }
 
         const novo: Usuario = {
@@ -151,7 +151,7 @@ export const useAuthStore = create<AuthState>()(
         if (dados.cargo === 'super_admin') {
           tenantIdFinal = 'global';
         } else if (!tenantIdFinal || tenantIdFinal === 'global' || tenantIdFinal === 'tenant-01') {
-          tenantIdFinal = 'tenant-8038';
+          tenantIdFinal = (dados.tenantId && dados.tenantId !== 'global' && dados.tenantId !== 'tenant-01') ? dados.tenantId : '';
         }
 
         const novoUsuario: Usuario = {

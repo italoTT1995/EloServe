@@ -40,7 +40,7 @@ export default function Funcionarios() {
   const tenantAtual = getTenantAtivo();
   const currentTenantId = usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global'
     ? usuarioLogado.tenantId
-    : (tenantAtivoId !== 'global' ? tenantAtivoId : (tenants.find(t => t.id !== 'global')?.id || 'tenant-8038'));
+    : (tenantAtivoId !== 'global' ? tenantAtivoId : (tenants.find(t => t.id !== 'global')?.id || ''));
 
   const { tema } = useThemeStore();
   const isWhite = tema === 'light';
@@ -137,7 +137,7 @@ export default function Funcionarios() {
       const tenantAtual = getTenantAtivo();
       const tenantIdResolvido = usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global'
         ? usuarioLogado.tenantId
-        : (tenantAtivoId !== 'global' ? tenantAtivoId : (tenants.find((t) => t.id !== 'global')?.id || 'tenant-8038'));
+        : (tenantAtivoId !== 'global' ? tenantAtivoId : (tenants.find((t) => t.id !== 'global')?.id || ''));
 
       const senhaFinal = form.senha.trim() ? form.senha.trim() : `${form.cargo}@2026`;
 

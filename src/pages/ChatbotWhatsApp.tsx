@@ -78,7 +78,7 @@ export default function ChatbotWhatsApp() {
   function handleVincularNumeroManual() {
     const limpo = numeroManualInput.trim();
     if (!limpo || limpo.length < 8) {
-      setErroNumero('Informe um número válido com DDD (ex: (31) 98765-4321).');
+      setErroNumero('Informe um número válido com DDD (ex: (11) 99999-8888).');
       return;
     }
     setErroNumero(null);
@@ -213,15 +213,24 @@ export default function ChatbotWhatsApp() {
               <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
                 Seu plano atual é o <strong>{tenantAtual.planoId.toUpperCase()}</strong>. Para habilitar o EloBot WhatsApp, solicite o upgrade com o seu consultor.
               </p>
-              <a
-                href={`https://api.whatsapp.com/send?phone=5531971826083&text=Ol%C3%A1!%20Gostaria%20de%20ativar%20o%20M%C3%B3dulo%20WhatsApp%20IA%20do%20EloServe%20para%20o%20restaurante%20${encodeURIComponent(tenantAtual.nomeFantasia)}.`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 cursor-pointer"
-              >
-                <Phone className="w-4 h-4" />
-                Falar com o Franqueador no WhatsApp
-              </a>
+              {(() => {
+                const zapSuporte = (tenants.find((t) => t.id === 'global')?.telefoneWhatsApp || '').replace(/\D/g, '');
+                return zapSuporte ? (
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=${zapSuporte}&text=Ol%C3%A1!%20Gostaria%20de%20ativar%20o%20M%C3%B3dulo%20WhatsApp%20IA%20do%20EloServe%20para%20o%20restaurante%20${encodeURIComponent(tenantAtual.nomeFantasia)}.`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 cursor-pointer"
+                  >
+                    <Phone className="w-4 h-4" />
+                    Falar com o Franqueador no WhatsApp
+                  </a>
+                ) : (
+                  <p className="text-xs text-amber-400 font-medium">
+                    Contato do Franqueador ainda não cadastrado no painel Master.
+                  </p>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -827,7 +836,7 @@ export default function ChatbotWhatsApp() {
                               setNumeroManualInput(e.target.value);
                               if (erroNumero) setErroNumero(null);
                             }}
-                            placeholder="Ex: (31) 98765-4321"
+                            placeholder="Ex: (11) 99999-8888"
                             className={`flex-1 px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-emerald-500 ${
                               isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
                             }`}
@@ -863,7 +872,11 @@ export default function ChatbotWhatsApp() {
                             <button
                               type="button"
                               onClick={() => {
-                                const num = tenantAtual?.telefoneWhatsApp || '(31) 98888-0000';
+                                const num = numeroManualInput.trim() || tenantAtual?.telefoneWhatsApp || '';
+                                if (!num) {
+                                  setErroNumero('Por favor, informe o número de WhatsApp da loja acima.');
+                                  return;
+                                }
                                 simularConexaoSucesso(tenantId, num);
                                 atualizarDadosTenant(tenantId, { instanciaWhatsAppConectada: true });
                               }}

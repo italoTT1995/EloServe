@@ -664,7 +664,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   tenantNome: tenantAtual.nomeFantasia,
                   solicitanteNome: usuarioLogado?.nome || 'Operador',
                   solicitanteCargo: usuarioLogado?.cargo || 'gerente',
-                  telefoneContato: formSuporte.telefoneWhatsApp || tenantAtual.telefoneWhatsApp || '(31) 99999-9999',
+                  telefoneContato: formSuporte.telefoneWhatsApp || tenantAtual.telefoneWhatsApp || '',
                   categoria: formSuporte.categoria,
                   descricao: formSuporte.descricao.trim(),
                   prioridade: formSuporte.prioridade,
@@ -703,7 +703,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   type="text"
                   value={formSuporte.telefoneWhatsApp}
                   onChange={(e) => setFormSuporte({ ...formSuporte, telefoneWhatsApp: e.target.value })}
-                  placeholder={tenantAtual.telefoneWhatsApp || "(31) 99999-9999"}
+                  placeholder={tenantAtual.telefoneWhatsApp || "Ex: (DDD) 99999-9999"}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono focus:border-purple-500 focus:outline-none"
                 />
               </div>

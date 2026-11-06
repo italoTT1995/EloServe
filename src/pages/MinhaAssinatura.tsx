@@ -36,7 +36,11 @@ export default function MinhaAssinatura() {
 
   
   function handleSolicitarMudancaPlano(planoAlvo: typeof planos[0]) {
-    const zapFranqueador = (tenants.find((t) => t.id === 'global')?.telefoneWhatsApp || '+55 (31) 97182-6083').replace(/\D/g, '');
+    const zapFranqueador = (tenants.find((t) => t.id === 'global')?.telefoneWhatsApp || '').replace(/\D/g, '');
+    if (!zapFranqueador) {
+      alert('O WhatsApp oficial de suporte do Franqueador ainda não foi cadastrado.');
+      return;
+    }
     const mensagem = encodeURIComponent(
       `Olá! Sou do restaurante *${tenant.nomeFantasia}* (CNPJ/CPF: ${tenant.documento}).\n\n` +
       `Gostaria de solicitar a alteração da minha assinatura do plano atual (*${planoAtual.nome}*) para o plano *${planoAlvo.nome}* (R$ ${planoAlvo.precoMensal.toFixed(2)}/mês).\n\n` +

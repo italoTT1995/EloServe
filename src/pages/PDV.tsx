@@ -249,7 +249,7 @@ export default function PDV() {
       adicionarPedidoDelivery({
         tipo: 'delivery',
         clienteNome: dadosEntrega.clienteNome || 'Cliente Delivery',
-        clienteTelefone: dadosEntrega.clienteTelefone || '(31) 99999-9999',
+        clienteTelefone: dadosEntrega.clienteTelefone || '',
         endereco: {
           rua: dadosEntrega.rua,
           numero: dadosEntrega.numero,
@@ -1215,7 +1215,7 @@ export default function PDV() {
                       const rua = partesVirgula[0] || '';
                       const numParte = partesVirgula[1]?.trim() || '';
                       const restoTraco = endStr.split('-');
-                      const bairroParte = restoTraco[1]?.split(',')[0]?.trim() || 'Savassi';
+                      const bairroParte = restoTraco[1]?.split(',')[0]?.trim() || '';
                       
                       setDadosEntrega((prev) => {
                         const dist = prev.distanciaKm || 2.5;
@@ -1254,7 +1254,7 @@ export default function PDV() {
                   type="text"
                   value={dadosEntrega.clienteNome}
                   onChange={(e) => setDadosEntrega({ ...dadosEntrega, clienteNome: e.target.value })}
-                  placeholder="Ex: Mariana Costa"
+                  placeholder="Ex: Nome do cliente"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
                 />
               </div>
@@ -1266,7 +1266,7 @@ export default function PDV() {
                   type="text"
                   value={dadosEntrega.clienteTelefone}
                   onChange={(e) => setDadosEntrega({ ...dadosEntrega, clienteTelefone: e.target.value })}
-                  placeholder="(31) 98888-7777"
+                  placeholder="Ex: (DDD) 99999-9999"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
                 />
               </div>
@@ -1283,7 +1283,7 @@ export default function PDV() {
                     type="text"
                     value={dadosEntrega.rua}
                     onChange={(e) => setDadosEntrega({ ...dadosEntrega, rua: e.target.value })}
-                    placeholder="Ex: Rua Paraíba"
+                    placeholder="Ex: Rua das Flores"
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
                   />
                 </div>
@@ -1308,7 +1308,7 @@ export default function PDV() {
                     type="text"
                     value={dadosEntrega.bairro}
                     onChange={(e) => setDadosEntrega({ ...dadosEntrega, bairro: e.target.value })}
-                    placeholder="Ex: Savassi"
+                    placeholder="Ex: Centro"
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
                   />
                 </div>
@@ -1318,7 +1318,7 @@ export default function PDV() {
                     type="text"
                     value={dadosEntrega.cidade}
                     onChange={(e) => setDadosEntrega({ ...dadosEntrega, cidade: e.target.value })}
-                    placeholder="Belo Horizonte"
+                    placeholder="Cidade"
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
                   />
                 </div>
@@ -1341,7 +1341,7 @@ export default function PDV() {
                     type="text"
                     value={dadosEntrega.pontoReferencia || ''}
                     onChange={(e) => setDadosEntrega({ ...dadosEntrega, pontoReferencia: e.target.value })}
-                    placeholder="Ex: Próximo à Praça da Savassi"
+                    placeholder="Ex: Próximo à praça principal"
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
                   />
                 </div>

@@ -142,14 +142,7 @@ export const useChatbotStore = create<ChatbotState>()(
       getConfig: (tenantId: string) => {
         const { configuracoes } = get();
         if (configuracoes[tenantId]) {
-          const cfg = configuracoes[tenantId];
-          // Remove número de teste legado caso presente no localStorage
-          if (cfg.numeroConectado === '+55 (31) 99928-4873') {
-            cfg.numeroConectado = undefined;
-            cfg.statusConexao = 'desconectado';
-            cfg.bateriaCelular = undefined;
-          }
-          return cfg;
+          return configuracoes[tenantId];
         }
         const nova: ConfiguracaoChatbotTenant = {
           ...CONFIG_PADRAO,
@@ -487,7 +480,7 @@ export const useChatbotStore = create<ChatbotState>()(
       },
     }),
     {
-      name: 'eloserve-chatbot-store-v3',
+      name: 'eloserve-chatbot-store-v4',
     }
   )
 );

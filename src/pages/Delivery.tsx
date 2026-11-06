@@ -154,8 +154,8 @@ export default function Delivery() {
           ? {
               rua: novoRua.trim(),
               numero: novoNumero.trim(),
-              bairro: novoBairro.trim() || 'Savassi',
-              cidade: novoCidade.trim() || 'Belo Horizonte',
+              bairro: novoBairro.trim() || '',
+              cidade: novoCidade.trim() || '',
               complemento: novoComplemento.trim() || undefined,
               pontoReferencia: novoPontoReferencia.trim() || undefined,
               distanciaKm: novoDistanciaKm,
@@ -743,7 +743,7 @@ export default function Delivery() {
                         const rua = partesVirgula[0] || '';
                         const numParte = partesVirgula[1]?.trim() || '';
                         const restoTraco = endStr.split('-');
-                        const bairroParte = restoTraco[1]?.split(',')[0]?.trim() || 'Savassi';
+                        const bairroParte = restoTraco[1]?.split(',')[0]?.trim() || '';
                         setNovoRua(rua.trim());
                         setNovoNumero(numParte);
                         setNovoBairro(bairroParte);
@@ -772,7 +772,7 @@ export default function Delivery() {
                   type="text"
                   value={novoClienteNome}
                   onChange={(e) => setNovoClienteNome(e.target.value)}
-                  placeholder="Ex: Mariana Costa"
+                  placeholder="Ex: Nome do cliente"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -784,7 +784,7 @@ export default function Delivery() {
                   type="text"
                   value={novoClienteTelefone}
                   onChange={(e) => setNovoClienteTelefone(e.target.value)}
-                  placeholder="(31) 98765-4321"
+                  placeholder="Ex: (DDD) 99999-9999"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -807,7 +807,7 @@ export default function Delivery() {
                       type="text"
                       value={novoRua}
                       onChange={(e) => setNovoRua(e.target.value)}
-                      placeholder="Ex: Rua Paraíba"
+                      placeholder="Ex: Rua das Flores"
                       className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
@@ -832,7 +832,7 @@ export default function Delivery() {
                       type="text"
                       value={novoBairro}
                       onChange={(e) => setNovoBairro(e.target.value)}
-                      placeholder="Savassi"
+                      placeholder="Ex: Centro"
                       className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>

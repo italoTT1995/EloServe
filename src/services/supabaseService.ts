@@ -117,7 +117,7 @@ export const supabaseService = {
     try {
       let safeTenantId = usuario.tenantId;
       if (!safeTenantId || safeTenantId === 'tenant-01') {
-        safeTenantId = usuario.cargo === 'super_admin' ? 'global' : 'tenant-8038';
+        safeTenantId = usuario.cargo === 'super_admin' ? 'global' : (usuario.tenantId || '');
       }
 
       const payload = {

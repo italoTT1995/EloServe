@@ -12,123 +12,9 @@ const FAIXAS_TAXA_PADRAO: FaixaTaxaEntrega[] = [
   { ateKm: 10.0, taxa: 14.0 },
 ];
 
-const CLIENTES_INICIAIS: ClienteDelivery[] = [
-  {
-    id: 'cli-01',
-    nome: 'Mariana Costa',
-    telefone: '(31) 98765-4321',
-    dataNascimento: '18/10/1992', // Próxima ao aniversário!
-    dataUltimoPedido: '12/10/2026',
-    descricaoUltimoPedido: 'Combo Família 4 Burgers + Fritas',
-    valorUltimoPedido: 119.0,
-    totalPedidos: 14, // Quase liberando a recompensa de 15 pedidos do plano de fidelidade!
-    totalGasto: 1140.0,
-    enderecos: ['Rua Paraíba, 420, Apto 501 - Savassi, Belo Horizonte'],
-  },
-  {
-    id: 'cli-02',
-    nome: 'Lucas Silva',
-    telefone: '(31) 99123-8899',
-    dataNascimento: '05/04/1988',
-    dataUltimoPedido: '06/10/2026', // Exatamente 7 dias atrás (alvo perfeito de Remarketing por inatividade!)
-    descricaoUltimoPedido: 'Pizza Margherita Especial + Coca-Cola',
-    valorUltimoPedido: 65.5,
-    totalPedidos: 8,
-    totalGasto: 520.0,
-    enderecos: ['Av. Getúlio Vargas, 1450 - Funcionários, Belo Horizonte'],
-  },
-  {
-    id: 'cli-03',
-    nome: 'Camila Fernandes',
-    telefone: '(31) 99455-2211',
-    dataNascimento: '15/10/1995', // Aniversário esta semana!
-    dataUltimoPedido: '10/10/2026',
-    descricaoUltimoPedido: '2x EloBurger Smash Bacon + Chopp',
-    valorUltimoPedido: 87.8,
-    totalPedidos: 5,
-    totalGasto: 412.0,
-    enderecos: ['Rua Sergipe, 980 - Boa Viagem, Belo Horizonte'],
-  },
-];
+const CLIENTES_INICIAIS: ClienteDelivery[] = [];
 
-const PEDIDOS_DELIVERY_INICIAIS: PedidoDelivery[] = [
-  {
-    id: 'del-101',
-    numero: 201,
-    clienteNome: 'Mariana Costa',
-    clienteTelefone: '(31) 98765-4321',
-    tipo: 'delivery',
-    endereco: {
-      cep: '30130-140',
-      rua: 'Rua Paraíba',
-      numero: '420',
-      complemento: 'Apto 501',
-      bairro: 'Savassi',
-      cidade: 'Belo Horizonte',
-      pontoReferencia: 'Próximo à Praça da Savassi',
-      distanciaKm: 1.8,
-      obs: 'Interfone quebrado, favor chamar no WhatsApp',
-    },
-    itens: [
-      { nome: 'EloBurger Smash Bacon', quantidade: 2, preco: 34.9 },
-      { nome: 'Batata Rústica com Alecrim', quantidade: 1, preco: 24.5 },
-      { nome: 'Coca-Cola Lata 350ml', quantidade: 2, preco: 7.5 },
-    ],
-    subtotal: 109.3,
-    taxaEntrega: 4.5,
-    total: 113.8,
-    formaPagamento: 'pix',
-    status: 'pronto',
-    horario: '11:20',
-    entregadorNome: 'Thiago Silva (Moto 1)',
-    pago: true,
-  },
-  {
-    id: 'del-102',
-    numero: 202,
-    clienteNome: 'Lucas Silva',
-    clienteTelefone: '(31) 99123-8899',
-    tipo: 'delivery',
-    endereco: {
-      cep: '30112-021',
-      rua: 'Av. Getúlio Vargas',
-      numero: '1450',
-      bairro: 'Funcionários',
-      cidade: 'Belo Horizonte',
-      distanciaKm: 2.4,
-    },
-    itens: [
-      { nome: 'Pizza Margherita Especial', quantidade: 1, preco: 58.0 },
-      { nome: 'Cerveja Heineken Long Neck', quantidade: 2, preco: 11.0 },
-    ],
-    subtotal: 80.0,
-    taxaEntrega: 4.5,
-    total: 84.5,
-    formaPagamento: 'maquininha_entrega',
-    status: 'a_caminho',
-    horario: '11:05',
-    entregadorNome: 'Thiago Silva (Moto 1)',
-    pago: false,
-  },
-  {
-    id: 'del-103',
-    numero: 203,
-    clienteNome: 'Gabriel Rocha',
-    clienteTelefone: '(31) 99887-1122',
-    tipo: 'retirada',
-    itens: [
-      { nome: 'EloBurger Clássico Salada', quantidade: 1, preco: 29.9 },
-      { nome: 'Suco Natural Laranja 400ml', quantidade: 1, preco: 12.0 },
-    ],
-    subtotal: 41.9,
-    taxaEntrega: 0,
-    total: 41.9,
-    formaPagamento: 'pix',
-    status: 'preparando',
-    horario: '11:35',
-    pago: true,
-  },
-];
+const PEDIDOS_DELIVERY_INICIAIS: PedidoDelivery[] = [];
 
 interface DeliveryState {
   pedidos: PedidoDelivery[];
@@ -150,10 +36,10 @@ export const useDeliveryStore = create<DeliveryState>()(
   persist(
     (set, get) => ({
       pedidos: [],
-      clientes: CLIENTES_INICIAIS,
+      clientes: [],
       faixasTaxa: FAIXAS_TAXA_PADRAO,
       raioMaximoKm: 8.0,
-      enderecoOrigem: 'Rua Pernambuco, 1000 - Savassi, Belo Horizonte / MG',
+      enderecoOrigem: '',
 
       calcularTaxaPorDistancia: (distanciaKm) => {
         const faixas = get().faixasTaxa.sort((a, b) => a.ateKm - b.ateKm);
@@ -264,7 +150,7 @@ export const useDeliveryStore = create<DeliveryState>()(
       },
     }),
     {
-      name: 'eloserve_delivery_store_v3',
+      name: 'eloserve_delivery_store_v4',
     }
   )
 );

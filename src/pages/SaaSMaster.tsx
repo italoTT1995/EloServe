@@ -4282,7 +4282,8 @@ export default function SaaSMaster() {
                     <label className="text-slate-300 font-bold block mb-1">WhatsApp Oficial de Suporte & Cobrança:</label>
                     <input
                       type="text"
-                      defaultValue="+55 (31) 97182-6083"
+                      defaultValue={tenants.find((t) => t.id === 'global')?.telefoneWhatsApp || ''}
+                      placeholder="Ex: +55 (DDD) 99999-9999"
                       className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:outline-none focus:border-purple-500"
                     />
                   </div>

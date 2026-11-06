@@ -210,9 +210,9 @@ export const TENANT_GLOBAL: TenantRestaurante = {
   id: 'global',
   nomeFantasia: 'ELOserve',
   razaoSocial: 'EloServe Tecnologia e Gestão SaaS LTDA',
-  documento: '45.123.890/0001-12',
-  responsavelNome: 'Italo Lemos (Super Admin)',
-  telefoneWhatsApp: '+55 (31) 97182-6083',
+  documento: '',
+  responsavelNome: 'Ítalo Silva (Super Admin)',
+  telefoneWhatsApp: '',
   email: 'italo@eloserve.com.br',
   cidadeUf: 'Brasil (Multi-Tenant)',
   planoId: 'enterprise',
@@ -220,12 +220,12 @@ export const TENANT_GLOBAL: TenantRestaurante = {
   valorMensalidade: 0,
   dataInicio: '01/01/2026',
   proximoVencimento: 'Recorrente',
-  instanciaWhatsAppConectada: true,
+  instanciaWhatsAppConectada: false,
   criadoEm: '2026-01-01',
-  couvertArtisticoAtivo: true,
-  valorCouvertPorPessoa: 12.00,
-  valorCouvertPorComanda: 12.00,
-  diasAoVivo: ['quinta', 'sexta', 'sabado', 'domingo'],
+  couvertArtisticoAtivo: false,
+  valorCouvertPorPessoa: 0,
+  valorCouvertPorComanda: 0,
+  diasAoVivo: [],
 };
 
 const TENANTS_INICIAIS: TenantRestaurante[] = [];
@@ -740,31 +740,35 @@ export const useSaaSStore = create<SaaSState>()(
       },
     }),
     {
-      name: 'eloserve_saas_store_v6',
+      name: 'eloserve_saas_store_v7',
       partialize: (state) => {
         const { masterDesbloqueado, tentativasFalhasMaster, bloqueadoAte, ...rest } = state;
         return {
           ...rest,
-          tenants: (rest.tenants || []).filter(
-            (t) => !['tenant-01', 'tenant-02', 'tenant-03', 'tenant-04', 'tenant-05'].includes(t.id) &&
-                   !t.nomeFantasia.includes('Fogo de Minas') &&
-                   !t.nomeFantasia.includes('Bella Napoli') &&
-                   !t.nomeFantasia.includes('Smash Burguer') &&
-                   !t.nomeFantasia.includes('Boteco & Espetos') &&
-                   !t.nomeFantasia.includes('Sushi Prime')
-          ),
+          tenants: (rest.tenants || [])
+            .map((t) => (t.id === 'global' ? { ...t, telefoneWhatsApp: t.telefoneWhatsApp === '+55 (31) 97182-6083' ? '' : t.telefoneWhatsApp, documento: t.documento === '45.123.890/0001-12' ? '' : t.documento } : t))
+            .filter(
+              (t) => !['tenant-01', 'tenant-02', 'tenant-03', 'tenant-04', 'tenant-05'].includes(t.id) &&
+                     !t.nomeFantasia.includes('Fogo de Minas') &&
+                     !t.nomeFantasia.includes('Bella Napoli') &&
+                     !t.nomeFantasia.includes('Smash Burguer') &&
+                     !t.nomeFantasia.includes('Boteco & Espetos') &&
+                     !t.nomeFantasia.includes('Sushi Prime')
+            ),
         };
       },
       onRehydrateStorage: () => (state) => {
         if (state) {
-          state.tenants = (state.tenants || []).filter(
-            (t) => !['tenant-01', 'tenant-02', 'tenant-03', 'tenant-04', 'tenant-05'].includes(t.id) &&
-                   !t.nomeFantasia.includes('Fogo de Minas') &&
-                   !t.nomeFantasia.includes('Bella Napoli') &&
-                   !t.nomeFantasia.includes('Smash Burguer') &&
-                   !t.nomeFantasia.includes('Boteco & Espetos') &&
-                   !t.nomeFantasia.includes('Sushi Prime')
-          );
+          state.tenants = (state.tenants || [])
+            .map((t) => (t.id === 'global' ? { ...t, telefoneWhatsApp: t.telefoneWhatsApp === '+55 (31) 97182-6083' ? '' : t.telefoneWhatsApp, documento: t.documento === '45.123.890/0001-12' ? '' : t.documento } : t))
+            .filter(
+              (t) => !['tenant-01', 'tenant-02', 'tenant-03', 'tenant-04', 'tenant-05'].includes(t.id) &&
+                     !t.nomeFantasia.includes('Fogo de Minas') &&
+                     !t.nomeFantasia.includes('Bella Napoli') &&
+                     !t.nomeFantasia.includes('Smash Burguer') &&
+                     !t.nomeFantasia.includes('Boteco & Espetos') &&
+                     !t.nomeFantasia.includes('Sushi Prime')
+            );
         }
       },
     }
