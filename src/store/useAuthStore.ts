@@ -15,61 +15,6 @@ export const USUARIOS_PADRAO: Usuario[] = [
     ativo: true,
     criadoEm: '2026-01-01',
   },
-  {
-    id: 'usr-gerente',
-    nome: 'Carlos Gerente (Dono / Gestão)',
-    email: 'gerente@eloserve.com.br',
-    cargo: 'admin_restaurante',
-    tenantId: 'tenant-8038',
-    pin: '1234',
-    senha: 'Gerente@2026',
-    ativo: true,
-    criadoEm: '2026-01-15',
-  },
-  {
-    id: 'usr-caixa',
-    nome: 'Mariana Caixa (Frente de Caixa)',
-    email: 'caixa@eloserve.com.br',
-    cargo: 'caixa',
-    tenantId: 'tenant-8038',
-    pin: '2233',
-    senha: 'Caixa@2026',
-    ativo: true,
-    criadoEm: '2026-02-01',
-  },
-  {
-    id: 'usr-garcom',
-    nome: 'Lucas Garçom (Salão & Mesas)',
-    email: 'garcom@eloserve.com.br',
-    cargo: 'garcom',
-    tenantId: 'tenant-8038',
-    pin: '3344',
-    senha: 'Garcom@2026',
-    ativo: true,
-    criadoEm: '2026-02-05',
-  },
-  {
-    id: 'usr-cozinha',
-    nome: 'Chef Roberto (Cozinha & KDS)',
-    email: 'cozinha@eloserve.com.br',
-    cargo: 'cozinha',
-    tenantId: 'tenant-8038',
-    pin: '5566',
-    senha: 'Cozinha@2026',
-    ativo: true,
-    criadoEm: '2026-02-10',
-  },
-  {
-    id: 'usr-entregador',
-    nome: 'Diego Entregador (Delivery)',
-    email: 'entregador@eloserve.com.br',
-    cargo: 'entregador',
-    tenantId: 'tenant-8038',
-    pin: '7788',
-    senha: 'Entrega@2026',
-    ativo: true,
-    criadoEm: '2026-02-15',
-  },
 ];
 
 export interface DescricaoCargoInfo {
@@ -513,7 +458,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'eloserve_auth_store_v5',
+      name: 'eloserve_auth_store_v6',
       partialize: (state) => ({
         usuarioLogado: state.usuarioLogado,
         isAuthenticated: state.isAuthenticated,
@@ -521,19 +466,23 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
+          const demoEmails = new Set([
+            'gerente@eloserve.com.br',
+            'caixa@eloserve.com.br',
+            'garcom@eloserve.com.br',
+            'cozinha@eloserve.com.br',
+            'entregador@eloserve.com.br',
+          ]);
           if (state.usuarios && state.usuarios.length > 0) {
-            state.usuarios = state.usuarios.map((u) => {
-              if (u.tenantId === 'tenant-01' && u.cargo !== 'super_admin') {
-                return { ...u, tenantId: 'tenant-8038' };
-              }
-              return u;
-            });
+            state.usuarios = state.usuarios.filter((u) => !demoEmails.has(u.email.toLowerCase()));
           }
-          // Garante que as contas padrão para teste de cada nível da hierarquia estejam presentes
-          const emailsExistentes = new Set((state.usuarios || []).map((u) => u.email.toLowerCase()));
-          const contasFaltantes = USUARIOS_PADRAO.filter((u) => !emailsExistentes.has(u.email.toLowerCase()));
-          if (contasFaltantes.length > 0) {
-            state.usuarios = [...(state.usuarios || []), ...contasFaltantes];
+          const temMaster = (state.usuarios || []).some(
+            (u) =>
+              u.cargo === 'super_admin' &&
+              (u.email === 'master@eloserve.com.br' || u.email === 'italo@eloserve.com.br')
+          );
+          if (!temMaster) {
+            state.usuarios = [USUARIOS_PADRAO[0], ...(state.usuarios || [])];
           }
         }
       },
