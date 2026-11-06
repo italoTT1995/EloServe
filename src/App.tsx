@@ -95,8 +95,9 @@ export default function App() {
         {/* Rota Pública de Autoatendimento da Mesa via QR Code (Seção 4.12) */}
         <Route path="/mesa/:numero" element={<AutoatendimentoMesa />} />
 
-        {/* Rota Pública do Cardápio Digital */}
-        <Route path="/cardapio" element={<CardapioDigitalPublico />} />
+        {/* Rotas Públicas do Cardápio Digital (para clientes finais via QR Code / WhatsApp) */}
+        <Route path="/cardapio-digital" element={<CardapioDigitalPublico />} />
+        <Route path="/cardapio-digital/:tenantId" element={<CardapioDigitalPublico />} />
         <Route path="/cardapio/:tenantId" element={<CardapioDigitalPublico />} />
 
         {/* Rotas Protegidas dentro do Layout da Aplicação */}

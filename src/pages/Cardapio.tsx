@@ -656,9 +656,11 @@ export default function Cardapio() {
   }
 
   function copiarLinkCardapio() {
-    const link = `${window.location.origin}/cardapio`;
+    const link = idLoja
+      ? `${window.location.origin}/cardapio/${idLoja}`
+      : `${window.location.origin}/cardapio-digital`;
     navigator.clipboard.writeText(link);
-    exibirToast('Link do Cardápio copiado para a área de transferência!');
+    exibirToast('Link do Cardápio Digital copiado para a área de transferência!');
   }
 
   return (
@@ -2209,7 +2211,7 @@ export default function Cardapio() {
             </div>
 
             <div className="text-center space-y-1">
-              <p className="text-sm font-black">{tenantAtual.nomeFantasia}</p>
+              <p className="text-sm font-black">{tenantAtual?.nomeFantasia || 'Restaurante'}</p>
               <p className="text-xs text-emerald-500 font-semibold">● Aberto e Aceitando Pedidos</p>
             </div>
 

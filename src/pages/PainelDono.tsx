@@ -23,6 +23,7 @@ import {
   Sun,
   Moon,
   Music,
+  Plus,
 } from 'lucide-react';
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -870,14 +871,15 @@ export default function PainelDono() {
             </p>
           </div>
 
-          <Link
-            to="/cardapio"
-            className={`text-xs font-bold transition-colors ${
-              isWhite ? 'text-orange-600 hover:text-orange-500' : 'text-orange-400 hover:text-orange-300'
-            }`}
-          >
-            Abrir Gestor de Cardápio Completo &rarr;
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/cardapio"
+              className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Inserir e Gerenciar Itens</span>
+            </Link>
+          </div>
         </div>
 
         {/* Barra de Filtros e Busca (Estilo Print 2) */}
