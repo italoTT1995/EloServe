@@ -759,17 +759,29 @@ export const useSaaSStore = create<SaaSState>()(
       },
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Recuperação inteligente caso o navegador tenha salvado em v7
-          if (!state.tenants || state.tenants.length === 0) {
-            try {
-              const rawV7 = typeof window !== 'undefined' ? localStorage.getItem('eloserve_saas_store_v7') : null;
-              if (rawV7) {
-                const parsedV7 = JSON.parse(rawV7);
-                if (parsedV7?.state?.tenants?.length > 0) {
-                  state.tenants = parsedV7.state.tenants;
+          // Recuperação inteligente de lojas de versões anteriores do localStorage (v7, v5, v4)
+          try {
+            if (typeof window !== 'undefined') {
+              const keysParaVerificar = ['eloserve_saas_store_v7', 'eloserve_saas_store_v5', 'eloserve_saas_store_v4'];
+              const mapaExistentes = new Map((state.tenants || []).map((t) => [t.id, t]));
+              for (const key of keysParaVerificar) {
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                  const parsed = JSON.parse(raw);
+                  const tenantsAntigos: TenantRestaurante[] = parsed?.state?.tenants || [];
+                  tenantsAntigos.forEach((t) => {
+                    if (t.id && t.id !== 'global' && !mapaExistentes.has(t.id)) {
+                      state.tenants.push(t);
+                      mapaExistentes.set(t.id, t);
+                      // Sincroniza com o Supabase para persistir em nuvem
+                      supabaseService.salvarTenant(t);
+                    }
+                  });
                 }
               }
-            } catch (e) {}
+            }
+          } catch (e) {
+            console.warn('Erro ao auto-recuperar tenants de versoes legadas:', e);
           }
 
           state.tenants = (state.tenants || [])

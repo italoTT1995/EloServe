@@ -466,6 +466,33 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
+          // Recuperação automática de usuários de versões anteriores do localStorage (v5, v4, v3, etc.)
+          try {
+            if (typeof window !== 'undefined') {
+              const keysParaVerificar = ['eloserve_auth_store_v5', 'eloserve_auth_store_v4', 'eloserve_auth_store_v3'];
+              for (const key of keysParaVerificar) {
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                  const parsed = JSON.parse(raw);
+                  const usuariosAntigos: Usuario[] = parsed?.state?.usuarios || [];
+                  if (usuariosAntigos.length > 0) {
+                    const mapaExistentes = new Map((state.usuarios || []).map((u) => [u.email.toLowerCase(), u]));
+                    usuariosAntigos.forEach((u) => {
+                      if (u.email && !mapaExistentes.has(u.email.toLowerCase())) {
+                        state.usuarios.push(u);
+                        mapaExistentes.set(u.email.toLowerCase(), u);
+                        // Persiste no Supabase para nunca mais sumir
+                        supabaseService.salvarUsuario(u);
+                      }
+                    });
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Erro ao auto-recuperar usuarios de versoes legadas:', e);
+          }
+
           const demoEmails = new Set([
             'gerente@eloserve.com.br',
             'caixa@eloserve.com.br',
