@@ -67,6 +67,7 @@ import {
   baixarQrCodeMesaPng,
 } from '../utils/qrCodeHelper';
 import { useThemeStore } from '../store/useThemeStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { ModalReciboWhatsApp } from '../components/common/ModalReciboWhatsApp';
 import { DadosReciboDigital } from '../utils/whatsappReciboHelper';
 
@@ -94,9 +95,17 @@ export default function Mesas() {
   const { funcionarios } = useFuncionarioStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
   const { fichasTecnicas } = useEstoqueStore();
-  const { getTenantAtivo, mudarPlanoTenant, atualizarDadosTenant } = useSaaSStore();
+  const { getTenantAtivo, mudarPlanoTenant, atualizarDadosTenant, tenantAtivoId, tenants } = useSaaSStore();
+  const { usuarioLogado } = useAuthStore();
   const tenantAtual = getTenantAtivo();
-  const idLoja = (!tenantAtual || tenantAtual.id === 'global') ? 'tenant-01' : tenantAtual.id;
+  const idLoja =
+    usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global' && usuarioLogado.tenantId !== 'tenant-01'
+      ? usuarioLogado.tenantId
+      : tenantAtual?.id && tenantAtual.id !== 'global' && tenantAtual.id !== 'tenant-01'
+      ? tenantAtual.id
+      : tenantAtivoId && tenantAtivoId !== 'global' && tenantAtivoId !== 'tenant-01'
+      ? tenantAtivoId
+      : tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
   const mesas = getMesasPorTenant(idLoja);
   const produtos = getProdutosPorTenant(idLoja);
   const categorias = getCategoriasPorTenant(idLoja);
@@ -126,7 +135,7 @@ export default function Mesas() {
   });
 
   function handleSalvarCouvert() {
-    const targetId = tenantAtual?.id === 'global' ? 'tenant-01' : (tenantAtual?.id || 'tenant-01');
+    const targetId = idLoja;
     atualizarDadosTenant(targetId, {
       couvertArtisticoAtivo: formCouvert.ativo,
       valorCouvertPorPessoa: formCouvert.valorPorPessoa,

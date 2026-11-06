@@ -32,17 +32,25 @@ import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useThemeStore } from '../store/useThemeStore';
 
 export default function PainelDono() {
-  const { tenantAtivoId, getTenantAtivo, atualizarDadosTenant } = useSaaSStore();
-  const tenantAtual = getTenantAtivo();
-  const currentTenantId = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
+  const { tenantAtivoId, tenants, getTenantAtivo, atualizarDadosTenant } = useSaaSStore();
   const { usuarioLogado } = useAuthStore();
-  const { caixaAtual, getMesasPorTenant, pedidosKDS, getVendasPorTenant } = useAppStore();
-  const mesas = getMesasPorTenant(currentTenantId);
-  const todasVendas = getVendasPorTenant ? getVendasPorTenant(currentTenantId) : [];
+  
+  // Resolução estrita do restaurante: prioriza o tenant do usuário logado (dono/gerente), ou o tenant ativo se super_admin
+  const currentTenantId =
+    usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global' && usuarioLogado.tenantId !== 'tenant-01'
+      ? usuarioLogado.tenantId
+      : tenantAtivoId !== 'global' && tenantAtivoId !== 'tenant-01'
+      ? tenantAtivoId
+      : tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
+
+  const tenantAtual = tenants.find((t) => t.id === currentTenantId) || getTenantAtivo();
+  const { getMesasPorTenant, getVendasPorTenant } = useAppStore();
+  const mesas = currentTenantId ? getMesasPorTenant(currentTenantId) : [];
+  const todasVendas = currentTenantId ? getVendasPorTenant(currentTenantId) : [];
   const { tema, alternarTema } = useThemeStore();
   const isWhite = tema === 'light';
   const { getProdutosPorTenant, alternarDisponibilidade, atualizarPreco } = useProductStore();
-  const produtos = getProdutosPorTenant(currentTenantId);
+  const produtos = currentTenantId ? getProdutosPorTenant(currentTenantId) : [];
   const { pedidos: pedidosDelivery } = useDeliveryStore();
 
   // Estados locais
@@ -61,24 +69,20 @@ export default function PainelDono() {
   const [valorCouvert, setValorCouvert] = useState<number>(tenantAtual?.valorCouvertPorPessoa ?? 12.0);
   const [diasAoVivo, setDiasAoVivo] = useState<string[]>(tenantAtual?.diasAoVivo ?? ['quinta', 'sexta', 'sabado', 'domingo']);
 
-  // Cálculos dinâmicos em tempo real do restaurante
+  // Cálculos dinâmicos em tempo real do restaurante (100% isolados pelo currentTenantId)
   const vendasHoje = useMemo(() => {
+    if (!currentTenantId) return [];
     const hojeStr = new Date().toLocaleDateString('pt-BR');
-    return (todasVendas || []).filter((v) => v.dataHora.includes(hojeStr) && v.status === 'concluida');
-  }, [todasVendas]);
+    return (todasVendas || []).filter((v) => v.tenantId === currentTenantId && v.dataHora.includes(hojeStr) && v.status === 'concluida');
+  }, [todasVendas, currentTenantId]);
 
   const totalVendasHoje = useMemo(() => {
-    const soma = vendasHoje.reduce((acc, v) => acc + (v.total || 0), 0);
-    if (soma > 0) return soma;
-    if (caixaAtual.status === 'aberto' && caixaAtual.totalVendas > 0) return caixaAtual.totalVendas;
-    return (todasVendas || []).reduce((acc, v) => acc + (v.total || 0), 0);
-  }, [vendasHoje, caixaAtual, todasVendas]);
+    return vendasHoje.reduce((acc, v) => acc + (v.total || 0), 0);
+  }, [vendasHoje]);
 
   const totalPedidosHoje = useMemo(() => {
-    if (vendasHoje.length > 0) return vendasHoje.length;
-    if (totalVendasHoje > 0 && todasVendas.length > 0) return todasVendas.length;
-    return 0;
-  }, [vendasHoje, totalVendasHoje, todasVendas]);
+    return vendasHoje.length;
+  }, [vendasHoje]);
 
   const ticketMedioHoje = useMemo(() => {
     return totalPedidosHoje > 0 ? totalVendasHoje / totalPedidosHoje : 0;
@@ -88,6 +92,154 @@ export default function PainelDono() {
     const mesasOcupadas = mesas.filter((m) => m.status === 'ocupada').length;
     return Math.max(mesasOcupadas, totalPedidosHoje);
   }, [mesas, totalPedidosHoje]);
+
+  // Vendas dos últimos 7 dias calculadas dinamicamente
+  const dadosVendas7Dias = useMemo(() => {
+    const diasNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const resultado: { diaNome: string; dataStr: string; valor: number }[] = [];
+    const agora = new Date();
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(agora);
+      d.setDate(d.getDate() - i);
+      const dataStr = d.toLocaleDateString('pt-BR');
+      const diaNome = diasNomes[d.getDay()];
+
+      const valorDia = (todasVendas || [])
+        .filter((v) => v.tenantId === currentTenantId && v.status === 'concluida' && v.dataHora.includes(dataStr))
+        .reduce((acc, v) => acc + (v.total || 0), 0);
+
+      resultado.push({ diaNome, dataStr, valor: valorDia });
+    }
+
+    const maxValorReal = Math.max(...resultado.map((r) => r.valor), 0);
+    const maxValor = maxValorReal > 0 ? Math.ceil(maxValorReal * 1.25) : 100;
+    const total7Dias = resultado.reduce((acc, r) => acc + r.valor, 0);
+
+    const pontos = resultado.map((r, idx) => {
+      const x = Math.round((idx / 6) * 700);
+      const y = maxValorReal > 0 ? Math.round(180 - (r.valor / maxValor) * 150) : 180;
+      return { x, y };
+    });
+
+    let pathD = `M ${pontos[0].x} ${pontos[0].y}`;
+    for (let i = 1; i < pontos.length; i++) {
+      const prev = pontos[i - 1];
+      const curr = pontos[i];
+      const cx1 = Math.round(prev.x + (curr.x - prev.x) / 2);
+      const cy1 = prev.y;
+      const cx2 = Math.round(prev.x + (curr.x - prev.x) / 2);
+      const cy2 = curr.y;
+      pathD += ` C ${cx1} ${cy1}, ${cx2} ${cy2}, ${curr.x} ${curr.y}`;
+    }
+    const areaD = `${pathD} L 700 200 L 0 200 Z`;
+
+    return { dias: resultado, maxValor, maxValorReal, total7Dias, pathD, areaD };
+  }, [todasVendas, currentTenantId]);
+
+  // Vendas por Origem (Canal: Mesa, Balcão, Delivery)
+  const vendasPorOrigem = useMemo(() => {
+    const vendasTenant = (todasVendas || []).filter((v) => v.tenantId === currentTenantId && v.status === 'concluida');
+    let totalMesa = 0;
+    let totalDelivery = 0;
+    let totalBalcao = 0;
+
+    vendasTenant.forEach((v) => {
+      if (v.tipoOrigem === 'mesa') totalMesa += v.total;
+      else if (v.tipoOrigem === 'delivery') totalDelivery += v.total;
+      else totalBalcao += v.total;
+    });
+
+    const totalGeral = totalMesa + totalDelivery + totalBalcao;
+    const pctMesa = totalGeral > 0 ? Math.round((totalMesa / totalGeral) * 100) : 0;
+    const pctDelivery = totalGeral > 0 ? Math.round((totalDelivery / totalGeral) * 100) : 0;
+    const pctBalcao = totalGeral > 0 ? Math.max(0, 100 - pctMesa - pctDelivery) : 0;
+
+    // Perímetro do círculo r=40 é 251.32
+    const circ = 251.32;
+    const strokeMesa = (pctMesa / 100) * circ;
+    const strokeDelivery = (pctDelivery / 100) * circ;
+
+    return {
+      totalGeral,
+      totalMesa,
+      totalDelivery,
+      totalBalcao,
+      pctMesa,
+      pctDelivery,
+      pctBalcao,
+      strokeMesa,
+      strokeDelivery,
+      circ,
+    };
+  }, [todasVendas, currentTenantId]);
+
+  // Itens mais vendidos calculados exclusivamente das vendas reais do tenant
+  const itensMaisVendidos = useMemo(() => {
+    if (!currentTenantId) return [];
+    const contagem: Record<string, { nome: string; qtd: number }> = {};
+    const vendasTenant = (todasVendas || []).filter((v) => v.tenantId === currentTenantId && v.status === 'concluida');
+
+    vendasTenant.forEach((v) => {
+      (v.itens || []).forEach((it) => {
+        const chave = it.nome;
+        if (!contagem[chave]) {
+          contagem[chave] = { nome: it.nome, qtd: 0 };
+        }
+        contagem[chave].qtd += it.quantidade;
+      });
+    });
+
+    const lista = Object.values(contagem).sort((a, b) => b.qtd - a.qtd).slice(0, 5);
+    const maxQtd = lista.length > 0 ? Math.max(...lista.map((i) => i.qtd), 1) : 1;
+
+    return lista.map((i) => ({
+      nome: i.nome,
+      qtd: i.qtd,
+      barPct: Math.round((i.qtd / maxQtd) * 100),
+    }));
+  }, [todasVendas, currentTenantId]);
+
+  // Pedidos recentes calculados das vendas reais do tenant
+  const pedidosRecentes = useMemo(() => {
+    if (!currentTenantId) return [];
+    const vendasTenant = (todasVendas || [])
+      .filter((v) => v.tenantId === currentTenantId)
+      .slice(0, 15);
+
+    return vendasTenant.map((v) => {
+      const isCancelada = v.status === 'cancelada';
+      const hora = v.dataHora ? (v.dataHora.split(' ')[1] || v.dataHora) : '--:--';
+      const totalItens = (v.itens || []).reduce((acc, it) => acc + it.quantidade, 0);
+      const origemTexto =
+        v.tipoOrigem === 'mesa' && v.mesaNumero
+          ? `Mesa ${v.mesaNumero} • ${totalItens} ${totalItens === 1 ? 'item' : 'itens'}`
+          : v.tipoOrigem === 'delivery'
+          ? `Delivery • ${totalItens} ${totalItens === 1 ? 'item' : 'itens'}`
+          : `Balcão • ${totalItens} ${totalItens === 1 ? 'item' : 'itens'}`;
+
+      return {
+        id: `#${v.id.slice(-6).toUpperCase()}`,
+        status: isCancelada ? 'Cancelado' : 'Concluído',
+        statusCor: isCancelada
+          ? isWhite
+            ? 'bg-rose-100 text-rose-800 border border-rose-200'
+            : 'bg-rose-950/80 text-rose-400 border border-rose-500/30'
+          : isWhite
+          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+          : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
+        origem: origemTexto,
+        valor: `R$ ${v.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        hora,
+      };
+    });
+  }, [todasVendas, currentTenantId, isWhite]);
+
+  const ITENS_POR_PAGINA = 5;
+  const totalPaginas = Math.max(1, Math.ceil(pedidosRecentes.length / ITENS_POR_PAGINA));
+  const pedidosPaginados = useMemo(() => {
+    return pedidosRecentes.slice((paginaPedidos - 1) * ITENS_POR_PAGINA, paginaPedidos * ITENS_POR_PAGINA);
+  }, [pedidosRecentes, paginaPedidos]);
 
   function handleSalvarCouvert() {
     atualizarDadosTenant(currentTenantId, {
@@ -151,68 +303,7 @@ export default function PainelDono() {
     });
   }, [produtos, buscaItem, categoriaCardapio]);
 
-  // Lista de Pedidos Recentes (estilo Print 3)
-  const pedidosRecentes = [
-    {
-      id: '#M24-2305',
-      status: 'Concluído',
-      statusCor: isWhite
-        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
-      origem: 'Mesa 24 • 3 itens',
-      valor: 'R$ 85,97',
-      hora: '13:42',
-    },
-    {
-      id: '#M4-9359',
-      status: 'Concluído',
-      statusCor: isWhite
-        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
-      origem: 'Mesa 4 • 2 itens',
-      valor: 'R$ 32,99',
-      hora: '13:35',
-    },
-    {
-      id: '#M26-2378',
-      status: 'Concluído',
-      statusCor: isWhite
-        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
-      origem: 'Mesa 26 • 3 itens',
-      valor: 'R$ 138,94',
-      hora: '13:20',
-    },
-    {
-      id: '#M21-2576',
-      status: 'Novo',
-      statusCor: isWhite
-        ? 'bg-orange-100 text-orange-800 border border-orange-200'
-        : 'bg-orange-950/80 text-orange-400 border border-orange-500/30',
-      origem: 'Mesa 21 • 3 itens',
-      valor: 'R$ 99,96',
-      hora: '13:14',
-    },
-    {
-      id: '##2607033RAJ',
-      status: 'Concluído',
-      statusCor: isWhite
-        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-        : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30',
-      origem: 'Nuane Cabral Queiroz - Delivery • 1 item',
-      valor: 'R$ 27,49',
-      hora: '12:58',
-    },
-  ];
 
-  // Itens Mais Vendidos (estilo Print 3)
-  const itensMaisVendidos = [
-    { nome: 'Prato com Churrasco', qtd: 160, barPct: 100 },
-    { nome: 'Guaraná 1l', qtd: 25, barPct: 22 },
-    { nome: 'Coca Cola KS 290ml', qtd: 24, barPct: 20 },
-    { nome: 'Coca Cola 350ml', qtd: 20, barPct: 16 },
-    { nome: 'Coca Cola 1,5l', qtd: 18, barPct: 14 },
-  ];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto select-none pb-12">
@@ -368,10 +459,10 @@ export default function PainelDono() {
           <div className="relative h-64 w-full">
             {/* Eixo Y */}
             <div className="absolute left-0 top-0 bottom-6 w-12 flex flex-col justify-between text-[10px] text-slate-500 font-mono">
-              <span>R$1.6k</span>
-              <span>R$1.2k</span>
-              <span>R$800</span>
-              <span>R$400</span>
+              <span>{dadosVendas7Dias.maxValorReal > 0 ? `R$${dadosVendas7Dias.maxValor.toLocaleString('pt-BR')}` : 'R$0'}</span>
+              <span>{dadosVendas7Dias.maxValorReal > 0 ? `R$${Math.round(dadosVendas7Dias.maxValor * 0.75).toLocaleString('pt-BR')}` : 'R$0'}</span>
+              <span>{dadosVendas7Dias.maxValorReal > 0 ? `R$${Math.round(dadosVendas7Dias.maxValor * 0.5).toLocaleString('pt-BR')}` : 'R$0'}</span>
+              <span>{dadosVendas7Dias.maxValorReal > 0 ? `R$${Math.round(dadosVendas7Dias.maxValor * 0.25).toLocaleString('pt-BR')}` : 'R$0'}</span>
               <span>R$0</span>
             </div>
 
@@ -383,42 +474,45 @@ export default function PainelDono() {
               <div className="w-full border-b border-slate-800/60 h-0" />
               <div className="w-full border-b border-slate-800/60 h-0" />
 
-              {/* Curva SVG com Gradiente Laranja */}
-              <svg
-                viewBox="0 0 700 200"
-                className="absolute inset-0 w-full h-[85%] overflow-visible"
-                preserveAspectRatio="none"
-              >
-                <defs>
-                  <linearGradient id="laranjaGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f97316" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#f97316" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                {/* Área preenchida */}
-                <path
-                  d="M 0 145 C 50 150, 100 185, 150 180 C 200 130, 250 120, 300 120 C 350 120, 400 95, 450 70 C 500 45, 550 40, 600 55 C 650 75, 680 90, 700 95 L 700 200 L 0 200 Z"
-                  fill="url(#laranjaGradient)"
-                />
-                {/* Linha da curva */}
-                <path
-                  d="M 0 145 C 50 150, 100 185, 150 180 C 200 130, 250 120, 300 120 C 350 120, 400 95, 450 70 C 500 45, 550 40, 600 55 C 650 75, 680 90, 700 95"
-                  fill="none"
-                  stroke="#ea580c"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              </svg>
+              {/* Curva SVG com Gradiente Laranja ou Estado Vazio */}
+              {dadosVendas7Dias.maxValorReal > 0 ? (
+                <svg
+                  viewBox="0 0 700 200"
+                  className="absolute inset-0 w-full h-[85%] overflow-visible"
+                  preserveAspectRatio="none"
+                >
+                  <defs>
+                    <linearGradient id="laranjaGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f97316" stopOpacity="0.35" />
+                      <stop offset="100%" stopColor="#f97316" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  {/* Área preenchida */}
+                  <path
+                    d={dadosVendas7Dias.areaD}
+                    fill="url(#laranjaGradient)"
+                  />
+                  {/* Linha da curva */}
+                  <path
+                    d={dadosVendas7Dias.pathD}
+                    fill="none"
+                    stroke="#ea580c"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <p className="text-xs text-slate-500 font-medium">Nenhuma venda registrada nos últimos 7 dias</p>
+                  <span className="text-[10px] text-slate-600 mt-1">Os dados aparecerão automaticamente conforme as vendas forem realizadas</span>
+                </div>
+              )}
 
               {/* Eixo X: Dias da Semana */}
               <div className="absolute -bottom-1 left-0 right-0 flex justify-between text-[11px] text-slate-400 font-medium">
-                <span>Sáb</span>
-                <span>Dom</span>
-                <span>Seg</span>
-                <span>Ter</span>
-                <span>Qua</span>
-                <span>Qui</span>
-                <span>Sex</span>
+                {dadosVendas7Dias.dias.map((d, i) => (
+                  <span key={i}>{d.diaNome}</span>
+                ))}
               </div>
             </div>
           </div>
@@ -441,35 +535,45 @@ export default function PainelDono() {
                 stroke="currentColor"
                 fill="transparent"
               />
-              {/* Segmento Mesa (89%) */}
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                stroke="#ea580c"
-                strokeWidth="14"
-                strokeDasharray="251.2"
-                strokeDashoffset="27.6"
-                strokeLinecap="round"
-                fill="transparent"
-              />
-              {/* Segmento Delivery (11%) */}
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                stroke="#fdba74"
-                strokeWidth="14"
-                strokeDasharray="251.2"
-                strokeDashoffset="223.5"
-                fill="transparent"
-              />
+              {vendasPorOrigem.totalGeral > 0 && (
+                <>
+                  {/* Segmento Mesa */}
+                  {vendasPorOrigem.pctMesa > 0 && (
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      stroke="#ea580c"
+                      strokeWidth="14"
+                      strokeDasharray={`${vendasPorOrigem.strokeMesa} ${vendasPorOrigem.circ}`}
+                      strokeDashoffset="0"
+                      strokeLinecap="round"
+                      fill="transparent"
+                    />
+                  )}
+                  {/* Segmento Delivery */}
+                  {vendasPorOrigem.pctDelivery > 0 && (
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      stroke="#fdba74"
+                      strokeWidth="14"
+                      strokeDasharray={`${vendasPorOrigem.strokeDelivery} ${vendasPorOrigem.circ}`}
+                      strokeDashoffset={-vendasPorOrigem.strokeMesa}
+                      fill="transparent"
+                    />
+                  )}
+                </>
+              )}
             </svg>
 
             {/* Texto Central */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
               <span className="text-[10px] text-slate-400">Total 7d</span>
-              <span className="text-base font-black text-white font-mono">R$ 6.1k</span>
+              <span className="text-base font-black text-white font-mono">
+                R$ {vendasPorOrigem.totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
 
@@ -480,21 +584,21 @@ export default function PainelDono() {
                 <span className="w-2.5 h-2.5 rounded-full bg-orange-600"></span>
                 <span>Mesa</span>
               </span>
-              <span className="font-mono text-slate-200 font-bold">89%</span>
+              <span className="font-mono text-slate-200 font-bold">{vendasPorOrigem.pctMesa}%</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-orange-300"></span>
                 <span>Delivery</span>
               </span>
-              <span className="font-mono text-slate-200 font-bold">11%</span>
+              <span className="font-mono text-slate-200 font-bold">{vendasPorOrigem.pctDelivery}%</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
-                <span>Retirada</span>
+                <span>Balcão / Retirada</span>
               </span>
-              <span className="font-mono text-slate-200 font-bold">0%</span>
+              <span className="font-mono text-slate-200 font-bold">{vendasPorOrigem.pctBalcao}%</span>
             </div>
           </div>
         </div>
@@ -506,75 +610,95 @@ export default function PainelDono() {
         <div className="lg:col-span-7 bg-[#141416] border border-slate-800/80 rounded-2xl p-6 shadow-lg space-y-4">
           <h3 className="text-sm font-bold text-white">Itens mais vendidos (7 dias)</h3>
 
-          <div className="space-y-3 pt-2">
-            {itensMaisVendidos.map((item, idx) => (
-              <div key={idx} className="space-y-1 text-xs">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span className="font-medium truncate">{item.nome}</span>
-                  <span className="font-mono font-bold text-orange-400 shrink-0">{item.qtd} un</span>
-                </div>
-                <div className="w-full h-3 rounded-full bg-slate-800/70 overflow-hidden">
-                  <div
-                    className="h-full bg-orange-500 rounded-full transition-all duration-500"
-                    style={{ width: `${item.barPct}%` }}
-                  />
-                </div>
+          {itensMaisVendidos.length > 0 ? (
+            <>
+              <div className="space-y-3 pt-2">
+                {itensMaisVendidos.map((item, idx) => (
+                  <div key={idx} className="space-y-1 text-xs">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="font-medium truncate">{item.nome}</span>
+                      <span className="font-mono font-bold text-orange-400 shrink-0">{item.qtd} un</span>
+                    </div>
+                    <div className="w-full h-3 rounded-full bg-slate-800/70 overflow-hidden">
+                      <div
+                        className="h-full bg-orange-500 rounded-full transition-all duration-500"
+                        style={{ width: `${item.barPct}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          <div className="pt-2 flex justify-between text-[10px] text-slate-500 font-mono">
-            <span>0</span>
-            <span>45</span>
-            <span>90</span>
-            <span>135</span>
-            <span>180</span>
-          </div>
+              <div className="pt-2 flex justify-between text-[10px] text-slate-500 font-mono">
+                <span>0</span>
+                <span>{Math.round(itensMaisVendidos[0]?.qtd * 0.25) || 1}</span>
+                <span>{Math.round(itensMaisVendidos[0]?.qtd * 0.5) || 2}</span>
+                <span>{Math.round(itensMaisVendidos[0]?.qtd * 0.75) || 3}</span>
+                <span>{itensMaisVendidos[0]?.qtd || 4} un</span>
+              </div>
+            </>
+          ) : (
+            <div className="h-44 flex flex-col items-center justify-center text-center p-4">
+              <p className="text-xs text-slate-500 font-medium">Nenhum item vendido ainda</p>
+              <span className="text-[10px] text-slate-600 mt-1">Conforme pedidos forem fechados, o ranking de mais vendidos será exibido aqui</span>
+            </div>
+          )}
         </div>
 
         {/* Pedidos Recentes (5 cols) */}
         <div className="lg:col-span-5 bg-[#141416] border border-slate-800/80 rounded-2xl p-6 shadow-lg flex flex-col justify-between space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white">Pedidos Recentes</h3>
-            {/* Paginação < 1/6 > */}
+            {/* Paginação */}
             <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
               <button
                 type="button"
+                disabled={paginaPedidos <= 1}
                 onClick={() => setPaginaPedidos((p) => Math.max(1, p - 1))}
-                className="p-1 hover:text-white cursor-pointer"
+                className="p-1 hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Página anterior"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
-              <span>{paginaPedidos}/6</span>
+              <span>{paginaPedidos}/{totalPaginas}</span>
               <button
                 type="button"
-                onClick={() => setPaginaPedidos((p) => Math.min(6, p + 1))}
-                className="p-1 hover:text-white cursor-pointer"
+                disabled={paginaPedidos >= totalPaginas}
+                onClick={() => setPaginaPedidos((p) => Math.min(totalPaginas, p + 1))}
+                className="p-1 hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Próxima página"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          <div className="divide-y divide-slate-800/70 text-xs">
-            {pedidosRecentes.map((ped, idx) => (
-              <div key={idx} className="py-2.5 flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white font-mono">{ped.id}</span>
-                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${ped.statusCor}`}>
-                      {ped.status}
-                    </span>
+          {pedidosPaginados.length > 0 ? (
+            <div className="divide-y divide-slate-800/70 text-xs">
+              {pedidosPaginados.map((ped, idx) => (
+                <div key={idx} className="py-2.5 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white font-mono">{ped.id}</span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${ped.statusCor}`}>
+                        {ped.status}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">{ped.origem}</p>
                   </div>
-                  <p className="text-[10px] text-slate-400">{ped.origem}</p>
+                  <div className="text-right">
+                    <span className="font-bold text-white font-mono block">{ped.valor}</span>
+                    <span className="text-[9px] text-slate-500">{ped.hora}</span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="font-bold text-white font-mono block">{ped.valor}</span>
-                  <span className="text-[9px] text-slate-500">{ped.hora}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-44 flex flex-col items-center justify-center text-center p-4">
+              <p className="text-xs text-slate-500 font-medium">Nenhum pedido recente</p>
+              <span className="text-[10px] text-slate-600 mt-1">Quando houver pedidos no PDV ou Mesas, eles aparecerão aqui</span>
+            </div>
+          )}
 
           <Link
             to="/mesas"
@@ -799,107 +923,129 @@ export default function PainelDono() {
         </div>
 
         {/* Grid de Cards de Itens (Estilo Print 2 com Toggle Verde/Cinza) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {produtosFiltrados.slice(0, 8).map((prod) => (
-            <div
-              key={prod.id}
-              className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs transition-all ${
-                isWhite
-                  ? 'bg-slate-50 hover:bg-slate-100/90 border-slate-200 shadow-sm'
-                  : 'bg-[#0e0e10] border-slate-800/80 hover:border-slate-700'
-              }`}
-            >
-              {/* Imagem Thumbnail e Nome */}
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden ${
-                    isWhite
-                      ? 'bg-orange-100 text-orange-700 border border-orange-200'
-                      : 'bg-slate-800 text-slate-300'
-                  }`}
-                >
-                  {prod.fotoUrl ? (
-                    <img src={prod.fotoUrl} alt={prod.nome} className="w-full h-full object-cover" />
-                  ) : (
-                    prod.nome.charAt(0)
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <span
-                    className={`font-bold truncate block ${
-                      isWhite ? 'text-slate-900' : 'text-white'
+        {produtosFiltrados.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {produtosFiltrados.slice(0, 8).map((prod) => (
+              <div
+                key={prod.id}
+                className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs transition-all ${
+                  isWhite
+                    ? 'bg-slate-50 hover:bg-slate-100/90 border-slate-200 shadow-sm'
+                    : 'bg-[#0e0e10] border-slate-800/80 hover:border-slate-700'
+                }`}
+              >
+                {/* Imagem Thumbnail e Nome */}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden ${
+                      isWhite
+                        ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                        : 'bg-slate-800 text-slate-300'
                     }`}
                   >
-                    {prod.nome}
-                  </span>
-                  {/* Preço editável */}
-                  {editandoPrecoId === prod.id ? (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <span className="text-slate-400 text-[10px]">R$</span>
-                      <input
-                        type="text"
-                        autoFocus
-                        value={novoPrecoValor}
-                        onChange={(e) => setNovoPrecoValor(e.target.value)}
-                        className={`w-14 px-1 py-0.5 border border-orange-500 rounded font-mono text-[10px] ${
-                          isWhite ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'
-                        }`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleSalvarPreco(prod.id, prod.nome)}
-                        className="p-0.5 text-emerald-500 hover:text-emerald-600"
-                      >
-                        <Check className="w-3 h-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditandoPrecoId(null)}
-                        className="p-0.5 text-slate-400 hover:text-slate-600"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditandoPrecoId(prod.id);
-                        setNovoPrecoValor(prod.precoVenda.toFixed(2).replace('.', ','));
-                      }}
-                      className={`text-[11px] font-mono font-bold hover:underline flex items-center gap-1 cursor-pointer ${
-                        isWhite ? 'text-orange-600' : 'text-orange-400'
+                    {prod.fotoUrl ? (
+                      <img src={prod.fotoUrl} alt={prod.nome} className="w-full h-full object-cover" />
+                    ) : (
+                      prod.nome.charAt(0)
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <span
+                      className={`font-bold truncate block ${
+                        isWhite ? 'text-slate-900' : 'text-white'
                       }`}
                     >
-                      <span>R$ {prod.precoVenda.toFixed(2).replace('.', ',')}</span>
-                      <Edit2 className="w-2.5 h-2.5 text-slate-400" />
-                    </button>
-                  )}
+                      {prod.nome}
+                    </span>
+                    {/* Preço editável */}
+                    {editandoPrecoId === prod.id ? (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-slate-400 text-[10px]">R$</span>
+                        <input
+                          type="text"
+                          autoFocus
+                          value={novoPrecoValor}
+                          onChange={(e) => setNovoPrecoValor(e.target.value)}
+                          className={`w-14 px-1 py-0.5 border border-orange-500 rounded font-mono text-[10px] ${
+                            isWhite ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSalvarPreco(prod.id, prod.nome)}
+                          className="p-0.5 text-emerald-500 hover:text-emerald-600"
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditandoPrecoId(null)}
+                          className="p-0.5 text-slate-400 hover:text-slate-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditandoPrecoId(prod.id);
+                          setNovoPrecoValor(prod.precoVenda.toFixed(2).replace('.', ','));
+                        }}
+                        className={`text-[11px] font-mono font-bold hover:underline flex items-center gap-1 cursor-pointer ${
+                          isWhite ? 'text-orange-600' : 'text-orange-400'
+                        }`}
+                      >
+                        <span>R$ {prod.precoVenda.toFixed(2).replace('.', ',')}</span>
+                        <Edit2 className="w-2.5 h-2.5 text-slate-400" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Toggle Switch Estilo Print 2 (Verde: Disponível / Cinza: Indisponível) */}
-              <button
-                type="button"
-                onClick={() => handleToggleProduto(prod.id, prod.nome, prod.disponivel)}
-                className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors cursor-pointer shrink-0 ${
-                  prod.disponivel
-                    ? 'bg-emerald-500'
-                    : isWhite
-                    ? 'bg-slate-300'
-                    : 'bg-slate-700'
-                }`}
-                title={prod.disponivel ? 'Item disponível para venda' : 'Item esgotado / pausado'}
-              >
-                <span
-                  className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform shadow-sm ${
-                    prod.disponivel ? 'translate-x-6' : 'translate-x-1'
+                {/* Toggle Switch Estilo Print 2 (Verde: Disponível / Cinza: Indisponível) */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleProduto(prod.id, prod.nome, prod.disponivel)}
+                  className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors cursor-pointer shrink-0 ${
+                    prod.disponivel
+                      ? 'bg-emerald-500'
+                      : isWhite
+                      ? 'bg-slate-300'
+                      : 'bg-slate-700'
                   }`}
-                />
-              </button>
+                  title={prod.disponivel ? 'Item disponível para venda' : 'Item esgotado / pausado'}
+                >
+                  <span
+                    className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform shadow-sm ${
+                      prod.disponivel ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={`py-12 px-6 rounded-2xl border border-dashed flex flex-col items-center justify-center text-center space-y-3 ${
+            isWhite ? 'border-slate-300 bg-slate-50' : 'border-slate-800 bg-[#0e0e10]/50'
+          }`}>
+            <Tag className={`w-8 h-8 ${isWhite ? 'text-slate-400' : 'text-slate-600'}`} />
+            <div>
+              <p className={`text-sm font-bold ${isWhite ? 'text-slate-800' : 'text-slate-200'}`}>
+                Nenhum produto cadastrado no Cardápio
+              </p>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                Cadastre os pratos, porções e bebidas do seu restaurante para começar a vender no PDV e controlar a disponibilidade.
+              </p>
             </div>
-          ))}
-        </div>
+            <Link
+              to="/cardapio"
+              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-orange-500/20 transition-all inline-flex items-center gap-1.5"
+            >
+              <span>+ Cadastrar primeiro produto no Cardápio &rarr;</span>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

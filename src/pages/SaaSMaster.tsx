@@ -172,8 +172,9 @@ export default function SaaSMaster() {
   // Estados do Ambiente de Edição da Loja (editor_loja)
   const [subAbaEditor, setSubAbaEditor] = useState<'dados_loja' | 'cardapio_precos'>('dados_loja');
   const tenantEmEdicao = tenants.find((t) => t.id === (tenantEmEdicaoId || tenants[0]?.id)) || tenants[0];
-  const produtos = getProdutosPorTenant(tenantEmEdicao?.id || 'tenant-01');
-  const categorias = getCategoriasPorTenant(tenantEmEdicao?.id || 'tenant-01');
+  const fallbackTenantId = tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
+  const produtos = getProdutosPorTenant(tenantEmEdicao?.id || fallbackTenantId);
+  const categorias = getCategoriasPorTenant(tenantEmEdicao?.id || fallbackTenantId);
 
   const [formEdicao, setFormEdicao] = useState({
     nomeFantasia: '',
@@ -813,7 +814,7 @@ export default function SaaSMaster() {
     const isTodos = tenantAlvoId === 'todos';
 
     const vendasPeriodo = (todasVendasApp || []).filter((v) => {
-      const matchTenant = isTodos || (!v.tenantId && tenantAlvoId === 'tenant-01') || v.tenantId === tenantAlvoId;
+      const matchTenant = isTodos || v.tenantId === tenantAlvoId;
       if (!matchTenant) return false;
       const d = parseDataItem(v.dataHora);
       if (d.ano === 0 && d.mes === 0) return true;
@@ -877,7 +878,7 @@ export default function SaaSMaster() {
     const receitaLiquida = Math.max(0, receitaBruta - totalDescontos - totalCancelamentos);
 
     const despesasPeriodo = (todasDespesasApp || []).filter((d) => {
-      const matchTenant = isTodos || (!d.tenantId && tenantAlvoId === 'tenant-01') || d.tenantId === tenantAlvoId;
+      const matchTenant = isTodos || d.tenantId === tenantAlvoId;
       if (!matchTenant) return false;
       const dataD = parseDataItem(d.data);
       if (dataD.ano === 0 && dataD.mes === 0) return true;

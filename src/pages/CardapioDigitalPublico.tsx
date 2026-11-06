@@ -25,7 +25,8 @@ export default function CardapioDigitalPublico() {
   const { getTenantAtivo, tenants } = useSaaSStore();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
 
-  const idAlvo = queryTenant || (getTenantAtivo()?.id && getTenantAtivo()?.id !== 'global' ? getTenantAtivo()?.id : 'tenant-01') || 'tenant-01';
+  const fallbackTenant = tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
+  const idAlvo = queryTenant || (getTenantAtivo()?.id && getTenantAtivo()?.id !== 'global' ? getTenantAtivo()?.id : fallbackTenant) || fallbackTenant;
   const tenantAtual = tenants.find((t) => t.id === idAlvo) || getTenantAtivo();
 
   const produtos = getProdutosPorTenant(idAlvo);

@@ -23,6 +23,7 @@ import {
 import { useEstoqueStore, CATEGORIAS_ESTOQUE_NOMES } from '../store/useEstoqueStore';
 import { useProductStore } from '../store/useProductStore';
 import { useSaaSStore } from '../store/useSaaSStore';
+import { useAuthStore } from '../store/useAuthStore';
 import {
   CategoriaEstoque,
   ItemEstoque,
@@ -37,22 +38,34 @@ import {
 import { calcularCustoIngrediente } from '../utils/estoqueUtils';
 
 export default function Estoque() {
-  const { tenantAtivoId } = useSaaSStore();
-  const idLoja = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
+  const { tenantAtivoId, tenants } = useSaaSStore();
+  const { usuarioLogado } = useAuthStore();
+  const idLoja =
+    usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global' && usuarioLogado.tenantId !== 'tenant-01'
+      ? usuarioLogado.tenantId
+      : tenantAtivoId && tenantAtivoId !== 'global' && tenantAtivoId !== 'tenant-01'
+      ? tenantAtivoId
+      : tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
   const { getProdutosPorTenant } = useProductStore();
   const produtos = getProdutosPorTenant(idLoja);
 
   const {
-    itens,
-    compras,
-    fichasTecnicas,
-    fornecedores,
-    movimentacoes,
+    getItensPorTenant,
+    getComprasPorTenant,
+    getFichasPorTenant,
+    getFornecedoresPorTenant,
+    getMovimentacoesPorTenant,
     registrarSaidaManual,
     adicionarCompra,
     adicionarItemEstoque,
     adicionarFornecedor,
   } = useEstoqueStore();
+
+  const itens = getItensPorTenant(idLoja);
+  const compras = getComprasPorTenant(idLoja);
+  const fichasTecnicas = getFichasPorTenant(idLoja);
+  const fornecedores = getFornecedoresPorTenant(idLoja);
+  const movimentacoes = getMovimentacoesPorTenant(idLoja);
 
   const [abaAtiva, setAbaAtiva] = useState<'estoque' | 'compras' | 'fichas' | 'fornecedores' | 'movimentacoes'>('estoque');
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>('todas');
@@ -152,14 +165,14 @@ export default function Estoque() {
       unidadeMedida: formCompra.unidadeMedida,
       precoTotal: Number(formCompra.precoTotal),
       precoUnitario: Number(formCompra.precoUnitario),
-    });
+    }, idLoja);
     setModalNovaCompra(false);
     dispararToast(`Compra de ${formCompra.quantidade}x ${formCompra.produtoNome} registrada e estoque atualizado!`);
   }
 
   function handleConfirmarSaidaManual() {
     if (!modalSaidaManual) return;
-    registrarSaidaManual(modalSaidaManual.id, Number(qtdSaidaManual), motivoSaidaManual);
+    registrarSaidaManual(modalSaidaManual.id, Number(qtdSaidaManual), motivoSaidaManual, idLoja);
     dispararToast(`Baixa de ${qtdSaidaManual} ${modalSaidaManual.unidadeMedida} de "${modalSaidaManual.nome}" realizada!`);
     setModalSaidaManual(null);
     setQtdSaidaManual(1);
@@ -179,14 +192,14 @@ export default function Estoque() {
       precoCusto: Number(formItem.precoCusto),
       statusDisponibilidade: 'disponivel',
       fornecedorHabitual: formItem.fornecedorHabitual || undefined,
-    });
+    }, idLoja);
     setModalNovoItem(false);
     dispararToast(`Item "${formItem.nome}" cadastrado com sucesso no estoque!`);
   }
 
   function handleSalvarNovoFornecedor(e: React.FormEvent) {
     e.preventDefault();
-    adicionarFornecedor(formForn);
+    adicionarFornecedor({ ...formForn, tenantId: idLoja }, idLoja);
     setModalNovoFornecedor(false);
     dispararToast(`Fornecedor "${formForn.nomeOuEmpresa}" cadastrado com sucesso!`);
   }

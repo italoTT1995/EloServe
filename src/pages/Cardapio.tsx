@@ -33,6 +33,7 @@ import { useProductStore } from '../store/useProductStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useThemeStore } from '../store/useThemeStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { AdminAuthModal } from '../components/common/AdminAuthModal';
 import { Produto, IngredientePrato, ItemEstoque } from '../types';
 import {
@@ -62,8 +63,14 @@ const FOTOS_SUGERIDAS = [
 ];
 
 export default function Cardapio() {
-  const { tenantAtivoId, getTenantAtivo } = useSaaSStore();
-  const idLoja = tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
+  const { tenantAtivoId, getTenantAtivo, tenants } = useSaaSStore();
+  const { usuarioLogado } = useAuthStore();
+  const idLoja =
+    usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global' && usuarioLogado.tenantId !== 'tenant-01'
+      ? usuarioLogado.tenantId
+      : tenantAtivoId && tenantAtivoId !== 'global' && tenantAtivoId !== 'tenant-01'
+      ? tenantAtivoId
+      : tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
   const tenantAtual = getTenantAtivo();
   const { tema } = useThemeStore();
   const isWhite = tema === 'light';
@@ -80,7 +87,8 @@ export default function Cardapio() {
     removerCategoria,
   } = useProductStore();
 
-  const { itens: itensEstoque, salvarFichaTecnica } = useEstoqueStore();
+  const { getItensPorTenant, salvarFichaTecnica } = useEstoqueStore();
+  const itensEstoque = getItensPorTenant(idLoja);
 
   const produtos = getProdutosPorTenant(idLoja);
   const categorias = getCategoriasPorTenant(idLoja);
@@ -110,6 +118,7 @@ export default function Cardapio() {
     fotoUrl: '',
     setorPreparo: 'cozinha' as 'cozinha' | 'bar' | 'nenhum',
     destaque: false,
+    itemEstoqueId: '',
     fichaTecnica: [] as IngredientePrato[],
   });
 
@@ -320,6 +329,7 @@ export default function Cardapio() {
       fotoUrl: '',
       setorPreparo: 'cozinha',
       destaque: false,
+      itemEstoqueId: '',
       fichaTecnica: [],
     });
     setIngredienteSelId(itensEstoque[0]?.id || '');
@@ -340,6 +350,7 @@ export default function Cardapio() {
       fotoUrl: prod.fotoUrl || '',
       setorPreparo: prod.setorPreparo,
       destaque: !!prod.destaque,
+      itemEstoqueId: prod.itemEstoqueId || '',
       fichaTecnica: prod.fichaTecnica ? [...prod.fichaTecnica] : [],
     });
     setIngredienteSelId(itensEstoque[0]?.id || '');
@@ -502,6 +513,7 @@ export default function Cardapio() {
           fotoUrl: formProduto.fotoUrl.trim(),
           setorPreparo: formProduto.setorPreparo,
           destaque: formProduto.destaque,
+          itemEstoqueId: formProduto.itemEstoqueId ? formProduto.itemEstoqueId : undefined,
           fichaTecnica: formProduto.fichaTecnica,
         },
         idLoja
@@ -511,6 +523,7 @@ export default function Cardapio() {
       if (formProduto.fichaTecnica.length > 0) {
         salvarFichaTecnica({
           id: `ft-${produtoEditando.id}`,
+          tenantId: idLoja,
           produtoId: produtoEditando.id,
           nomePrato: formProduto.nome.trim(),
           componentes: formProduto.fichaTecnica.map((ing) => {
@@ -548,6 +561,7 @@ export default function Cardapio() {
           setorPreparo: formProduto.setorPreparo,
           disponivel: true,
           destaque: formProduto.destaque,
+          itemEstoqueId: formProduto.itemEstoqueId ? formProduto.itemEstoqueId : undefined,
           fichaTecnica: formProduto.fichaTecnica,
         },
         idLoja
@@ -556,6 +570,7 @@ export default function Cardapio() {
       if (formProduto.fichaTecnica.length > 0) {
         salvarFichaTecnica({
           id: `ft-${novoProduto.id}`,
+          tenantId: idLoja,
           produtoId: novoProduto.id,
           nomePrato: novoProduto.nome,
           componentes: formProduto.fichaTecnica.map((ing) => {
@@ -1510,6 +1525,35 @@ export default function Cardapio() {
                       : 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
                   }`}
                 />
+              </div>
+
+              {/* Vínculo Direto com Estoque (Bebidas e Produtos Unitários) */}
+              <div className={`p-3.5 rounded-2xl border space-y-2 ${
+                isWhite ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Scale className="w-4 h-4 text-orange-500 shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-xs">Vínculo Direto ao Estoque (Produtos Unitários / Bebidas)</h4>
+                    <p className={`text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Opcional. Para refrigerantes, cervejas, águas ou produtos vendidos por unidade. Cada venda deduz 1 unidade deste item diretamente no estoque.
+                    </p>
+                  </div>
+                </div>
+                <select
+                  value={formProduto.itemEstoqueId}
+                  onChange={(e) => setFormProduto({ ...formProduto, itemEstoqueId: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                    isWhite ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-950 border-slate-800 text-white'
+                  }`}
+                >
+                  <option value="">Nenhum vínculo direto (item composto ou sem controle unitário)</option>
+                  {itensEstoque.map((it) => (
+                    <option key={it.id} value={it.id}>
+                      {it.nome} • ({it.quantidadeAtual} {it.unidadeMedida} em estoque)
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Destaque */}

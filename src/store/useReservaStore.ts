@@ -6,65 +6,6 @@ import { useAppStore } from './useAppStore';
 const hoje = new Date().toISOString().split('T')[0];
 const amanha = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-const RESERVAS_INICIAIS: Record<string, ReservaMesa[]> = {
-  'tenant-01': [
-    {
-      id: 'res-101',
-      tenantId: 'tenant-01',
-      clienteNome: 'Fernanda Martins',
-      clienteTelefone: '(31) 99876-5432',
-      data: hoje,
-      horario: '20:30',
-      quantidadePessoas: 6,
-      mesaNumero: 4,
-      status: 'confirmada',
-      especiais: {
-        aniversario: true,
-        presencaBolo: true,
-        decoracao: true,
-        observacoes: 'Aniversário surpresa com bolo e velas.',
-      },
-      observacoes: 'Mesa próxima à área infantil se possível.',
-      origem: 'elobot',
-      criadoEm: `${hoje} 11:15`,
-    },
-    {
-      id: 'res-102',
-      tenantId: 'tenant-01',
-      clienteNome: 'Carlos Eduardo Santos',
-      clienteTelefone: '(31) 98711-2233',
-      data: hoje,
-      horario: '21:00',
-      quantidadePessoas: 4,
-      status: 'pendente',
-      especiais: {
-        aniversario: false,
-        presencaBolo: false,
-        observacoes: 'Jantar de negócios executivo.',
-      },
-      origem: 'elobot',
-      criadoEm: `${hoje} 14:20`,
-    },
-    {
-      id: 'res-103',
-      tenantId: 'tenant-01',
-      clienteNome: 'Juliana Alencar',
-      clienteTelefone: '(31) 99422-7788',
-      data: amanha,
-      horario: '19:45',
-      quantidadePessoas: 8,
-      status: 'confirmada',
-      especiais: {
-        aniversario: true,
-        presencaBolo: true,
-        observacoes: 'Bolo será levado pela família na hora do jantar.',
-      },
-      origem: 'manual',
-      criadoEm: `${hoje} 10:00`,
-    },
-  ],
-};
-
 interface ReservaState {
   reservasPorTenant: Record<string, ReservaMesa[]>;
   getReservas: (tenantId?: string) => ReservaMesa[];
@@ -81,12 +22,14 @@ export const useReservaStore = create<ReservaState>()(
       reservasPorTenant: {},
 
       getReservas: (tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) return [];
         return get().reservasPorTenant[idAlvo] || [];
       },
 
       adicionarReserva: (dados) => {
-        const idAlvo = !dados.tenantId || dados.tenantId === 'global' ? 'tenant-01' : dados.tenantId;
+        const idAlvo = (!dados.tenantId || dados.tenantId === 'global' || dados.tenantId === 'tenant-01') ? '' : dados.tenantId;
+        if (!idAlvo) return { ...dados, id: '', criadoEm: '', tenantId: '' } as ReservaMesa;
         const agora = new Date();
         const novaReserva: ReservaMesa = {
           ...dados,
@@ -128,7 +71,8 @@ export const useReservaStore = create<ReservaState>()(
       },
 
       atualizarStatusReserva: (id, status, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) return;
         set((state) => {
           const lista = state.reservasPorTenant[idAlvo] || [];
           return {
@@ -141,7 +85,8 @@ export const useReservaStore = create<ReservaState>()(
       },
 
       vincularMesaReserva: (id, mesaNumero, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) return;
         const reserva = (get().reservasPorTenant[idAlvo] || []).find((r) => r.id === id);
 
         set((state) => {
@@ -176,7 +121,8 @@ export const useReservaStore = create<ReservaState>()(
       },
 
       cancelarReserva: (id, motivo, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) return;
         const reserva = (get().reservasPorTenant[idAlvo] || []).find((r) => r.id === id);
 
         set((state) => {
@@ -222,7 +168,8 @@ export const useReservaStore = create<ReservaState>()(
       },
 
       sentarReservaNaMesa: (id, mesaNumero, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) return { sucesso: false, mensagem: 'Estabelecimento inválido.' };
         const reserva = (get().reservasPorTenant[idAlvo] || []).find((r) => r.id === id);
         if (!reserva) {
           return { sucesso: false, mensagem: 'Reserva não encontrada.' };

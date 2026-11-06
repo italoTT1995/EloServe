@@ -82,8 +82,8 @@ export const useComissaoStore = create<ComissaoState>()(
         if (!tenantId || tenantId === 'todos') {
           return state.fechamentos || [];
         }
-        const idAlvo = tenantId === 'global' ? 'tenant-01' : tenantId;
-        return (state.fechamentos || []).filter((f) => !f.tenantId || f.tenantId === idAlvo);
+        if (tenantId === 'global' || tenantId === 'tenant-01') return [];
+        return (state.fechamentos || []).filter((f) => f.tenantId === tenantId);
       },
     }),
     {

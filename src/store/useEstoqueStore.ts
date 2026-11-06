@@ -11,6 +11,7 @@ import {
   ItemComandaMesa,
 } from '../types';
 import { converterParaUnidadeEstoque } from '../utils/estoqueUtils';
+import { useProductStore } from './useProductStore';
 
 export const CATEGORIAS_ESTOQUE_NOMES: Record<CategoriaEstoque, string> = {
   alimentos: 'Alimentos & Insumos',
@@ -31,28 +32,36 @@ interface EstoqueState {
   movimentacoes: MovimentacaoEstoque[];
   pedidosProcessados: string[];
 
+  // Getters isolados por Estabelecimento / Restaurante (Tenant)
+  getItensPorTenant: (tenantId?: string) => ItemEstoque[];
+  getComprasPorTenant: (tenantId?: string) => RegistroCompra[];
+  getFichasPorTenant: (tenantId?: string) => FichaTecnica[];
+  getFornecedoresPorTenant: (tenantId?: string) => Fornecedor[];
+  getMovimentacoesPorTenant: (tenantId?: string) => MovimentacaoEstoque[];
+
   // Ações de Integração Cardápio / PDV / Vendas / Salão & Mesas
   processarBaixaVenda: (venda: VendaRealizada) => { sucesso: boolean; movimentacoesGeradas: number };
-  processarBaixaItensMesa: (numeroMesa: number, itensComanda: ItemComandaMesa[], operador: string) => { sucesso: boolean; movimentacoesGeradas: number };
+  processarBaixaItensMesa: (numeroMesa: number, itensComanda: ItemComandaMesa[], operador: string, tenantId?: string) => { sucesso: boolean; movimentacoesGeradas: number };
   estornarBaixaVenda: (venda: VendaRealizada, motivo: string, operador: string) => { sucesso: boolean; itensRestaurados: number };
+  estornarItemComandaMesa: (numeroMesa: number, itemCancelado: ItemComandaMesa, motivo: string, operador: string, tenantId?: string) => { sucesso: boolean; movimentacoesGeradas: number };
   registrarMovimentacao: (mov: Omit<MovimentacaoEstoque, 'id' | 'dataHora'>) => void;
 
   // Ações de Estoque
-  baixarEstoquePorVenda: (produtoNome: string, quantidade: number) => void;
-  registrarSaidaManual: (itemId: string, quantidade: number, motivo: string) => void;
+  baixarEstoquePorVenda: (produtoNome: string, quantidade: number, tenantId?: string) => void;
+  registrarSaidaManual: (itemId: string, quantidade: number, motivo: string, tenantId?: string) => void;
   ajustarSobraDiaAnterior: (itemId: string, sobra: number) => void;
-  adicionarItemEstoque: (item: Omit<ItemEstoque, 'id'>) => void;
+  adicionarItemEstoque: (item: Omit<ItemEstoque, 'id'>, tenantId?: string) => void;
   editarItemEstoque: (id: string, dados: Partial<ItemEstoque>) => void;
   removerItemEstoque: (id: string) => void;
 
   // Ações de Compras
-  adicionarCompra: (compra: Omit<RegistroCompra, 'id'>) => void;
+  adicionarCompra: (compra: Omit<RegistroCompra, 'id'>, tenantId?: string) => void;
 
   // Ações de Fichas Técnicas
-  salvarFichaTecnica: (ficha: FichaTecnica) => void;
+  salvarFichaTecnica: (ficha: FichaTecnica, tenantId?: string) => void;
 
   // Ações de Fornecedores
-  adicionarFornecedor: (fornecedor: Omit<Fornecedor, 'id'>) => void;
+  adicionarFornecedor: (fornecedor: Omit<Fornecedor, 'id'>, tenantId?: string) => void;
 
   // Consumo diário automático na abertura
   processarAberturaDiaConsumoPrevisto: () => void;
@@ -69,7 +78,40 @@ export const useEstoqueStore = create<EstoqueState>()(
       pedidosProcessados: [],
 
       // ==============================================================
-      // BAIXA AUTOMÁTICA EM VENDAS COM FICHA TÉCNICA (SEÇÃO 2 E 4)
+      // CONSULTAS ISOLADAS POR RESTAURANTE
+      // ==============================================================
+      getItensPorTenant: (tenantId?: string) => {
+        const state = get();
+        if (!tenantId || tenantId === 'global') return [];
+        return (state.itens || []).filter((i) => !i.tenantId || i.tenantId === tenantId);
+      },
+
+      getComprasPorTenant: (tenantId?: string) => {
+        const state = get();
+        if (!tenantId || tenantId === 'global') return [];
+        return (state.compras || []).filter((c) => !c.tenantId || c.tenantId === tenantId);
+      },
+
+      getFichasPorTenant: (tenantId?: string) => {
+        const state = get();
+        if (!tenantId || tenantId === 'global') return [];
+        return (state.fichasTecnicas || []).filter((f) => !f.tenantId || f.tenantId === tenantId);
+      },
+
+      getFornecedoresPorTenant: (tenantId?: string) => {
+        const state = get();
+        if (!tenantId || tenantId === 'global') return [];
+        return (state.fornecedores || []).filter((f) => !f.tenantId || f.tenantId === tenantId);
+      },
+
+      getMovimentacoesPorTenant: (tenantId?: string) => {
+        const state = get();
+        if (!tenantId || tenantId === 'global') return [];
+        return (state.movimentacoes || []).filter((m) => !m.tenantId || m.tenantId === tenantId);
+      },
+
+      // ==============================================================
+      // BAIXA AUTOMÁTICA EM VENDAS COM FICHA TÉCNICA OU VÍNCULO DIRETO
       // ==============================================================
       processarBaixaVenda: (venda) => {
         const state = get();
@@ -84,12 +126,34 @@ export const useEstoqueStore = create<EstoqueState>()(
           new Date().toLocaleDateString('pt-BR') +
           ' ' +
           new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const targetTenantId = venda.tenantId;
 
         venda.itens.forEach((itemVendido) => {
-          // 1. Caso o item do prato possua Ficha Técnica / Ingredientes vinculados
-          if (itemVendido.fichaTecnica && itemVendido.fichaTecnica.length > 0) {
-            itemVendido.fichaTecnica.forEach((ing) => {
-              const itemIdx = itensAtuais.findIndex((it) => it.id === ing.ingredienteId);
+          let ficha = itemVendido.fichaTecnica;
+          let itemEstoqueIdDireto: string | undefined = undefined;
+
+          // Se a ficha técnica não veio inline no item de venda, consulta pelo catálogo de produtos
+          if (!ficha || ficha.length === 0) {
+            try {
+              const prods = useProductStore.getState().getProdutosPorTenant(targetTenantId);
+              const prod = prods.find((p) => p.id === itemVendido.produtoId);
+              if (prod) {
+                if (prod.fichaTecnica && prod.fichaTecnica.length > 0) {
+                  ficha = prod.fichaTecnica;
+                }
+                if (prod.itemEstoqueId) {
+                  itemEstoqueIdDireto = prod.itemEstoqueId;
+                }
+              }
+            } catch (_) {}
+          }
+
+          // 1. Caso o item possua Ficha Técnica (receita de múltiplos ingredientes)
+          if (ficha && ficha.length > 0) {
+            ficha.forEach((ing) => {
+              const itemIdx = itensAtuais.findIndex(
+                (it) => it.id === ing.ingredienteId && (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId)
+              );
               if (itemIdx > -1) {
                 const itemEst = itensAtuais[itemIdx];
                 const qtdPorPorcaoNaUnidadeEstoque = converterParaUnidadeEstoque(
@@ -115,6 +179,7 @@ export const useEstoqueStore = create<EstoqueState>()(
 
                 novasMovimentacoes.push({
                   id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                  tenantId: targetTenantId || itemEst.tenantId,
                   dataHora: agoraTexto,
                   itemId: itemEst.id,
                   itemNome: itemEst.nome,
@@ -128,10 +193,42 @@ export const useEstoqueStore = create<EstoqueState>()(
                 });
               }
             });
+          } else if (itemEstoqueIdDireto) {
+            // 2. Caso o item possua vínculo direto unitário no estoque (ex: cerveja, refrigerante, água)
+            const itemIdx = itensAtuais.findIndex(
+              (it) => it.id === itemEstoqueIdDireto && (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId)
+            );
+            if (itemIdx > -1) {
+              const itemEst = itensAtuais[itemIdx];
+              const totalConsumo = itemVendido.quantidade;
+              const novoSaldo = Math.max(0, Number((itemEst.quantidadeAtual - totalConsumo).toFixed(4)));
+              itemEst.quantidadeAtual = novoSaldo;
+              let novoStatus = itemEst.statusDisponibilidade;
+              if (novoSaldo <= 5) novoStatus = 'esgotado';
+              else if (novoSaldo <= itemEst.estoqueMinimo) novoStatus = 'esgotando';
+              else novoStatus = 'disponivel';
+              itemEst.statusDisponibilidade = novoStatus;
+
+              novasMovimentacoes.push({
+                id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                tenantId: targetTenantId || itemEst.tenantId,
+                dataHora: agoraTexto,
+                itemId: itemEst.id,
+                itemNome: itemEst.nome,
+                tipo: 'saida_venda',
+                quantidade: totalConsumo,
+                unidadeMedida: itemEst.unidadeMedida,
+                motivo: `Venda #${venda.id}: ${itemVendido.quantidade}x ${itemVendido.nome} (Vínculo Direto)`,
+                pedidoId: venda.id,
+                responsavel: venda.operador || 'Operador Caixa',
+                saldoApos: novoSaldo,
+              });
+            }
           } else {
-            // 2. Se o prato não possui ficha técnica mas é um produto de controle individual (ex: cerveja/refrigerante)
+            // 3. Fallback: Se não possui ficha técnica mas é item com controle individual pelo nome
             const itemIdx = itensAtuais.findIndex(
               (it) =>
+                (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId) &&
                 it.metodoControle === 'individual' &&
                 (it.nome.toLowerCase() === itemVendido.nome.toLowerCase() ||
                   it.nome.toLowerCase().includes(itemVendido.nome.toLowerCase()) ||
@@ -151,6 +248,7 @@ export const useEstoqueStore = create<EstoqueState>()(
 
               novasMovimentacoes.push({
                 id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                tenantId: targetTenantId || itemEst.tenantId,
                 dataHora: agoraTexto,
                 itemId: itemEst.id,
                 itemNome: itemEst.nome,
@@ -178,7 +276,7 @@ export const useEstoqueStore = create<EstoqueState>()(
       // ==============================================================
       // BAIXA AUTOMÁTICA EM ITENS LANÇADOS NA MESA (FICHA TÉCNICA / DIRETO)
       // ==============================================================
-      processarBaixaItensMesa: (numeroMesa, itensComanda, operador) => {
+      processarBaixaItensMesa: (numeroMesa, itensComanda, operador, tenantId) => {
         const state = get();
         const itensAtuais = state.itens.map((it) => ({ ...it }));
         const novasMovimentacoes: MovimentacaoEstoque[] = [];
@@ -186,14 +284,46 @@ export const useEstoqueStore = create<EstoqueState>()(
           new Date().toLocaleDateString('pt-BR') +
           ' ' +
           new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const targetTenantId = tenantId;
 
         itensComanda.forEach((itemLancado) => {
-          // 1. Caso o prato possua Ficha Técnica cadastrada
-          const ficha = state.fichasTecnicas.find((f) => f.produtoId === itemLancado.produtoId);
+          let ficha = state.fichasTecnicas.find(
+            (f) => f.produtoId === itemLancado.produtoId && (!targetTenantId || !f.tenantId || f.tenantId === targetTenantId)
+          );
+          let itemEstoqueIdDireto: string | undefined = undefined;
+
+          // Se não achou na ficha técnica direta, consulta o produto
+          try {
+            const prods = useProductStore.getState().getProdutosPorTenant(targetTenantId);
+            const prod = prods.find((p) => p.id === itemLancado.produtoId);
+            if (prod) {
+              if (prod.itemEstoqueId) itemEstoqueIdDireto = prod.itemEstoqueId;
+              if (!ficha && prod.fichaTecnica && prod.fichaTecnica.length > 0) {
+                ficha = {
+                  id: `ft-${prod.id}`,
+                  tenantId: targetTenantId,
+                  produtoId: prod.id,
+                  nomePrato: prod.nome,
+                  componentes: prod.fichaTecnica.map((ing) => ({
+                    ingredienteId: ing.ingredienteId,
+                    ingredienteNome: ing.ingredienteNome,
+                    pesoGramas: ing.quantidade,
+                    custoPorGrama: 0,
+                    custoTotalComponente: ing.custoUnitarioEstimado || 0,
+                  })),
+                  custoTotalEstimado: 0,
+                  precoVenda: prod.precoVenda,
+                  margemBrutaPercentual: 0,
+                };
+              }
+            }
+          } catch (_) {}
 
           if (ficha && ficha.componentes && ficha.componentes.length > 0) {
             ficha.componentes.forEach((comp) => {
-              const itemIdx = itensAtuais.findIndex((it) => it.id === comp.ingredienteId);
+              const itemIdx = itensAtuais.findIndex(
+                (it) => it.id === comp.ingredienteId && (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId)
+              );
               if (itemIdx > -1) {
                 const itemEst = itensAtuais[itemIdx];
                 const qtdPorPorcaoNaUnidadeEstoque = converterParaUnidadeEstoque(
@@ -219,6 +349,7 @@ export const useEstoqueStore = create<EstoqueState>()(
 
                 novasMovimentacoes.unshift({
                   id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                  tenantId: targetTenantId || itemEst.tenantId,
                   dataHora: agoraTexto,
                   tipo: 'saida_venda',
                   itemId: itemEst.id,
@@ -232,10 +363,41 @@ export const useEstoqueStore = create<EstoqueState>()(
                 });
               }
             });
+          } else if (itemEstoqueIdDireto) {
+            const itemIdx = itensAtuais.findIndex(
+              (it) => it.id === itemEstoqueIdDireto && (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId)
+            );
+            if (itemIdx > -1) {
+              const itemEst = itensAtuais[itemIdx];
+              const totalConsumo = itemLancado.quantidade;
+              const novoSaldo = Math.max(0, itemEst.quantidadeAtual - totalConsumo);
+              itemEst.quantidadeAtual = novoSaldo;
+              let novoStatus = itemEst.statusDisponibilidade;
+              if (novoSaldo <= 5) novoStatus = 'esgotado';
+              else if (novoSaldo <= itemEst.estoqueMinimo) novoStatus = 'esgotando';
+              else novoStatus = 'disponivel';
+              itemEst.statusDisponibilidade = novoStatus;
+
+              novasMovimentacoes.unshift({
+                id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                tenantId: targetTenantId || itemEst.tenantId,
+                dataHora: agoraTexto,
+                tipo: 'saida_venda',
+                itemId: itemEst.id,
+                itemNome: itemEst.nome,
+                quantidade: totalConsumo,
+                unidadeMedida: itemEst.unidadeMedida,
+                motivo: `Mesa #${numeroMesa}: ${itemLancado.quantidade}x ${itemLancado.nome} (Vínculo Direto)`,
+                pedidoId: `Mesa-${numeroMesa}`,
+                responsavel: operador || 'Garçom',
+                saldoApos: novoSaldo,
+              });
+            }
           } else {
-            // 2. Se não possui ficha técnica mas é um produto de controle individual (ex: cerveja/refrigerante)
+            // Item individual pelo nome
             const itemIdx = itensAtuais.findIndex(
               (it) =>
+                (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId) &&
                 it.metodoControle === 'individual' &&
                 (it.nome.toLowerCase() === itemLancado.nome.toLowerCase() ||
                   it.nome.toLowerCase().includes(itemLancado.nome.toLowerCase()) ||
@@ -255,6 +417,7 @@ export const useEstoqueStore = create<EstoqueState>()(
 
               novasMovimentacoes.unshift({
                 id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                tenantId: targetTenantId || itemEst.tenantId,
                 dataHora: agoraTexto,
                 tipo: 'saida_venda',
                 itemId: itemEst.id,
@@ -279,6 +442,157 @@ export const useEstoqueStore = create<EstoqueState>()(
       },
 
       // ==============================================================
+      // ESTORNO / RESTITUIÇÃO DE ITEM CANCELADO NA MESA
+      // ==============================================================
+      estornarItemComandaMesa: (numeroMesa, itemCancelado, motivo, operador, tenantId) => {
+        const state = get();
+        const novasMovimentacoes: MovimentacaoEstoque[] = [];
+        const itensAtuais = state.itens.map((item) => ({ ...item }));
+        const agoraTexto =
+          new Date().toLocaleDateString('pt-BR') +
+          ' ' +
+          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const targetTenantId = tenantId;
+
+        let ficha = state.fichasTecnicas.find(
+          (f) => f.produtoId === itemCancelado.produtoId && (!targetTenantId || !f.tenantId || f.tenantId === targetTenantId)
+        );
+        let itemEstoqueIdDireto: string | undefined = undefined;
+
+        try {
+          const prods = useProductStore.getState().getProdutosPorTenant(targetTenantId);
+          const prod = prods.find((p) => p.id === itemCancelado.produtoId);
+          if (prod) {
+            if (prod.itemEstoqueId) itemEstoqueIdDireto = prod.itemEstoqueId;
+            if (!ficha && prod.fichaTecnica && prod.fichaTecnica.length > 0) {
+              ficha = {
+                id: `ft-${prod.id}`,
+                tenantId: targetTenantId,
+                produtoId: prod.id,
+                nomePrato: prod.nome,
+                componentes: prod.fichaTecnica.map((ing) => ({
+                  ingredienteId: ing.ingredienteId,
+                  ingredienteNome: ing.ingredienteNome,
+                  pesoGramas: ing.quantidade,
+                  custoPorGrama: 0,
+                  custoTotalComponente: ing.custoUnitarioEstimado || 0,
+                })),
+                custoTotalEstimado: 0,
+                precoVenda: prod.precoVenda,
+                margemBrutaPercentual: 0,
+              };
+            }
+          }
+        } catch (_) {}
+
+        if (ficha && ficha.componentes && ficha.componentes.length > 0) {
+          ficha.componentes.forEach((comp) => {
+            const itemIdx = itensAtuais.findIndex(
+              (it) => it.id === comp.ingredienteId && (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId)
+            );
+            if (itemIdx > -1) {
+              const itemEst = itensAtuais[itemIdx];
+              const qtdPorPorcaoNaUnidadeEstoque = converterParaUnidadeEstoque(
+                comp.pesoGramas,
+                'g',
+                itemEst.unidadeMedida
+              );
+              const totalDevolvido = Number((qtdPorPorcaoNaUnidadeEstoque * itemCancelado.quantidade).toFixed(4));
+              const novoSaldo = Number((itemEst.quantidadeAtual + totalDevolvido).toFixed(4));
+              itemEst.quantidadeAtual = novoSaldo;
+              let novoStatus = itemEst.statusDisponibilidade;
+              if (novoSaldo > itemEst.estoqueMinimo) novoStatus = 'disponivel';
+              itemEst.statusDisponibilidade = novoStatus;
+
+              novasMovimentacoes.push({
+                id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                tenantId: targetTenantId || itemEst.tenantId,
+                dataHora: agoraTexto,
+                tipo: 'estorno_cancelamento',
+                itemId: itemEst.id,
+                itemNome: itemEst.nome,
+                quantidade: totalDevolvido,
+                unidadeMedida: itemEst.unidadeMedida,
+                motivo: `Cancelamento Mesa #${numeroMesa}: ${motivo || 'Item Cancelado'} (${itemCancelado.quantidade}x ${itemCancelado.nome})`,
+                pedidoId: `Mesa-${numeroMesa}`,
+                responsavel: operador || 'Gerente',
+                saldoApos: novoSaldo,
+              });
+            }
+          });
+        } else if (itemEstoqueIdDireto) {
+          const itemIdx = itensAtuais.findIndex(
+            (it) => it.id === itemEstoqueIdDireto && (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId)
+          );
+          if (itemIdx > -1) {
+            const itemEst = itensAtuais[itemIdx];
+            const totalDevolvido = itemCancelado.quantidade;
+            const novoSaldo = Number((itemEst.quantidadeAtual + totalDevolvido).toFixed(4));
+            itemEst.quantidadeAtual = novoSaldo;
+            let novoStatus = itemEst.statusDisponibilidade;
+            if (novoSaldo > itemEst.estoqueMinimo) novoStatus = 'disponivel';
+            itemEst.statusDisponibilidade = novoStatus;
+
+            novasMovimentacoes.push({
+              id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              tenantId: targetTenantId || itemEst.tenantId,
+              dataHora: agoraTexto,
+              tipo: 'estorno_cancelamento',
+              itemId: itemEst.id,
+              itemNome: itemEst.nome,
+              quantidade: totalDevolvido,
+              unidadeMedida: itemEst.unidadeMedida,
+              motivo: `Cancelamento Mesa #${numeroMesa}: ${motivo || 'Item Cancelado'} (Vínculo Direto)`,
+              pedidoId: `Mesa-${numeroMesa}`,
+              responsavel: operador || 'Gerente',
+              saldoApos: novoSaldo,
+            });
+          }
+        } else {
+          const itemIdx = itensAtuais.findIndex(
+            (it) =>
+              (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId) &&
+              it.metodoControle === 'individual' &&
+              (it.nome.toLowerCase() === itemCancelado.nome.toLowerCase() ||
+                it.nome.toLowerCase().includes(itemCancelado.nome.toLowerCase()) ||
+                itemCancelado.nome.toLowerCase().includes(it.nome.toLowerCase()))
+          );
+
+          if (itemIdx > -1) {
+            const itemEst = itensAtuais[itemIdx];
+            const totalDevolvido = itemCancelado.quantidade;
+            const novoSaldo = itemEst.quantidadeAtual + totalDevolvido;
+            itemEst.quantidadeAtual = novoSaldo;
+            let novoStatus = itemEst.statusDisponibilidade;
+            if (novoSaldo > itemEst.estoqueMinimo) novoStatus = 'disponivel';
+            itemEst.statusDisponibilidade = novoStatus;
+
+            novasMovimentacoes.push({
+              id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              tenantId: targetTenantId || itemEst.tenantId,
+              dataHora: agoraTexto,
+              tipo: 'estorno_cancelamento',
+              itemId: itemEst.id,
+              itemNome: itemEst.nome,
+              quantidade: totalDevolvido,
+              unidadeMedida: itemEst.unidadeMedida,
+              motivo: `Cancelamento Mesa #${numeroMesa}: ${motivo || 'Item Cancelado'} (Item Direto)`,
+              pedidoId: `Mesa-${numeroMesa}`,
+              responsavel: operador || 'Gerente',
+              saldoApos: novoSaldo,
+            });
+          }
+        }
+
+        set({
+          itens: itensAtuais,
+          movimentacoes: [...novasMovimentacoes, ...state.movimentacoes],
+        });
+
+        return { sucesso: true, movimentacoesGeradas: novasMovimentacoes.length };
+      },
+
+      // ==============================================================
       // ESTORNO / CANCELAMENTO DE VENDA COM RESTITUIÇÃO AO ESTOQUE
       // ==============================================================
       estornarBaixaVenda: (venda, motivo, operador) => {
@@ -289,11 +603,32 @@ export const useEstoqueStore = create<EstoqueState>()(
           new Date().toLocaleDateString('pt-BR') +
           ' ' +
           new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const targetTenantId = venda.tenantId;
 
         venda.itens.forEach((itemVendido) => {
-          if (itemVendido.fichaTecnica && itemVendido.fichaTecnica.length > 0) {
-            itemVendido.fichaTecnica.forEach((ing) => {
-              const itemIdx = itensAtuais.findIndex((it) => it.id === ing.ingredienteId);
+          let ficha = itemVendido.fichaTecnica;
+          let itemEstoqueIdDireto: string | undefined = undefined;
+
+          if (!ficha || ficha.length === 0) {
+            try {
+              const prods = useProductStore.getState().getProdutosPorTenant(targetTenantId);
+              const prod = prods.find((p) => p.id === itemVendido.produtoId);
+              if (prod) {
+                if (prod.fichaTecnica && prod.fichaTecnica.length > 0) {
+                  ficha = prod.fichaTecnica;
+                }
+                if (prod.itemEstoqueId) {
+                  itemEstoqueIdDireto = prod.itemEstoqueId;
+                }
+              }
+            } catch (_) {}
+          }
+
+          if (ficha && ficha.length > 0) {
+            ficha.forEach((ing) => {
+              const itemIdx = itensAtuais.findIndex(
+                (it) => it.id === ing.ingredienteId && (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId)
+              );
               if (itemIdx > -1) {
                 const itemEst = itensAtuais[itemIdx];
                 const qtdPorPorcaoNaUnidadeEstoque = converterParaUnidadeEstoque(
@@ -311,6 +646,7 @@ export const useEstoqueStore = create<EstoqueState>()(
 
                 novasMovimentacoes.push({
                   id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                  tenantId: targetTenantId || itemEst.tenantId,
                   dataHora: agoraTexto,
                   itemId: itemEst.id,
                   itemNome: itemEst.nome,
@@ -324,9 +660,38 @@ export const useEstoqueStore = create<EstoqueState>()(
                 });
               }
             });
+          } else if (itemEstoqueIdDireto) {
+            const itemIdx = itensAtuais.findIndex(
+              (it) => it.id === itemEstoqueIdDireto && (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId)
+            );
+            if (itemIdx > -1) {
+              const itemEst = itensAtuais[itemIdx];
+              const totalDevolvido = itemVendido.quantidade;
+              const novoSaldo = Number((itemEst.quantidadeAtual + totalDevolvido).toFixed(4));
+              itemEst.quantidadeAtual = novoSaldo;
+              let novoStatus = itemEst.statusDisponibilidade;
+              if (novoSaldo > itemEst.estoqueMinimo) novoStatus = 'disponivel';
+              itemEst.statusDisponibilidade = novoStatus;
+
+              novasMovimentacoes.push({
+                id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                tenantId: targetTenantId || itemEst.tenantId,
+                dataHora: agoraTexto,
+                itemId: itemEst.id,
+                itemNome: itemEst.nome,
+                tipo: 'estorno_cancelamento',
+                quantidade: totalDevolvido,
+                unidadeMedida: itemEst.unidadeMedida,
+                motivo: `Estorno Venda #${venda.id}: ${motivo || 'Cancelamento'} (Vínculo Direto)`,
+                pedidoId: venda.id,
+                responsavel: operador || 'Operador / Admin',
+                saldoApos: novoSaldo,
+              });
+            }
           } else {
             const itemIdx = itensAtuais.findIndex(
               (it) =>
+                (!targetTenantId || !it.tenantId || it.tenantId === targetTenantId) &&
                 it.metodoControle === 'individual' &&
                 (it.nome.toLowerCase() === itemVendido.nome.toLowerCase() ||
                   it.nome.toLowerCase().includes(itemVendido.nome.toLowerCase()) ||
@@ -344,6 +709,7 @@ export const useEstoqueStore = create<EstoqueState>()(
 
               novasMovimentacoes.push({
                 id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                tenantId: targetTenantId || itemEst.tenantId,
                 dataHora: agoraTexto,
                 itemId: itemEst.id,
                 itemNome: itemEst.nome,
@@ -381,10 +747,13 @@ export const useEstoqueStore = create<EstoqueState>()(
         set((state) => ({ movimentacoes: [novaMov, ...state.movimentacoes] }));
       },
 
-      baixarEstoquePorVenda: (produtoNome, quantidade) => {
+      baixarEstoquePorVenda: (produtoNome, quantidade, tenantId) => {
         if (!produtoNome) return;
         set((state) => ({
           itens: (state.itens || []).map((item) => {
+            if (tenantId && item.tenantId && item.tenantId !== tenantId) {
+              return item;
+            }
             if (
               item &&
               item.nome &&
@@ -407,7 +776,7 @@ export const useEstoqueStore = create<EstoqueState>()(
         }));
       },
 
-      registrarSaidaManual: (itemId, quantidade, motivo) => {
+      registrarSaidaManual: (itemId, quantidade, motivo, tenantId) => {
         const state = get();
         const agoraTexto =
           new Date().toLocaleDateString('pt-BR') +
@@ -432,6 +801,7 @@ export const useEstoqueStore = create<EstoqueState>()(
           const itemCast = itemModificado as ItemEstoque;
           novasMovimentacoes.unshift({
             id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            tenantId: tenantId || itemCast.tenantId,
             dataHora: agoraTexto,
             itemId: itemCast.id,
             itemNome: itemCast.nome,
@@ -461,10 +831,11 @@ export const useEstoqueStore = create<EstoqueState>()(
         }));
       },
 
-      adicionarItemEstoque: (item) => {
+      adicionarItemEstoque: (item, tenantId) => {
         const novo: ItemEstoque = {
           ...item,
           id: `est-${Date.now().toString().slice(-4)}`,
+          tenantId: tenantId || item.tenantId,
         };
         set((state) => ({ itens: [novo, ...state.itens] }));
       },
@@ -481,9 +852,10 @@ export const useEstoqueStore = create<EstoqueState>()(
         }));
       },
 
-      adicionarCompra: (compra) => {
+      adicionarCompra: (compra, tenantId) => {
         const novoId = `cmp-${Date.now().toString().slice(-4)}`;
-        const novoRegistro: RegistroCompra = { ...compra, id: novoId };
+        const tId = tenantId || compra.tenantId;
+        const novoRegistro: RegistroCompra = { ...compra, id: novoId, tenantId: tId };
         const agoraTexto =
           new Date().toLocaleDateString('pt-BR') +
           ' ' +
@@ -492,7 +864,10 @@ export const useEstoqueStore = create<EstoqueState>()(
         set((state) => {
           let itemComprado: ItemEstoque | null = null;
           const itensAtualizados = state.itens.map((item) => {
-            if (item.nome.toLowerCase() === compra.produtoNome.toLowerCase()) {
+            if (
+              item.nome.toLowerCase() === compra.produtoNome.toLowerCase() &&
+              (!tId || !item.tenantId || item.tenantId === tId)
+            ) {
               const qtdAdicionada = compra.quantidade;
               const novaQtd = item.quantidadeAtual + qtdAdicionada;
               let novoStatus = item.statusDisponibilidade;
@@ -513,6 +888,7 @@ export const useEstoqueStore = create<EstoqueState>()(
             const itemCast = itemComprado as ItemEstoque;
             novasMovimentacoes.unshift({
               id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              tenantId: tId || itemCast.tenantId,
               dataHora: agoraTexto,
               itemId: itemCast.id,
               itemNome: itemCast.nome,
@@ -533,24 +909,31 @@ export const useEstoqueStore = create<EstoqueState>()(
         });
       },
 
-      salvarFichaTecnica: (ficha) => {
+      salvarFichaTecnica: (ficha, tenantId) => {
+        const tId = tenantId || ficha.tenantId;
+        const fichaComTenant = { ...ficha, tenantId: tId };
         set((state) => {
-          const existe = state.fichasTecnicas.some((f) => f.id === ficha.id || f.produtoId === ficha.produtoId);
+          const existe = state.fichasTecnicas.some(
+            (f) => f.id === ficha.id || (f.produtoId === ficha.produtoId && (!tId || f.tenantId === tId))
+          );
           if (existe) {
             return {
               fichasTecnicas: state.fichasTecnicas.map((f) =>
-                f.id === ficha.id || f.produtoId === ficha.produtoId ? ficha : f
+                f.id === ficha.id || (f.produtoId === ficha.produtoId && (!tId || f.tenantId === tId))
+                  ? fichaComTenant
+                  : f
               ),
             };
           }
-          return { fichasTecnicas: [...state.fichasTecnicas, ficha] };
+          return { fichasTecnicas: [...state.fichasTecnicas, fichaComTenant] };
         });
       },
 
-      adicionarFornecedor: (fornecedor) => {
+      adicionarFornecedor: (fornecedor, tenantId) => {
         const novo: Fornecedor = {
           ...fornecedor,
           id: `forn-${Date.now().toString().slice(-4)}`,
+          tenantId: tenantId || fornecedor.tenantId,
         };
         set((state) => ({ fornecedores: [...state.fornecedores, novo] }));
       },
@@ -573,7 +956,7 @@ export const useEstoqueStore = create<EstoqueState>()(
       },
     }),
     {
-      name: 'eloserve_estoque_store_v4',
+      name: 'eloserve_estoque_store_v5',
     }
   )
 );

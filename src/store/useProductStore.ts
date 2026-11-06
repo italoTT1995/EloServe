@@ -42,15 +42,19 @@ export const useProductStore = create<ProductState>()(
         if (!produtosNovos || !categoriasNovas) return;
         const agrupadoProd: Record<string, Produto[]> = {};
         for (const p of produtosNovos) {
-          const tId = (p as any).tenantId || 'tenant-01';
-          if (!agrupadoProd[tId]) agrupadoProd[tId] = [];
-          agrupadoProd[tId].push(p);
+          const tId = (p as any).tenantId || (p as any).tenant_id;
+          if (tId && tId !== 'global' && tId !== 'tenant-01') {
+            if (!agrupadoProd[tId]) agrupadoProd[tId] = [];
+            agrupadoProd[tId].push(p);
+          }
         }
         const agrupadoCat: Record<string, Categoria[]> = {};
         for (const c of categoriasNovas) {
-          const tId = (c as any).tenantId || 'tenant-01';
-          if (!agrupadoCat[tId]) agrupadoCat[tId] = [];
-          agrupadoCat[tId].push(c);
+          const tId = (c as any).tenantId || (c as any).tenant_id;
+          if (tId && tId !== 'global' && tId !== 'tenant-01') {
+            if (!agrupadoCat[tId]) agrupadoCat[tId] = [];
+            agrupadoCat[tId].push(c);
+          }
         }
         set({
           produtosPorTenant: agrupadoProd,
@@ -62,7 +66,8 @@ export const useProductStore = create<ProductState>()(
 
       sincronizarProdutoIndividual: (produto, tenantId) => {
         if (!produto) return;
-        const tId = tenantId || (produto as any).tenantId || 'tenant-01';
+        const tId = tenantId || (produto as any).tenantId || (produto as any).tenant_id;
+        if (!tId || tId === 'global' || tId === 'tenant-01') return;
         set((state) => {
           const map = state.produtosPorTenant || {};
           const listaAtual = map[tId] || [];
@@ -96,37 +101,46 @@ export const useProductStore = create<ProductState>()(
 
       getProdutosPorTenant: (tenantId?: string) => {
         const state = get();
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
-        if (state.produtosPorTenant && state.produtosPorTenant[idAlvo]) {
-          return state.produtosPorTenant[idAlvo];
+        if (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') {
+          return [];
         }
-        if (PRODUTOS_POR_TENANT[idAlvo]) {
-          return PRODUTOS_POR_TENANT[idAlvo];
+        if (state.produtosPorTenant && state.produtosPorTenant[tenantId]) {
+          return state.produtosPorTenant[tenantId];
+        }
+        if (PRODUTOS_POR_TENANT[tenantId]) {
+          return PRODUTOS_POR_TENANT[tenantId];
         }
         return [];
       },
 
       getCategoriasPorTenant: (tenantId?: string) => {
         const state = get();
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
-        if (state.categoriasPorTenant && state.categoriasPorTenant[idAlvo]) {
-          return state.categoriasPorTenant[idAlvo];
+        if (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') {
+          return [];
         }
-        if (CATEGORIAS_POR_TENANT[idAlvo]) {
-          return CATEGORIAS_POR_TENANT[idAlvo];
+        if (state.categoriasPorTenant && state.categoriasPorTenant[tenantId] && state.categoriasPorTenant[tenantId].length > 0) {
+          return state.categoriasPorTenant[tenantId];
+        }
+        if (CATEGORIAS_POR_TENANT[tenantId] && CATEGORIAS_POR_TENANT[tenantId].length > 0) {
+          return CATEGORIAS_POR_TENANT[tenantId];
         }
         return [
-          { id: `c-${idAlvo}-pratos`, nome: 'Pratos Principais' },
-          { id: `c-${idAlvo}-bebidas`, nome: 'Bebidas' },
-          { id: `c-${idAlvo}-sobremesas`, nome: 'Sobremesas' },
+          { id: `c-${tenantId}-pratos`, nome: 'Pratos Principais', icone: 'Utensils', cor: '#FF6B00' },
+          { id: `c-${tenantId}-bebidas`, nome: 'Bebidas & Drinks', icone: 'Wine', cor: '#00A3FF' },
+          { id: `c-${tenantId}-sobremesas`, nome: 'Sobremesas', icone: 'Cake', cor: '#E040FB' },
         ];
       },
 
       adicionarProduto: (novo, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) {
+          console.error('Tentativa de adicionar produto sem restaurante válido vinculado:', tenantId);
+          throw new Error('Identificador do restaurante não definido');
+        }
         const novoProduto: Produto = {
           ...novo,
           id: `p-${idAlvo}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          tenantId: idAlvo,
         };
 
         set((state) => {
@@ -265,7 +279,11 @@ export const useProductStore = create<ProductState>()(
       },
 
       adicionarCategoria: (nome, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) {
+          console.error('Tentativa de adicionar categoria sem restaurante válido');
+          throw new Error('Identificador do restaurante não definido');
+        }
         const novaCat: Categoria = {
           id: `c-${idAlvo}-${Date.now()}`,
           nome: nome.trim(),
@@ -285,7 +303,8 @@ export const useProductStore = create<ProductState>()(
       },
 
       removerCategoria: (id, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) return;
         set((state) => {
           const novasPorTenant: Record<string, Categoria[]> = { ...state.categoriasPorTenant };
           if (novasPorTenant[idAlvo]) {

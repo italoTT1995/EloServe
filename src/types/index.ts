@@ -41,6 +41,7 @@ export interface IngredientePrato {
 
 export interface Produto {
   id: string;
+  tenantId?: string;
   categoriaId: string;
   nome: string;
   descricao?: string;
@@ -52,6 +53,7 @@ export interface Produto {
   disponivel: boolean;
   destaque?: boolean;
   fichaTecnica?: IngredientePrato[];
+  itemEstoqueId?: string; // Vínculo direto a item unitário do estoque (ex: bebidas, refrigerantes, água)
 }
 
 export interface ItemCarrinho {
@@ -312,6 +314,7 @@ export type StatusDisponibilidade = 'disponivel' | 'esgotando' | 'esgotado';
 
 export interface ItemEstoque {
   id: string;
+  tenantId?: string;
   nome: string;
   categoria: CategoriaEstoque;
   metodoControle: MetodoControleEstoque;
@@ -329,6 +332,7 @@ export interface ItemEstoque {
 
 export interface RegistroCompra {
   id: string;
+  tenantId?: string;
   data: string;
   fornecedorOuLocal: string;
   produtoNome: string;
@@ -349,6 +353,7 @@ export interface ComponenteFichaTecnica {
 
 export interface FichaTecnica {
   id: string;
+  tenantId?: string;
   produtoId: string;
   nomePrato: string;
   componentes: ComponenteFichaTecnica[];
@@ -366,6 +371,7 @@ export type TipoMovimentacaoEstoque =
 
 export interface MovimentacaoEstoque {
   id: string;
+  tenantId?: string;
   dataHora: string;
   itemId: string;
   itemNome: string;
@@ -691,6 +697,7 @@ export interface FaixaTaxaEntrega {
 // -------------------------------------------------------------
 export interface Fornecedor {
   id: string;
+  tenantId?: string;
   nomeOuEmpresa: string;
   pessoaContato: string;
   telefone: string;

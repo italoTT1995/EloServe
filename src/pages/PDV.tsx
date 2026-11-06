@@ -34,6 +34,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useProductStore } from '../store/useProductStore';
 import { useEstoqueStore } from '../store/useEstoqueStore';
 import { useSaaSStore } from '../store/useSaaSStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useWindowFocus } from '../hooks/useWindowFocus';
 import { audio } from '../lib/audio';
@@ -68,10 +69,16 @@ export default function PDV() {
   } = useCartStore();
 
   const { registrarVenda, vendas, cancelarVenda, operadorAtivo } = useAppStore();
-  const { tenantAtivoId, getTenantAtivo } = useSaaSStore();
+  const { tenantAtivoId, getTenantAtivo, tenants } = useSaaSStore();
+  const { usuarioLogado } = useAuthStore();
+  const idLoja =
+    usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global' && usuarioLogado.tenantId !== 'tenant-01'
+      ? usuarioLogado.tenantId
+      : tenantAtivoId && tenantAtivoId !== 'global' && tenantAtivoId !== 'tenant-01'
+      ? tenantAtivoId
+      : tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
   const tenantAtual = getTenantAtivo();
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
-  const idLoja = !tenantAtivoId || tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
   const produtos = getProdutosPorTenant(idLoja);
   const categorias = getCategoriasPorTenant(idLoja);
   const { processarBaixaVenda } = useEstoqueStore();

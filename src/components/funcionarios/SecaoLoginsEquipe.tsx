@@ -394,7 +394,7 @@ export function SecaoLoginsEquipe({
             type="button"
             onClick={() => {
               gerarPinAleatorio();
-              setFormTenantId(isVisaoGlobalMaster ? (tenants[0]?.id || 'tenant-01') : tenantId);
+              setFormTenantId(isVisaoGlobalMaster ? (tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '') : tenantId);
               setModalNovoAberto(true);
             }}
             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#FF6B00] to-orange-600 hover:from-[#E66000] hover:to-orange-700 !text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-[#FF6B00]/25 transition-all cursor-pointer active:scale-95 shrink-0"

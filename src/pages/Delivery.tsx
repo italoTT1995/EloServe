@@ -25,6 +25,7 @@ import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useFuncionarioStore } from '../store/useFuncionarioStore';
 import { useProductStore } from '../store/useProductStore';
 import { useSaaSStore } from '../store/useSaaSStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { StatusDelivery, PedidoDelivery, Produto } from '../types';
 
 export default function Delivery() {
@@ -42,9 +43,15 @@ export default function Delivery() {
     adicionarPedidoDelivery,
   } = useDeliveryStore();
 
-  const { tenantAtivoId } = useSaaSStore();
+  const { tenantAtivoId, tenants } = useSaaSStore();
+  const { usuarioLogado } = useAuthStore();
   const { getProdutosPorTenant } = useProductStore();
-  const idLoja = !tenantAtivoId || tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId;
+  const idLoja =
+    usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global' && usuarioLogado.tenantId !== 'tenant-01'
+      ? usuarioLogado.tenantId
+      : tenantAtivoId && tenantAtivoId !== 'global' && tenantAtivoId !== 'tenant-01'
+      ? tenantAtivoId
+      : tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
   const produtos = getProdutosPorTenant(idLoja);
 
   const { funcionarios } = useFuncionarioStore();

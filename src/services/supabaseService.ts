@@ -171,14 +171,15 @@ export const supabaseService = {
   // -------------------------------------------------------------
   // CATEGORIAS & PRODUTOS (CARDÁPIO)
   // -------------------------------------------------------------
-  async salvarCategoria(categoria: Categoria, tenantId: string = 'tenant-01') {
+  async salvarCategoria(categoria: Categoria, tenantId: string) {
+    if (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') return;
     try {
       const payload = {
         id: categoria.id,
         tenant_id: tenantId,
         nome: categoria.nome,
-        icone: categoria.icone,
-        cor: categoria.cor,
+        icone: categoria.icone || 'Utensils',
+        cor: categoria.cor || '#FF6B00',
       };
       const { error } = await supabase.from('categorias').upsert(payload);
       if (error) console.error('Erro ao salvar categoria no Supabase:', error);
@@ -196,12 +197,43 @@ export const supabaseService = {
     }
   },
 
-  async salvarProduto(produto: Produto, tenantId: string = 'tenant-01') {
+  async salvarProduto(produto: Produto, tenantId: string) {
+    if (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') {
+      console.warn('salvarProduto ignorado: tenantId inválido:', tenantId);
+      return;
+    }
     try {
+      let categoriaIdValida = produto.categoriaId || null;
+      if (categoriaIdValida) {
+        // Assegura que a categoria existe no Supabase para não violar a foreign key
+        const { data: catExiste } = await supabase
+          .from('categorias')
+          .select('id')
+          .eq('id', categoriaIdValida)
+          .maybeSingle();
+
+        if (!catExiste) {
+          const catNome = categoriaIdValida.includes('pratos')
+            ? 'Pratos Principais'
+            : categoriaIdValida.includes('bebidas')
+            ? 'Bebidas & Drinks'
+            : categoriaIdValida.includes('sobremesas')
+            ? 'Sobremesas'
+            : 'Geral';
+          await supabase.from('categorias').upsert({
+            id: categoriaIdValida,
+            tenant_id: tenantId,
+            nome: catNome,
+            icone: 'Utensils',
+            cor: '#FF6B00',
+          });
+        }
+      }
+
       const payload = {
         id: produto.id,
         tenant_id: tenantId,
-        categoria_id: produto.categoriaId,
+        categoria_id: categoriaIdValida,
         nome: produto.nome,
         descricao: produto.descricao,
         preco_venda: produto.precoVenda,
@@ -249,7 +281,8 @@ export const supabaseService = {
   // -------------------------------------------------------------
   // MESAS & COMANDAS
   // -------------------------------------------------------------
-  async salvarMesa(mesa: Mesa, tenantId: string = 'tenant-01') {
+  async salvarMesa(mesa: Mesa, tenantId: string) {
+    if (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') return;
     try {
       const payload = {
         id: mesa.id,

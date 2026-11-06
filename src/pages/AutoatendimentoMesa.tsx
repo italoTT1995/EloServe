@@ -39,7 +39,8 @@ export default function AutoatendimentoMesa() {
 
   const tenantQuery = searchParams.get('tenant');
   const tenantAtual = getTenantAtivo();
-  const targetTenantId = tenantQuery || (tenantAtual?.id && tenantAtual.id !== 'global' ? tenantAtual.id : 'tenant-01');
+  const fallbackTenant = tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
+  const targetTenantId = tenantQuery || (tenantAtual?.id && tenantAtual.id !== 'global' ? tenantAtual.id : fallbackTenant);
 
   const infoTenant = tenants.find((t) => t.id === targetTenantId) || tenantAtual;
 

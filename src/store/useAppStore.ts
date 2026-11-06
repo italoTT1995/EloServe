@@ -123,9 +123,11 @@ export const useAppStore = create<AppState>()(
         if (!mesasNovas || mesasNovas.length === 0) return;
         const agrupadoMesas: Record<string, Mesa[]> = {};
         for (const m of mesasNovas) {
-          const tId = m.tenantId || 'tenant-01';
-          if (!agrupadoMesas[tId]) agrupadoMesas[tId] = [];
-          agrupadoMesas[tId].push(m);
+          const tId = m.tenantId || (m as any).tenant_id;
+          if (tId && tId !== 'global' && tId !== 'tenant-01') {
+            if (!agrupadoMesas[tId]) agrupadoMesas[tId] = [];
+            agrupadoMesas[tId].push(m);
+          }
         }
         set({
           mesasPorTenant: agrupadoMesas,
@@ -135,7 +137,8 @@ export const useAppStore = create<AppState>()(
 
       sincronizarMesaIndividual: (mesaAtualizada) => {
         if (!mesaAtualizada) return;
-        const tId = mesaAtualizada.tenantId || 'tenant-01';
+        const tId = mesaAtualizada.tenantId || (mesaAtualizada as any).tenant_id;
+        if (!tId || tId === 'global' || tId === 'tenant-01') return;
         set((state) => {
           const map = state.mesasPorTenant || {};
           const listaAtual = map[tId] || [];
@@ -173,7 +176,10 @@ export const useAppStore = create<AppState>()(
 
       getMesasPorTenant: (tenantId?: string) => {
         const state = get();
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        if (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') {
+          return [];
+        }
+        const idAlvo = tenantId;
         const map = state.mesasPorTenant || {};
         if (map[idAlvo] && map[idAlvo].length > 0) {
           return map[idAlvo];
@@ -252,8 +258,10 @@ export const useAppStore = create<AppState>()(
         if (tenantId === 'todos') {
           return state.vendas || [];
         }
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
-        return (state.vendas || []).filter((v) => !v.tenantId || v.tenantId === idAlvo);
+        if (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') {
+          return [];
+        }
+        return (state.vendas || []).filter((v) => v.tenantId === tenantId);
       },
 
       getDespesasPorTenant: (tenantId?: string) => {
@@ -261,8 +269,10 @@ export const useAppStore = create<AppState>()(
         if (tenantId === 'todos') {
           return state.despesasRestaurante || [];
         }
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
-        return (state.despesasRestaurante || []).filter((d) => !d.tenantId || d.tenantId === idAlvo);
+        if (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') {
+          return [];
+        }
+        return (state.despesasRestaurante || []).filter((d) => d.tenantId === tenantId);
       },
 
       adicionarDespesaRestaurante: (despesa) => {
@@ -305,8 +315,10 @@ export const useAppStore = create<AppState>()(
         if (tenantId === 'todos') {
           return lista;
         }
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
-        return lista.filter((n) => !n.tenantId || n.tenantId === idAlvo);
+        if (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') {
+          return [];
+        }
+        return lista.filter((n) => n.tenantId === tenantId);
       },
 
       adicionarNotaFiscal: (nota) => {
@@ -479,10 +491,14 @@ export const useAppStore = create<AppState>()(
       },
 
       atualizarStatusMesa: (numero, status, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numero)) || '')
+          : tenantId;
+        if (!idAlvo) return;
         let mesaAlvo: Mesa | undefined;
-        set((state) => {
-          const map = state.mesasPorTenant || MESAS_POR_TENANT;
+        set((s) => {
+          const map = s.mesasPorTenant || MESAS_POR_TENANT;
           const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
           const novaLista = listaAtual.map((m) => {
             if (m.numero === numero) {
@@ -505,7 +521,10 @@ export const useAppStore = create<AppState>()(
       },
 
       adicionarMesa: (dados, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) {
+          return { sucesso: false, mensagem: 'Restaurante não identificado para adicionar mesa.' };
+        }
         const estado = get();
         const map = estado.mesasPorTenant || MESAS_POR_TENANT;
         const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
@@ -535,8 +554,11 @@ export const useAppStore = create<AppState>()(
       },
 
       removerMesa: (numero, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         const estado = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(estado.mesasPorTenant || {}).find((t) => estado.mesasPorTenant[t]?.some((m) => m.numero === numero)) || '')
+          : tenantId;
+        if (!idAlvo) return { sucesso: false, mensagem: 'Restaurante não identificado.' };
         const map = estado.mesasPorTenant || MESAS_POR_TENANT;
         const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
         const mesa = listaAtual.find((m) => m.numero === numero);
@@ -562,10 +584,14 @@ export const useAppStore = create<AppState>()(
       },
 
       editarMesa: (numero, dados, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numero)) || '')
+          : tenantId;
+        if (!idAlvo) return;
         let mesaAtualizada: Mesa | undefined;
-        set((state) => {
-          const map = state.mesasPorTenant || MESAS_POR_TENANT;
+        set((s) => {
+          const map = s.mesasPorTenant || MESAS_POR_TENANT;
           const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
           const novaLista = listaAtual.map((m) => {
             if (m.numero === numero) {
@@ -588,10 +614,14 @@ export const useAppStore = create<AppState>()(
       },
 
       adicionarPessoaMesa: (numeroMesa, nomePessoa, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numeroMesa)) || '')
+          : tenantId;
+        if (!idAlvo) return;
         let mesaAtualizada: Mesa | undefined;
-        set((state) => {
-          const map = state.mesasPorTenant || MESAS_POR_TENANT;
+        set((s) => {
+          const map = s.mesasPorTenant || MESAS_POR_TENANT;
           const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
           const novaLista = listaAtual.map((m) => {
             if (m.numero !== numeroMesa) return m;
@@ -619,10 +649,14 @@ export const useAppStore = create<AppState>()(
       },
 
       removerPessoaMesa: (numeroMesa, nomePessoa, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numeroMesa)) || '')
+          : tenantId;
+        if (!idAlvo) return;
         let mesaAtualizada: Mesa | undefined;
-        set((state) => {
-          const map = state.mesasPorTenant || MESAS_POR_TENANT;
+        set((s) => {
+          const map = s.mesasPorTenant || MESAS_POR_TENANT;
           const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
           const novaLista = listaAtual.map((m) => {
             if (m.numero !== numeroMesa) return m;
@@ -647,8 +681,11 @@ export const useAppStore = create<AppState>()(
       },
 
       cancelarItemComandaMesa: (numeroMesa, itemId, motivo, gerenteNome, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numeroMesa)) || '')
+          : tenantId;
+        if (!idAlvo) return { sucesso: false, mensagem: 'Restaurante não identificado.' };
         const map = state.mesasPorTenant || MESAS_POR_TENANT;
         const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
         const mesa = listaAtual.find((m) => m.numero === numeroMesa);
@@ -660,6 +697,17 @@ export const useAppStore = create<AppState>()(
         if (!itemAlvo) {
           return { sucesso: false, mensagem: 'Item não encontrado na comanda.' };
         }
+
+        // Restaura ingredientes ou produto unitário diretamente no Estoque com tenantId correto
+        useEstoqueStore
+          .getState()
+          .estornarItemComandaMesa(
+            numeroMesa,
+            itemAlvo,
+            motivo || 'Cancelado pelo Gerente',
+            gerenteNome || 'Gerente',
+            idAlvo
+          );
 
         const novosItens = mesa.comandaItens.filter((it) => it.id !== itemId);
         const novoTotal = Number(novosItens.reduce((sum, it) => sum + it.subtotal, 0).toFixed(2));
@@ -699,14 +747,17 @@ export const useAppStore = create<AppState>()(
 
         return {
           sucesso: true,
-          mensagem: `Item "${itemAlvo.nome}" cancelado com sucesso.`,
+          mensagem: `Item "${itemAlvo.nome}" cancelado e estoque estornado com sucesso.`,
           itemCancelado: itemAlvo,
         };
       },
 
       toggleTaxaServicoMesa: (numeroMesa, clienteNome, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numeroMesa)) || '')
+          : tenantId;
+        if (!idAlvo) return { sucesso: false, isenta: false };
         const map = state.mesasPorTenant || MESAS_POR_TENANT;
         const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
         let isenta = false;
@@ -747,8 +798,11 @@ export const useAppStore = create<AppState>()(
       },
 
       toggleCouvertMesa: (numeroMesa, clienteNome, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numeroMesa)) || '')
+          : tenantId;
+        if (!idAlvo) return { sucesso: false, isento: false };
         const map = state.mesasPorTenant || MESAS_POR_TENANT;
         const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
         let isento = false;
@@ -789,8 +843,11 @@ export const useAppStore = create<AppState>()(
       },
 
       aplicarDescontoComandaMesa: (numeroMesa, clienteNome, valorDesconto, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numeroMesa)) || '')
+          : tenantId;
+        if (!idAlvo) return;
         const map = state.mesasPorTenant || MESAS_POR_TENANT;
         const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
 
@@ -827,8 +884,11 @@ export const useAppStore = create<AppState>()(
         if (numeroOrigem === numeroDestino) {
           return { sucesso: false, mensagem: 'A mesa de origem e destino devem ser diferentes.' };
         }
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numeroOrigem)) || '')
+          : tenantId;
+        if (!idAlvo) return { sucesso: false, mensagem: 'Restaurante não identificado.' };
         const map = state.mesasPorTenant || MESAS_POR_TENANT;
         const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
 
@@ -1016,8 +1076,13 @@ export const useAppStore = create<AppState>()(
       },
 
       lancarItensComandaMesa: (numeroMesa, novosItens, garcomNome, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numeroMesa)) || '')
+          : tenantId;
+        if (!idAlvo) {
+          return { sucesso: false, pedidoKDSId: '', totalAdicionado: 0 };
+        }
         const map = state.mesasPorTenant || MESAS_POR_TENANT;
         const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
         const mesa = listaAtual.find((m) => m.numero === numeroMesa);
@@ -1065,13 +1130,14 @@ export const useAppStore = create<AppState>()(
           criadoEm: agoraHora,
         };
 
-        // 2. Abate ingredientes/produtos diretamente no Estoque
+        // 2. Abate ingredientes/produtos diretamente no Estoque para este restaurante
         useEstoqueStore
           .getState()
           .processarBaixaItensMesa(
             numeroMesa,
             itensCompletos,
-            garcomNome || mesa.garcomResponsavel || 'Garçom'
+            garcomNome || mesa.garcomResponsavel || 'Garçom',
+            idAlvo
           );
 
         // 3. Atualiza estado da mesa daquela loja isolada e KDS
@@ -1184,17 +1250,20 @@ export const useAppStore = create<AppState>()(
         // Notifica o Supabase para sincronizar com todos os garçons conectados
         if (pedidoAtual) {
           const ped = pedidoAtual as PedidoKDS;
-          supabaseService.salvarPedido({
-            id: ped.id,
-            tenantId: (ped as any).tenantId || 'tenant-01',
-            numero: ped.numero,
-            tipo: ped.tipo,
-            mesaNumero: ped.mesaNumero,
-            clienteNome: ped.nomeCliente,
-            statusKDS: 'pronto',
-            itens: ped.itens,
-            total: 0,
-          });
+          const targetTId = (ped as any).tenantId || '';
+          if (targetTId && targetTId !== 'global' && targetTId !== 'tenant-01') {
+            supabaseService.salvarPedido({
+              id: ped.id,
+              tenantId: targetTId,
+              numero: ped.numero,
+              tipo: ped.tipo,
+              mesaNumero: ped.mesaNumero,
+              clienteNome: ped.nomeCliente,
+              statusKDS: 'pronto',
+              itens: ped.itens,
+              total: 0,
+            });
+          }
         }
 
         // Se for delivery, avança status
@@ -1271,8 +1340,11 @@ export const useAppStore = create<AppState>()(
       },
 
       marcarItemEntregueMesa: (numeroMesa, itemId, tenantId) => {
-        const idAlvo = !tenantId || tenantId === 'global' ? 'tenant-01' : tenantId;
         const state = get();
+        const idAlvo = (!tenantId || tenantId === 'global' || tenantId === 'tenant-01')
+          ? (Object.keys(state.mesasPorTenant || {}).find((t) => state.mesasPorTenant[t]?.some((m) => m.numero === numeroMesa)) || '')
+          : tenantId;
+        if (!idAlvo) return;
         const map = state.mesasPorTenant || MESAS_POR_TENANT;
         const listaAtual = map[idAlvo] || MESAS_POR_TENANT[idAlvo] || [];
 

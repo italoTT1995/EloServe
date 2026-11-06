@@ -200,8 +200,8 @@ export const useFinanceiroStore = create<FinanceiroState>()(
         if (!tenantId || tenantId === 'todos') {
           return state.lancamentos || [];
         }
-        const idAlvo = tenantId === 'global' ? 'tenant-01' : tenantId;
-        return (state.lancamentos || []).filter((l) => !l.tenantId || l.tenantId === idAlvo);
+        if (tenantId === 'global' || tenantId === 'tenant-01') return [];
+        return (state.lancamentos || []).filter((l) => l.tenantId === tenantId);
       },
 
       getRecorrenciasPorTenant: (tenantId?: string) => {
@@ -209,8 +209,8 @@ export const useFinanceiroStore = create<FinanceiroState>()(
         if (!tenantId || tenantId === 'todos') {
           return state.recorrencias || [];
         }
-        const idAlvo = tenantId === 'global' ? 'tenant-01' : tenantId;
-        return (state.recorrencias || []).filter((r) => !r.tenantId || r.tenantId === idAlvo);
+        if (tenantId === 'global' || tenantId === 'tenant-01') return [];
+        return (state.recorrencias || []).filter((r) => r.tenantId === tenantId);
       },
 
       adicionarLancamento: (dados) => {
@@ -488,7 +488,8 @@ export const useFinanceiroStore = create<FinanceiroState>()(
       // GERADOR DE RECORRÊNCIA AUTOMÁTICO (SEM DUPLICIDADE)
       processarRecorrencias: (tenantId: string) => {
         const state = get();
-        const idAlvo = !tenantId || tenantId === 'todos' || tenantId === 'global' ? 'tenant-01' : tenantId;
+        const idAlvo = (!tenantId || tenantId === 'todos' || tenantId === 'global' || tenantId === 'tenant-01') ? '' : tenantId;
+        if (!idAlvo) return 0;
         const recorrenciasAtivas = (state.recorrencias || []).filter(
           (r) => (r.tenantId === idAlvo || !r.tenantId) && r.ativo
         );

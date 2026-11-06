@@ -86,16 +86,18 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
   const isMasterUser = usuarioLogado?.cargo === 'super_admin';
   const isRestauranteUser = usuarioLogado?.cargo === 'admin_restaurante';
 
+  const fallbackTenant = tenants.find((t) => t.id !== 'global' && t.id !== 'tenant-01')?.id || '';
+
   // Garante que o restaurante logado acesse exclusivamente sua loja
   const defaultTenant = isRestauranteUser
-    ? (usuarioLogado?.tenantId || 'tenant-01')
-    : (tenantIdInicial || (tenants.length > 0 ? tenants[0].id : 'tenant-01'));
+    ? (usuarioLogado?.tenantId || fallbackTenant)
+    : (tenantIdInicial || (tenants.length > 0 ? tenants[0].id : fallbackTenant));
 
   const [tenantSelecionadoId, setTenantSelecionadoId] = useState<string>(defaultTenant);
 
   // Tenant efetivo garantido por regra de segurança
   const tenantEfetivoId = isRestauranteUser
-    ? (usuarioLogado?.tenantId || 'tenant-01')
+    ? (usuarioLogado?.tenantId || fallbackTenant)
     : tenantSelecionadoId;
 
   const restauranteAtual = useMemo(() => {
@@ -172,8 +174,8 @@ export default function Financeiro({ tenantIdInicial, isEmbedded = false }: Fina
 
   // Tenant alvo para salvamento de novos registros
   const tenantParaSalvar = isRestauranteUser
-    ? (usuarioLogado?.tenantId || 'tenant-01')
-    : (tenantSelecionadoId === 'todos' ? (tenants[0]?.id || 'tenant-01') : tenantSelecionadoId);
+    ? (usuarioLogado?.tenantId || fallbackTenant)
+    : (tenantSelecionadoId === 'todos' ? (tenants[0]?.id || fallbackTenant) : tenantSelecionadoId);
 
   // Executa processamento de lançamentos recorrentes futuros ao carregar a página
   useEffect(() => {
