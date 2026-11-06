@@ -20,7 +20,7 @@ export const USUARIOS_PADRAO: Usuario[] = [
     nome: 'Carlos Gerente (Dono / Gestão)',
     email: 'gerente@eloserve.com.br',
     cargo: 'admin_restaurante',
-    tenantId: 'tenant-01',
+    tenantId: 'tenant-8038',
     pin: '1234',
     senha: 'Gerente@2026',
     ativo: true,
@@ -31,7 +31,7 @@ export const USUARIOS_PADRAO: Usuario[] = [
     nome: 'Mariana Caixa (Frente de Caixa)',
     email: 'caixa@eloserve.com.br',
     cargo: 'caixa',
-    tenantId: 'tenant-01',
+    tenantId: 'tenant-8038',
     pin: '2233',
     senha: 'Caixa@2026',
     ativo: true,
@@ -42,7 +42,7 @@ export const USUARIOS_PADRAO: Usuario[] = [
     nome: 'Lucas Garçom (Salão & Mesas)',
     email: 'garcom@eloserve.com.br',
     cargo: 'garcom',
-    tenantId: 'tenant-01',
+    tenantId: 'tenant-8038',
     pin: '3344',
     senha: 'Garcom@2026',
     ativo: true,
@@ -53,7 +53,7 @@ export const USUARIOS_PADRAO: Usuario[] = [
     nome: 'Chef Roberto (Cozinha & KDS)',
     email: 'cozinha@eloserve.com.br',
     cargo: 'cozinha',
-    tenantId: 'tenant-01',
+    tenantId: 'tenant-8038',
     pin: '5566',
     senha: 'Cozinha@2026',
     ativo: true,
@@ -64,7 +64,7 @@ export const USUARIOS_PADRAO: Usuario[] = [
     nome: 'Diego Entregador (Delivery)',
     email: 'entregador@eloserve.com.br',
     cargo: 'entregador',
-    tenantId: 'tenant-01',
+    tenantId: 'tenant-8038',
     pin: '7788',
     senha: 'Entrega@2026',
     ativo: true,
@@ -122,12 +122,41 @@ export const useAuthStore = create<AuthState>()(
 
       sincronizarComSupabase: (usuariosNovos) => {
         if (!usuariosNovos || usuariosNovos.length === 0) return;
-        set({ usuarios: usuariosNovos });
+        set((state) => {
+          const mapa = new Map(state.usuarios.map((u) => [u.id, u]));
+          usuariosNovos.forEach((u) => {
+            const idKey = u.id;
+            const emailKey = u.email ? u.email.toLowerCase() : '';
+            let chaveEncontrada = mapa.has(idKey) ? idKey : null;
+            if (!chaveEncontrada && emailKey) {
+              for (const [k, v] of mapa.entries()) {
+                if (v.email && v.email.toLowerCase() === emailKey) {
+                  chaveEncontrada = k;
+                  break;
+                }
+              }
+            }
+            if (chaveEncontrada) {
+              mapa.set(chaveEncontrada, { ...mapa.get(chaveEncontrada), ...u });
+            } else {
+              mapa.set(idKey, u);
+            }
+          });
+          return { usuarios: Array.from(mapa.values()) };
+        });
       },
 
       adicionarUsuario: (dados) => {
+        let tenantIdFinal = dados.tenantId;
+        if (dados.cargo === 'super_admin') {
+          tenantIdFinal = 'global';
+        } else if (!tenantIdFinal || tenantIdFinal === 'global' || tenantIdFinal === 'tenant-01') {
+          tenantIdFinal = 'tenant-8038';
+        }
+
         const novo: Usuario = {
           ...dados,
+          tenantId: tenantIdFinal,
           id: `usr-${Date.now().toString().slice(-5)}`,
           criadoEm: dados.criadoEm || new Date().toISOString().split('T')[0],
         };
@@ -173,12 +202,19 @@ export const useAuthStore = create<AuthState>()(
           return { sucesso: false, mensagem: `O e-mail "${emailLimpo}" já está cadastrado em outro usuário.` };
         }
 
+        let tenantIdFinal = dados.tenantId;
+        if (dados.cargo === 'super_admin') {
+          tenantIdFinal = 'global';
+        } else if (!tenantIdFinal || tenantIdFinal === 'global' || tenantIdFinal === 'tenant-01') {
+          tenantIdFinal = 'tenant-8038';
+        }
+
         const novoUsuario: Usuario = {
           id: `usr-${Date.now().toString().slice(-6)}`,
           nome: nomeLimpo,
           email: emailLimpo,
           cargo: dados.cargo,
-          tenantId: dados.tenantId || 'tenant-01',
+          tenantId: tenantIdFinal,
           pin: pinLimpo,
           senha: senhaLimpa || pinLimpo,
           ativo: true,
@@ -477,7 +513,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'eloserve_auth_store_v4',
+      name: 'eloserve_auth_store_v5',
       partialize: (state) => ({
         usuarioLogado: state.usuarioLogado,
         isAuthenticated: state.isAuthenticated,
@@ -485,6 +521,14 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
+          if (state.usuarios && state.usuarios.length > 0) {
+            state.usuarios = state.usuarios.map((u) => {
+              if (u.tenantId === 'tenant-01' && u.cargo !== 'super_admin') {
+                return { ...u, tenantId: 'tenant-8038' };
+              }
+              return u;
+            });
+          }
           // Garante que as contas padrão para teste de cada nível da hierarquia estejam presentes
           const emailsExistentes = new Set((state.usuarios || []).map((u) => u.email.toLowerCase()));
           const contasFaltantes = USUARIOS_PADRAO.filter((u) => !emailsExistentes.has(u.email.toLowerCase()));

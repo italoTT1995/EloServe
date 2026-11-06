@@ -115,12 +115,17 @@ export const supabaseService = {
   // -------------------------------------------------------------
   async salvarUsuario(usuario: Usuario) {
     try {
+      let safeTenantId = usuario.tenantId;
+      if (!safeTenantId || safeTenantId === 'tenant-01') {
+        safeTenantId = usuario.cargo === 'super_admin' ? 'global' : 'tenant-8038';
+      }
+
       const payload = {
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email.toLowerCase().trim(),
         cargo: usuario.cargo,
-        tenant_id: usuario.tenantId,
+        tenant_id: safeTenantId,
         avatar: usuario.avatar,
         pin: usuario.pin,
         senha: usuario.senha,

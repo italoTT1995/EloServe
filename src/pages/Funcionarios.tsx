@@ -36,11 +36,11 @@ export default function Funcionarios() {
   } = useFuncionarioStore();
 
   const { usuarioLogado } = useAuthStore();
-  const { tenantAtivoId, getTenantAtivo } = useSaaSStore();
+  const { tenantAtivoId, getTenantAtivo, tenants } = useSaaSStore();
   const tenantAtual = getTenantAtivo();
   const currentTenantId = usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global'
     ? usuarioLogado.tenantId
-    : (tenantAtivoId === 'global' ? 'tenant-01' : tenantAtivoId);
+    : (tenantAtivoId !== 'global' ? tenantAtivoId : (tenants.find(t => t.id !== 'global')?.id || 'tenant-8038'));
 
   const { tema } = useThemeStore();
   const isWhite = tema === 'light';
@@ -133,11 +133,11 @@ export default function Funcionarios() {
     // Sincroniza usuário e cria login no sistema de autenticação
     try {
       const { usuarioLogado } = useAuthStore.getState();
-      const { getTenantAtivo } = useSaaSStore.getState();
+      const { getTenantAtivo, tenants } = useSaaSStore.getState();
       const tenantAtual = getTenantAtivo();
       const tenantIdResolvido = usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global'
         ? usuarioLogado.tenantId
-        : (tenantAtual?.id && tenantAtual.id !== 'global' ? tenantAtual.id : 'global');
+        : (tenantAtivoId !== 'global' ? tenantAtivoId : (tenants.find((t) => t.id !== 'global')?.id || 'tenant-8038'));
 
       const senhaFinal = form.senha.trim() ? form.senha.trim() : `${form.cargo}@2026`;
 
