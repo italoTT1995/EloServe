@@ -1,6 +1,6 @@
 import { useState, ReactNode } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { Crown, ArrowLeft, Megaphone, X, Sparkles, AlertTriangle, Info } from 'lucide-react';
+import { Crown, ArrowLeft, Megaphone, X, Sparkles, AlertTriangle, Info, RotateCcw } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -17,7 +17,7 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { usuarioLogado } = useAuthStore();
-  const { getTenantAtivo, getAvisosAtivosParaTenant, tenantAtivoId, selecionarTenant } = useSaaSStore();
+  const { getTenantAtivo, getAvisosAtivosParaTenant, tenantAtivoId, selecionarTenant, atualizarStatusAssinatura } = useSaaSStore();
   const { tema } = useThemeStore();
   const isWhite = tema === 'light';
 
@@ -59,6 +59,19 @@ export function Layout({ children }: LayoutProps) {
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {(tenantAtual.statusAssinatura === 'cancelado' || tenantAtual.statusAssinatura === 'bloqueado') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    atualizarStatusAssinatura(tenantAtual.id, 'ativo');
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 !text-white font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/30 text-[11px] cursor-pointer"
+                  title="Reativar e colocar em aberto este restaurante agora"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 !text-white" />
+                  <span className="!text-white">Reativar Loja (Deixar em Aberto)</span>
+                </button>
+              )}
               {!isNaTelaSaaS && (
                 <Link
                   to="/saas"

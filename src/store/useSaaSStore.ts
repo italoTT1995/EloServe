@@ -315,9 +315,16 @@ export const useSaaSStore = create<SaaSState>()(
         });
       },
 
-      sincronizarComSupabase: (tenants) => {
-        if (!tenants || tenants.length === 0) return;
-        set({ tenants });
+      sincronizarComSupabase: (tenantsNovos) => {
+        if (!tenantsNovos || tenantsNovos.length === 0) return;
+        set((state) => {
+          const mapa = new Map(state.tenants.map((t) => [t.id, t]));
+          tenantsNovos.forEach((t) => {
+            const existente = mapa.get(t.id);
+            mapa.set(t.id, existente ? { ...existente, ...t } : t);
+          });
+          return { tenants: Array.from(mapa.values()) };
+        });
       },
 
       adicionarTenant: (novo) => {
