@@ -365,7 +365,15 @@ export const useSaaSStore = create<SaaSState>()(
       atualizarDadosTenant: (tenantId, dados) => {
         set((state) => ({
           tenants: state.tenants.map((t) =>
-            t.id === tenantId ? { ...t, ...dados } : t
+            t.id === tenantId
+              ? {
+                  ...t,
+                  ...dados,
+                  ...(dados.statusAssinatura === 'ativo' || dados.statusAssinatura === 'trial'
+                    ? { naLixeira: false, deletadoEm: undefined }
+                    : {}),
+                }
+              : t
           ),
         }));
         supabaseService.atualizarTenant(tenantId, dados);
@@ -374,7 +382,15 @@ export const useSaaSStore = create<SaaSState>()(
       atualizarStatusAssinatura: (tenantId, status) => {
         set((state) => ({
           tenants: state.tenants.map((t) =>
-            t.id === tenantId ? { ...t, statusAssinatura: status } : t
+            t.id === tenantId
+              ? {
+                  ...t,
+                  statusAssinatura: status,
+                  ...(status === 'ativo' || status === 'trial'
+                    ? { naLixeira: false, deletadoEm: undefined }
+                    : {}),
+                }
+              : t
           ),
         }));
         supabaseService.atualizarTenant(tenantId, { statusAssinatura: status });

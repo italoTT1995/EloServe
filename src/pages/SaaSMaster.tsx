@@ -19,6 +19,7 @@ import {
   Crown,
   Calendar,
   X,
+  XCircle,
   Store,
   Bot,
   Sliders,
@@ -1113,6 +1114,7 @@ export default function SaaSMaster() {
 
   const tenantsNaLixeira = tenants.filter((t) => t.naLixeira);
   const tenantsAtivos = tenants.filter((t) => !t.naLixeira);
+  const tenantsCancelados = tenants.filter((t) => t.statusAssinatura === 'cancelado' || Boolean(t.naLixeira));
 
   const tenantsFiltrados = tenants.filter((t) => {
     const matchBusca =
@@ -1123,6 +1125,10 @@ export default function SaaSMaster() {
 
     if (filtroStatus === 'lixeira') {
       return matchBusca && Boolean(t.naLixeira);
+    }
+
+    if (filtroStatus === 'cancelado') {
+      return matchBusca && (t.statusAssinatura === 'cancelado' || Boolean(t.naLixeira));
     }
 
     if (t.naLixeira) return false;
@@ -2055,6 +2061,7 @@ export default function SaaSMaster() {
                 { id: 'trial', label: 'Em Teste' },
                 { id: 'atrasado', label: 'Atrasados' },
                 { id: 'bloqueado', label: 'Bloqueados' },
+                { id: 'cancelado', label: `Cancelados (${tenantsCancelados.length})` },
                 { id: 'lixeira', label: `🗑️ Lixeira (${tenantsNaLixeira.length})` },
               ].map((item) => (
                 <button
@@ -2062,10 +2069,10 @@ export default function SaaSMaster() {
                   onClick={() => setFiltroStatus(item.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                     filtroStatus === item.id
-                      ? item.id === 'lixeira'
+                      ? (item.id === 'lixeira' || item.id === 'cancelado')
                         ? 'bg-rose-600 text-white shadow-sm font-bold'
                         : 'bg-purple-600 text-white shadow-sm font-bold'
-                      : item.id === 'lixeira'
+                      : item.id === 'lixeira' || item.id === 'cancelado'
                       ? 'bg-rose-950/40 border border-rose-500/30 text-rose-300 hover:text-white'
                       : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
                   }`}
@@ -2104,6 +2111,17 @@ export default function SaaSMaster() {
               </button>
             </div>
           </div>
+
+          {filtroStatus === 'cancelado' && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-rose-950/30 border border-rose-500/30 rounded-2xl text-rose-200 text-xs shadow-lg animate-in fade-in duration-150">
+              <div className="flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>
+                  <strong>Restaurantes Cancelados ({tenantsCancelados.length}):</strong> Lojas com assinatura cancelada ou suspensa. Clique no botão verde <strong>"Reativar Loja"</strong> para reabri-las imediatamente em modo Ativo.
+                </span>
+              </div>
+            </div>
+          )}
 
           {filtroStatus === 'lixeira' && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-rose-950/30 border border-rose-500/30 rounded-2xl text-rose-200 text-xs shadow-lg animate-in fade-in duration-150">
@@ -2255,6 +2273,11 @@ export default function SaaSMaster() {
                               <Lock className="w-3 h-3" /> Bloqueado
                             </span>
                           )}
+                          {tenant.statusAssinatura === 'cancelado' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-950/60 text-rose-400 border border-rose-500/30 text-[11px] font-bold">
+                              <XCircle className="w-3 h-3 text-rose-400" /> Cancelado
+                            </span>
+                          )}
                         </td>
 
                         {/* Relatório & Métricas */}
@@ -2395,24 +2418,30 @@ export default function SaaSMaster() {
                                 <MessageSquare className="w-4 h-4" />
                               </button>
 
-                              {/* Bloquear / Desbloquear */}
-                              {tenant.statusAssinatura === 'bloqueado' ? (
+                              {/* Bloquear / Desbloquear / Reativar */}
+                              {tenant.statusAssinatura === 'cancelado' || tenant.statusAssinatura === 'bloqueado' ? (
                                 <button
+                                  type="button"
                                   onClick={() => {
                                     atualizarStatusAssinatura(tenant.id, 'ativo');
+                                    if (tenant.naLixeira) {
+                                      restaurarTenant(tenant.id);
+                                    }
                                     registrarLogAuditoria(
-                                      'Desbloqueio de Restaurante',
+                                      'Reativação de Restaurante',
                                       'seguranca',
-                                      `Acesso do restaurante "${tenant.nomeFantasia}" foi reativado (Desbloqueado)`
+                                      `Acesso do restaurante "${tenant.nomeFantasia}" foi reativado para Ativo (Deixado em Aberto) pelo Franqueador Master.`
                                     );
                                   }}
-                                  title="Desbloquear Restaurante"
-                                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-emerald-500 text-emerald-400 hover:text-white transition-all cursor-pointer"
+                                  title="Reativar Restaurante / Deixar em Aberto (Status Ativo)"
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer whitespace-nowrap"
                                 >
-                                  <Unlock className="w-4 h-4" />
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  <span>Reativar Loja</span>
                                 </button>
                               ) : (
                                 <button
+                                  type="button"
                                   onClick={() => {
                                     if (confirm(`Deseja suspender temporariamente o acesso do restaurante ${tenant.nomeFantasia}?`)) {
                                       atualizarStatusAssinatura(tenant.id, 'bloqueado');
@@ -2703,10 +2732,11 @@ export default function SaaSMaster() {
                           onChange={(e) => setFormEdicao({ ...formEdicao, statusAssinatura: e.target.value as StatusAssinatura })}
                           className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-semibold focus:outline-none focus:border-purple-500"
                         >
-                          <option value="ativo">Ativo (Acesso Completo)</option>
+                          <option value="ativo">Ativo (Acesso Completo / Em Aberto)</option>
                           <option value="trial">Degustação Grátis (Trial)</option>
                           <option value="atrasado">Atrasado (Alerta de Fatura)</option>
                           <option value="bloqueado">Bloqueado (Acesso Suspenso)</option>
+                          <option value="cancelado">Cancelado (Acesso Encerrado)</option>
                         </select>
                       </div>
 
