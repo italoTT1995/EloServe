@@ -19,7 +19,7 @@ import { EloGastroLogo, EloGastroClocheIcon } from '../components/common/EloGast
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { login, solicitarRecuperacaoSenha, redefinirSenhaComToken } = useAuthStore();
   const { selecionarTenant } = useSaaSStore();
 
   // Estados de Login
@@ -29,6 +29,16 @@ export default function Login() {
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+
+  // Estados de Recuperação de Senha Segura
+  const [modalEsqueciAberto, setModalEsqueciAberto] = useState(false);
+  const [emailRecuperacao, setEmailRecuperacao] = useState('');
+  const [codigoToken, setCodigoToken] = useState('');
+  const [novaSenhaRecuperacao, setNovaSenhaRecuperacao] = useState('');
+  const [etapaRecuperacao, setEtapaRecuperacao] = useState<'solicitar' | 'redefinir'>('solicitar');
+  const [msgRecuperacao, setMsgRecuperacao] = useState<string | null>(null);
+  const [erroRecuperacao, setErroRecuperacao] = useState<string | null>(null);
+  const [carregandoRecuperacao, setCarregandoRecuperacao] = useState(false);
 
   // Blindagem contra tema claro (garante visual dark/gourmet premium na tela de login)
   useEffect(() => {
@@ -129,7 +139,7 @@ export default function Login() {
             <div className="flex justify-center mb-2.5 transform hover:scale-105 transition-transform duration-300">
               <img
                 src="/images/elogastro-logo-transparent.png"
-                alt="eloGastrô"
+                alt="EloServe PDV"
                 className="h-24 sm:h-28 w-auto object-contain select-none drop-shadow-2xl"
               />
             </div>
@@ -178,7 +188,19 @@ export default function Login() {
                 <label className="text-xs font-bold text-slate-200 tracking-wide">
                   Senha ou PIN Rápido
                 </label>
-                <span className="text-[10px] font-mono text-slate-400">PIN 4 dígitos ou senha</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalEsqueciAberto(true);
+                    setEmailRecuperacao(email || '');
+                    setMsgRecuperacao(null);
+                    setErroRecuperacao(null);
+                    setEtapaRecuperacao('solicitar');
+                  }}
+                  className="text-[11px] text-orange-400 hover:text-orange-300 font-semibold transition-colors cursor-pointer"
+                >
+                  Esqueci minha senha
+                </button>
               </div>
               <div className="relative group">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 group-focus-within:text-[#FF6B00] transition-colors" />
@@ -223,7 +245,7 @@ export default function Login() {
                 <span>Validando Credenciais...</span>
               ) : (
                 <>
-                  <span>Entrar no eloGastrô</span>
+                  <span>Entrar no EloServe PDV</span>
                   <ArrowRight className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform" />
                 </>
               )}
@@ -254,9 +276,173 @@ export default function Login() {
       {/* 5. Footer Corporativo */}
       <footer className="relative z-10 w-full py-3 text-center pointer-events-none px-4">
         <p className="text-[11px] text-slate-400/90 font-medium drop-shadow-md">
-          © {new Date().getFullYear()} eloGastrô • Gestão completa para o seu restaurante. Tudo conectado à sua mesa.
+          © {new Date().getFullYear()} EloServe PDV • Gestão completa para restaurantes e bares. Tudo conectado à sua operação.
         </p>
       </footer>
+
+      {/* MODAL: RECUPERAÇÃO SEGURA DE SENHA */}
+      {modalEsqueciAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 flex items-center justify-center">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Recuperação de Senha Segura</h3>
+                  <p className="text-[10px] text-slate-400">EloServe PDV • Validação de Credenciais</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEsqueciAberto(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {msgRecuperacao && (
+              <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+                <div className="space-y-1">
+                  <p>{msgRecuperacao}</p>
+                </div>
+              </div>
+            )}
+
+            {erroRecuperacao && (
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{erroRecuperacao}</span>
+              </div>
+            )}
+
+            {etapaRecuperacao === 'solicitar' ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setErroRecuperacao(null);
+                  setCarregandoRecuperacao(true);
+                  setTimeout(() => {
+                    const res = solicitarRecuperacaoSenha(emailRecuperacao);
+                    setCarregandoRecuperacao(false);
+                    setMsgRecuperacao(res.mensagem);
+                    if (res.tokenSimulado) {
+                      setCodigoToken(res.tokenSimulado);
+                    }
+                    setEtapaRecuperacao('redefinir');
+                  }, 400);
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                    Informe seu e-mail de acesso cadastrado:
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={emailRecuperacao}
+                    onChange={(e) => setEmailRecuperacao(e.target.value)}
+                    placeholder="exemplo@restaurante.com"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
+                  💡 <strong>Nota para Garçons e Operadores de Caixa:</strong> Se você esqueceu seu PIN rápido de 4 dígitos, solicite ao <strong>proprietário ou gerente</strong> do seu restaurante para redefinir seu PIN instantaneamente no menu <em>Funcionários & Permissões</em>.
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalEsqueciAberto(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-800 text-xs font-bold text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={carregandoRecuperacao}
+                    className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md cursor-pointer disabled:opacity-50"
+                  >
+                    {carregandoRecuperacao ? 'Gerando Código...' : 'Enviar Código'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setErroRecuperacao(null);
+                  setCarregandoRecuperacao(true);
+                  setTimeout(() => {
+                    const res = redefinirSenhaComToken(codigoToken, novaSenhaRecuperacao);
+                    setCarregandoRecuperacao(false);
+                    if (res.sucesso) {
+                      setSucesso('Senha redefinida com sucesso! Entre agora com sua nova senha.');
+                      setModalEsqueciAberto(false);
+                      setSenha('');
+                    } else {
+                      setErroRecuperacao(res.mensagem);
+                    }
+                  }, 400);
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                    Código de Recuperação (6 dígitos):
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={codigoToken}
+                    onChange={(e) => setCodigoToken(e.target.value)}
+                    placeholder="000000"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-center text-sm font-mono tracking-widest text-white focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                    Defina sua Nova Senha:
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={4}
+                    value={novaSenhaRecuperacao}
+                    onChange={(e) => setNovaSenhaRecuperacao(e.target.value)}
+                    placeholder="Mínimo 4 caracteres"
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEtapaRecuperacao('solicitar')}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-800 text-xs font-bold text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={carregandoRecuperacao}
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md cursor-pointer disabled:opacity-50"
+                  >
+                    {carregandoRecuperacao ? 'Salvando...' : 'Salvar Nova Senha'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

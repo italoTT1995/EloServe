@@ -180,6 +180,49 @@ export function DashboardFinanceiro({
 
     const categoriasOrdenadas = Object.values(mapaCategorias).sort((a, b) => b.total - a.total);
 
+    // 3. Cálculos do DRE & Indicadores Contábeis Simplificados (Problema 15)
+    const totalDescontosVendas = vendasFiltradas.reduce((acc, v) => acc + (v.desconto || 0), 0);
+    const vendasCanceladasPeriodo = vendas.filter((v) => v.status === 'cancelada' && pertenceAoPeriodo(v.dataHora));
+    const totalCancelamentos = vendasCanceladasPeriodo.reduce((acc, v) => acc + (v.total || 0), 0);
+    const deducoesReceita = totalDescontosVendas + totalCancelamentos;
+    const receitaLiquida = Math.max(0, totalReceitas - deducoesReceita);
+
+    // CMV (Custo de Mercadorias Vendidas)
+    let cmvTotal = 0;
+    vendasFiltradas.forEach((v) => {
+      (v.itens || []).forEach((it) => {
+        if (it.fichaTecnica && it.fichaTecnica.length > 0) {
+          const custoFT = it.fichaTecnica.reduce((sum, ing) => sum + (ing.custoUnitarioEstimado || 0) * (ing.quantidade || 1), 0);
+          cmvTotal += custoFT * (it.quantidade || 1);
+        }
+      });
+    });
+    despesas.forEach((d) => {
+      const catObj = categorias.find((c) => c.id === d.categoriaId);
+      const isLinhaCMV = catObj?.linhaDRE === 'cmv';
+      const isNomeCMV = (d.categoriaNome || catObj?.nome || '').toLowerCase().match(/alimento|insumo|bebida|fornecedor|carne|hortifruti/);
+      if (isLinhaCMV || isNomeCMV) {
+        cmvTotal += d.valor;
+      }
+    });
+
+    const cmvFinal = cmvTotal;
+    const margemContribuicao = Math.max(0, receitaLiquida - cmvFinal);
+    const despesasFixas = despesas.reduce((acc, d) => {
+      const catObj = categorias.find((c) => c.id === d.categoriaId);
+      const isLinhaCMV = catObj?.linhaDRE === 'cmv';
+      const isNomeCMV = (d.categoriaNome || catObj?.nome || '').toLowerCase().match(/alimento|insumo|bebida|fornecedor|carne|hortifruti/);
+      return !isLinhaCMV && !isNomeCMV ? acc + d.valor : acc;
+    }, 0);
+
+    const ebitda = margemContribuicao - despesasFixas;
+    const lucroLiquido = resultadoEstimado;
+
+    const pctCMV = receitaLiquida > 0 ? (cmvFinal / receitaLiquida) * 100 : 0;
+    const pctMC = receitaLiquida > 0 ? (margemContribuicao / receitaLiquida) * 100 : 0;
+    const pctEbitda = receitaLiquida > 0 ? (ebitda / receitaLiquida) * 100 : 0;
+    const pctLucroLiquido = totalReceitas > 0 ? (lucroLiquido / totalReceitas) * 100 : 0;
+
     // Tem algum dado no período?
     const temDados = totalReceitas > 0 || totalDespesas > 0 || lancamentosFiltrados.length > 0;
 
@@ -197,6 +240,17 @@ export function DashboardFinanceiro({
       lancamentosFiltrados,
       temDados,
       totalVendasPDV,
+      deducoesReceita,
+      receitaLiquida,
+      cmvFinal,
+      margemContribuicao,
+      despesasFixas,
+      ebitda,
+      lucroLiquido,
+      pctCMV,
+      pctMC,
+      pctEbitda,
+      pctLucroLiquido,
     };
   }, [lancamentos, vendas, categorias, mesSelecionado, anoSelecionado]);
 
@@ -432,6 +486,138 @@ export function DashboardFinanceiro({
               }`}>
                 <span>{dados.contasPendentes.length} conta(s) a pagar</span>
                 <span className={`font-mono ${isWhite ? 'text-slate-400' : 'text-slate-500'}`}>Aguardando baixa</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SEÇÃO DRE: INDICADORES CONTÁBEIS COM EXPLICAÇÕES ACESSÍVEIS (Problema 15) */}
+          <div
+            className={`p-5 rounded-3xl border ${
+              isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1E293B] border-slate-800 shadow-lg'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 mb-4 border-b border-slate-800/60">
+              <div>
+                <h3 className={`text-sm font-black flex items-center gap-2 ${isWhite ? 'text-slate-900' : 'text-slate-100'}`}>
+                  <Layers className="w-4 h-4 text-[#FF6B00]" />
+                  <span>DRE Gerencial — Indicadores de Desempenho do Restaurante</span>
+                </h3>
+                <p className={`text-xs mt-0.5 ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Entenda exatamente para onde vai o faturamento do seu estabelecimento em linguagem direta.
+                </p>
+              </div>
+              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-xl self-start sm:self-center ${
+                isWhite ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+              }`}>
+                Competência: {nomePeriodoExibicao}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Indicador 1: CMV */}
+              <div className={`p-4 rounded-2xl border space-y-2 relative group ${
+                isWhite ? 'bg-slate-50 border-slate-200' : 'bg-[#0F172A] border-slate-800/80'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-orange-500 uppercase tracking-wider">CMV</span>
+                    <div className="relative group/tip cursor-help">
+                      <Info className="w-3.5 h-3.5 text-slate-400" />
+                      <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/tip:block w-56 p-2 rounded-xl bg-slate-950 border border-slate-800 text-[10px] text-slate-300 shadow-2xl z-20">
+                        <strong>Fórmula:</strong> Soma dos insumos consumidos nas fichas técnicas + compras de alimentos e bebidas no período.
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400">
+                    {dados.pctCMV.toFixed(1)}% da receita
+                  </span>
+                </div>
+                <div className="text-lg font-black font-mono text-white">
+                  R$ {dados.cmvFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  <strong className="text-slate-300">Custo de Mercadoria Vendida:</strong> o que você gastou em insumos e ingredientes para produzir os pratos vendidos.
+                </p>
+              </div>
+
+              {/* Indicador 2: Margem de Contribuição */}
+              <div className={`p-4 rounded-2xl border space-y-2 relative group ${
+                isWhite ? 'bg-slate-50 border-slate-200' : 'bg-[#0F172A] border-slate-800/80'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-emerald-400 uppercase tracking-wider">Margem Contribuição</span>
+                    <div className="relative group/tip cursor-help">
+                      <Info className="w-3.5 h-3.5 text-slate-400" />
+                      <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/tip:block w-56 p-2 rounded-xl bg-slate-950 border border-slate-800 text-[10px] text-slate-300 shadow-2xl z-20">
+                        <strong>Fórmula:</strong> Receita Líquida - CMV. É o valor gerado diretamente pelo cardápio para cobrir aluguel, equipe e contas.
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
+                    {dados.pctMC.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="text-lg font-black font-mono text-emerald-400">
+                  R$ {dados.margemContribuicao.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  <strong className="text-slate-300">Margem de Contribuição:</strong> o que sobra da venda dos pratos para pagar os custos fixos da empresa.
+                </p>
+              </div>
+
+              {/* Indicador 3: EBITDA */}
+              <div className={`p-4 rounded-2xl border space-y-2 relative group ${
+                isWhite ? 'bg-slate-50 border-slate-200' : 'bg-[#0F172A] border-slate-800/80'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-sky-400 uppercase tracking-wider">EBITDA</span>
+                    <div className="relative group/tip cursor-help">
+                      <Info className="w-3.5 h-3.5 text-slate-400" />
+                      <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/tip:block w-56 p-2 rounded-xl bg-slate-950 border border-slate-800 text-[10px] text-slate-300 shadow-2xl z-20">
+                        <strong>Fórmula:</strong> Margem de Contribuição - Despesas Fixas Operacionais (folha, aluguel, luz, gás, sistemas).
+                      </div>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                    dados.ebitda >= 0 ? 'bg-sky-500/10 text-sky-400' : 'bg-rose-500/10 text-rose-400'
+                  }`}>
+                    {dados.pctEbitda.toFixed(1)}%
+                  </span>
+                </div>
+                <div className={`text-lg font-black font-mono ${dados.ebitda >= 0 ? 'text-sky-400' : 'text-rose-400'}`}>
+                  R$ {dados.ebitda.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  <strong className="text-slate-300">Lucro Operacional:</strong> o resultado do restaurante antes de juros de empréstimos, impostos finais e depreciação.
+                </p>
+              </div>
+
+              {/* Indicador 4: Deduções da Receita */}
+              <div className={`p-4 rounded-2xl border space-y-2 relative group ${
+                isWhite ? 'bg-slate-50 border-slate-200' : 'bg-[#0F172A] border-slate-800/80'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-purple-400 uppercase tracking-wider">Deduções</span>
+                    <div className="relative group/tip cursor-help">
+                      <Info className="w-3.5 h-3.5 text-slate-400" />
+                      <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/tip:block w-56 p-2 rounded-xl bg-slate-950 border border-slate-800 text-[10px] text-slate-300 shadow-2xl z-20">
+                        <strong>Fórmula:</strong> Descontos aplicados nas vendas do caixa/mesas + cancelamentos ou estornos ocorridos no período.
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">
+                    Descontos/Estornos
+                  </span>
+                </div>
+                <div className="text-lg font-black font-mono text-purple-400">
+                  R$ {dados.deducoesReceita.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  <strong className="text-slate-300">Deduções:</strong> descontos concedidos aos clientes e pedidos cancelados retirados do faturamento bruto.
+                </p>
               </div>
             </div>
           </div>

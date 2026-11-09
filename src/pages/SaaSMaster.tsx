@@ -964,7 +964,7 @@ export default function SaaSMaster() {
 
     let csv = '\uFEFF';
     csv += '=========================================================================\n';
-    csv += `RELATÓRIO MENSAL DE OPERAÇÕES E VENDAS - PLATAFORMA eloGastrô\n`;
+    csv += `RELATÓRIO MENSAL DE OPERAÇÕES E VENDAS - PLATAFORMA EloServe PDV\n`;
     csv += `Restaurante:;${tenantInfo.nomeFantasia}\n`;
     csv += `Documento (CNPJ/CPF):;${tenantInfo.documento || '-'}\n`;
     csv += `Cidade / UF:;${tenantInfo.cidadeUf || '-'}\n`;

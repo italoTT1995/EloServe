@@ -85,11 +85,32 @@ export const useDeliveryStore = create<DeliveryState>()(
           console.warn('Erro ao integrar com KDS:', err);
         }
 
-        // 2. Dar baixa no Estoque e Insumos
+        // 2. Dar baixa no Estoque e Insumos respeitando ficha técnica e conversão de unidades
         try {
-          const { baixarEstoquePorVenda } = useEstoqueStore.getState();
-          novo.itens.forEach((it) => {
-            baixarEstoquePorVenda(it.nome, it.quantidade);
+          const { processarBaixaVenda } = useEstoqueStore.getState();
+          processarBaixaVenda({
+            id: novo.id,
+            tenantId: (novo as any).tenantId,
+            tipoOrigem: 'delivery',
+            dataHora: novo.horario,
+            total: novo.total,
+            subtotalBruto: novo.subtotal,
+            taxaEntrega: novo.taxaEntrega,
+            formaPagamento:
+              novo.formaPagamento === 'dinheiro'
+                ? 'dinheiro'
+                : novo.formaPagamento === 'pix'
+                ? 'pix'
+                : 'credito',
+            itens: novo.itens.map((it) => ({
+              produtoId: it.nome,
+              nome: it.nome,
+              quantidade: it.quantidade,
+              precoUnitario: it.preco,
+              subtotal: it.preco * it.quantidade,
+            })),
+            operador: 'Delivery WhatsApp / Robô',
+            status: 'concluida',
           });
         } catch (err) {
           console.warn('Erro ao processar baixa no estoque:', err);

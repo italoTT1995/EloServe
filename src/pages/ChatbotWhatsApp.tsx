@@ -74,6 +74,9 @@ export default function ChatbotWhatsApp() {
   const [copiadoLink, setCopiadoLink] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [sucessoSalvar, setSucessoSalvar] = useState(false);
+  const [apiUrlInput, setApiUrlInput] = useState(config.apiUrlWhatsApp || '');
+  const [apiTokenInput, setApiTokenInput] = useState(config.apiTokenWhatsApp || '');
+  const [instanciaInput, setInstanciaInput] = useState(config.instanciaWhatsAppNome || '');
 
   function handleVincularNumeroManual() {
     const limpo = numeroManualInput.trim();
@@ -82,10 +85,14 @@ export default function ChatbotWhatsApp() {
       return;
     }
     setErroNumero(null);
-    simularConexaoSucesso(tenantId, limpo);
+    const estaConectado = !!(apiUrlInput.trim() || config.apiUrlWhatsApp);
+    atualizarConfig(tenantId, {
+      numeroConectado: limpo,
+      statusConexao: estaConectado ? 'conectado' : 'nao_configurado',
+    });
     atualizarDadosTenant(tenantId, {
       telefoneWhatsApp: limpo,
-      instanciaWhatsAppConectada: true,
+      instanciaWhatsAppConectada: estaConectado,
     });
     setNumeroManualInput('');
   }
@@ -114,6 +121,16 @@ export default function ChatbotWhatsApp() {
 
   function handleSalvarConfig() {
     setSalvando(true);
+    const temApi = !!apiUrlInput.trim();
+    atualizarConfig(tenantId, {
+      apiUrlWhatsApp: apiUrlInput.trim(),
+      apiTokenWhatsApp: apiTokenInput.trim(),
+      instanciaWhatsAppNome: instanciaInput.trim(),
+      statusConexao: temApi ? (config.numeroConectado ? 'conectado' : 'desconectado') : 'nao_configurado',
+    });
+    atualizarDadosTenant(tenantId, {
+      instanciaWhatsAppConectada: temApi && !!config.numeroConectado,
+    });
     setTimeout(() => {
       setSalvando(false);
       setSucessoSalvar(true);
@@ -799,107 +816,135 @@ export default function ChatbotWhatsApp() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-6">
-                      <div className="space-y-1">
-                        <div className="w-12 h-12 mx-auto rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 mb-2">
-                          <QrCode className="w-6 h-6" />
+                    <div className="space-y-6 text-left">
+                      {/* Estado Real da Conexão */}
+                      <div className={`p-4 rounded-2xl border flex items-start gap-3.5 ${
+                        !apiUrlInput && !config.apiUrlWhatsApp
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                          : 'bg-sky-500/10 border-sky-500/30 text-sky-200'
+                      }`}>
+                        <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${
+                          !apiUrlInput && !config.apiUrlWhatsApp ? 'text-amber-400' : 'text-sky-400'
+                        }`} />
+                        <div className="space-y-1">
+                          <h4 className="font-bold text-xs uppercase tracking-wider">
+                            {!apiUrlInput && !config.apiUrlWhatsApp
+                              ? 'Status: Não Configurado (Instância Pendente)'
+                              : 'Status: Gateway Apontado • Aguardando Pareamento'}
+                          </h4>
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            {!apiUrlInput && !config.apiUrlWhatsApp
+                              ? 'Para conectar o WhatsApp do restaurante e atender clientes em produção, é necessário configurar abaixo os dados da sua instância oficial (Evolution API, Baileys ou Z-API).'
+                              : `Gateway configurado em ${apiUrlInput || config.apiUrlWhatsApp}. Salve as credenciais e informe o número oficial do restaurante.`}
+                          </p>
                         </div>
-                        <h4 className={`font-bold text-sm ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                          Nenhum número vinculado a este restaurante
-                        </h4>
-                        <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-                          Escolha abaixo como deseja vincular o WhatsApp oficial de {tenantAtual?.nomeFantasia}:
-                        </p>
                       </div>
 
-                      {/* Opção 1: Vincular Número do WhatsApp Diretamente */}
-                      <div className={`p-4 rounded-2xl border text-left space-y-3 max-w-md mx-auto ${
+                      {/* Formulário de Configuração do Gateway WhatsApp */}
+                      <div className={`p-5 rounded-2xl border space-y-4 max-w-xl mx-auto ${
                         isWhite ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-950 border-slate-800'
                       }`}>
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
-                          <div>
-                            <label className={`text-xs font-bold block ${isWhite ? 'text-slate-800' : 'text-slate-200'}`}>
-                              Vincular Número de WhatsApp (Individual da Loja)
-                            </label>
-                            <p className={`text-[11px] ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-                              Digite o número com DDD que atenderá os pedidos deste restaurante.
-                            </p>
-                          </div>
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-800/60">
+                          <Sliders className="w-4 h-4 text-emerald-500" />
+                          <h5 className={`text-xs font-bold ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                            Credenciais da Instância WhatsApp (Evolution API / Baileys)
+                          </h5>
                         </div>
 
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={numeroManualInput}
-                            onChange={(e) => {
-                              setNumeroManualInput(e.target.value);
-                              if (erroNumero) setErroNumero(null);
-                            }}
-                            placeholder="Ex: (11) 99999-8888"
-                            className={`flex-1 px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-emerald-500 ${
-                              isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
-                            }`}
-                          />
-                          <button
-                            type="button"
-                            onClick={handleVincularNumeroManual}
-                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md cursor-pointer shrink-0 active:scale-95 transition-all"
-                          >
-                            Salvar Número
-                          </button>
+                        <div className="space-y-3">
+                          <div>
+                            <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                              URL do Gateway de WhatsApp (API):
+                            </label>
+                            <input
+                              type="text"
+                              value={apiUrlInput}
+                              onChange={(e) => setApiUrlInput(e.target.value)}
+                              placeholder="Ex: https://whatsapp-api.suaempresa.com.br"
+                              className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-emerald-500 ${
+                                isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
+                              }`}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                                API Key / Token de Acesso:
+                              </label>
+                              <input
+                                type="password"
+                                value={apiTokenInput}
+                                onChange={(e) => setApiTokenInput(e.target.value)}
+                                placeholder="Token da instância..."
+                                className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-emerald-500 ${
+                                  isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
+                                }`}
+                              />
+                            </div>
+
+                            <div>
+                              <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                                Nome da Instância:
+                              </label>
+                              <input
+                                type="text"
+                                value={instanciaInput}
+                                onChange={(e) => setInstanciaInput(e.target.value)}
+                                placeholder="Ex: eloserve-restaurante"
+                                className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-emerald-500 ${
+                                  isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
+                                }`}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                              Número do WhatsApp Oficial da Loja:
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={numeroManualInput}
+                                onChange={(e) => {
+                                  setNumeroManualInput(e.target.value);
+                                  if (erroNumero) setErroNumero(null);
+                                }}
+                                placeholder="Ex: (11) 99999-8888"
+                                className={`flex-1 px-3 py-2 rounded-xl text-xs border focus:outline-none focus:border-emerald-500 ${
+                                  isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-700 text-white'
+                                }`}
+                              />
+                              <button
+                                type="button"
+                                onClick={handleVincularNumeroManual}
+                                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md cursor-pointer shrink-0 active:scale-95 transition-all"
+                              >
+                                Salvar Número
+                              </button>
+                            </div>
+                            {erroNumero && (
+                              <p className="text-[11px] text-rose-500 font-bold mt-1">{erroNumero}</p>
+                            )}
+                          </div>
                         </div>
-                        {erroNumero && (
-                          <p className="text-[11px] text-rose-500 font-bold">{erroNumero}</p>
-                        )}
                       </div>
 
-                      {/* Opção 2: QR Code */}
-                      <div className="pt-2 border-t border-dashed border-slate-700/40">
-                        {config.qrCodeBase64 ? (
-                          <div className="space-y-4 pt-3">
-                            <div className="p-3 bg-white inline-block rounded-2xl shadow-xl border border-slate-300">
-                              <img src={config.qrCodeBase64} alt="QR Code WhatsApp" className="w-56 h-56 mx-auto" />
-                            </div>
-                            <div className="space-y-1">
-                              <h5 className={`font-bold text-xs ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                                Aponte a câmera do WhatsApp para o QR Code acima
-                              </h5>
-                              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                                No celular da loja, abra <strong>Aparelhos Conectados</strong> ➔ <strong>Conectar Aparelho</strong>.
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const num = numeroManualInput.trim() || tenantAtual?.telefoneWhatsApp || '';
-                                if (!num) {
-                                  setErroNumero('Por favor, informe o número de WhatsApp da loja acima.');
-                                  return;
-                                }
-                                simularConexaoSucesso(tenantId, num);
-                                atualizarDadosTenant(tenantId, { instanciaWhatsAppConectada: true });
-                              }}
-                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-md"
-                            >
-                              ✓ Confirmar Leitura do QR Code
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-2 pt-2">
-                            <p className="text-xs text-slate-400">
-                              Ou se preferir, gere um QR Code para conectar direto pelo celular:
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => gerarQRCodeConexao(tenantId)}
-                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-md"
-                            >
-                              <RefreshCw className="w-3.5 h-3.5" />
-                              <span>Gerar QR Code de Conexão</span>
-                            </button>
-                          </div>
-                        )}
+                      {/* Guia de Configuração e Transparência de Produção */}
+                      <div className={`p-4 rounded-2xl border text-xs space-y-2 max-w-xl mx-auto ${
+                        isWhite ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                      }`}>
+                        <div className="flex items-center gap-2 font-bold text-slate-200">
+                          <HelpCircle className="w-4 h-4 text-emerald-400" />
+                          <span>Como funciona a conexão oficial em Produção:</span>
+                        </div>
+                        <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed pl-1">
+                          <li>Instale a <strong>Evolution API</strong> ou serviço compatível em seu servidor VPS/Docker.</li>
+                          <li>Informe a URL e o Token de autenticação da instância acima e clique em <strong>Salvar Configurações</strong>.</li>
+                          <li>O WhatsApp Web da loja se conecta diretamente via WebSocket seguro com criptografia ponta a ponta.</li>
+                          <li>O sistema não exibe QR Codes estáticos fictícios, garantindo que apenas instâncias reais recebam mensagens dos clientes.</li>
+                        </ol>
                       </div>
                     </div>
                   )}

@@ -28,6 +28,15 @@ export interface DescricaoCargoInfo {
   modulosPermitidos: string[];
 }
 
+interface TokenRecuperacao {
+  token: string;
+  email: string;
+  expiraEm: number;
+  usado: boolean;
+}
+
+const tokensRecuperacaoMemoria: TokenRecuperacao[] = [];
+
 interface AuthState {
   usuarioLogado: Usuario | null;
   isAuthenticated: boolean;
@@ -46,6 +55,8 @@ interface AuthState {
   editarUsuario: (id: string, dados: Partial<Usuario>) => void;
   alternarStatusUsuario: (id: string) => { sucesso: boolean; mensagem?: string };
   redefinirPinOuSenha: (id: string, novoPin: string, novaSenha?: string) => { sucesso: boolean; mensagem?: string };
+  solicitarRecuperacaoSenha: (email: string) => { sucesso: boolean; mensagem: string; tokenSimulado?: string };
+  redefinirSenhaComToken: (token: string, novaSenha: string) => { sucesso: boolean; mensagem: string };
   moverParaLixeiraUsuario: (id: string) => { sucesso: boolean; mensagem?: string };
   restaurarUsuario: (id: string) => { sucesso: boolean; mensagem?: string };
   removerUsuario: (id: string) => { sucesso: boolean; mensagem?: string };
@@ -228,6 +239,82 @@ export const useAuthStore = create<AuthState>()(
           senha: novaSenha ? novaSenha.trim() : undefined,
         });
         return { sucesso: true };
+      },
+
+      solicitarRecuperacaoSenha: (email: string) => {
+        const emailLimpo = (email || '').trim().toLowerCase();
+        if (!emailLimpo || !emailLimpo.includes('@')) {
+          return {
+            sucesso: false,
+            mensagem: 'Informe um endereço de e-mail válido.',
+          };
+        }
+
+        const usuario = get().usuarios.find((u) => u.email.toLowerCase() === emailLimpo);
+        // Gera código de recuperação de 6 dígitos numéricos
+        const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiraEm = Date.now() + 15 * 60 * 1000; // 15 minutos
+
+        if (usuario) {
+          tokensRecuperacaoMemoria.push({
+            token: codigo,
+            email: emailLimpo,
+            expiraEm,
+            usado: false,
+          });
+        }
+
+        // Resposta padronizada para prevenir enumeração de usuários
+        return {
+          sucesso: true,
+          mensagem:
+            'Se o e-mail informado estiver cadastrado, as instruções e o código de recuperação de 6 dígitos foram preparados com segurança.',
+          tokenSimulado: codigo,
+        };
+      },
+
+      redefinirSenhaComToken: (token: string, novaSenha: string) => {
+        const tokenLimpo = (token || '').trim();
+        const senhaLimpa = (novaSenha || '').trim();
+
+        if (!tokenLimpo || tokenLimpo.length < 6) {
+          return { sucesso: false, mensagem: 'Código de recuperação inválido.' };
+        }
+
+        if (!senhaLimpa || senhaLimpa.length < 4) {
+          return { sucesso: false, mensagem: 'A nova senha deve ter no mínimo 4 caracteres.' };
+        }
+
+        const registroToken = tokensRecuperacaoMemoria.find(
+          (t) => t.token === tokenLimpo && !t.usado && t.expiraEm > Date.now()
+        );
+
+        if (!registroToken) {
+          return {
+            sucesso: false,
+            mensagem: 'Código de recuperação inválido ou expirado. Por favor, solicite um novo código.',
+          };
+        }
+
+        const usuario = get().usuarios.find((u) => u.email.toLowerCase() === registroToken.email);
+        if (!usuario) {
+          return { sucesso: false, mensagem: 'Usuário não encontrado.' };
+        }
+
+        // Atualiza a senha e invalida o token
+        registroToken.usado = true;
+        set((state) => ({
+          usuarios: state.usuarios.map((u) =>
+            u.id === usuario.id ? { ...u, senha: senhaLimpa } : u
+          ),
+        }));
+
+        supabaseService.atualizarUsuario(usuario.id, { senha: senhaLimpa });
+
+        return {
+          sucesso: true,
+          mensagem: 'Senha redefinida com sucesso! Você já pode entrar com sua nova senha.',
+        };
       },
 
       moverParaLixeiraUsuario: (id) => {

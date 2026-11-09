@@ -24,11 +24,16 @@ import {
   Moon,
   Music,
   Plus,
+  ChevronDown,
+  ChevronUp,
+  ArrowRight,
 } from 'lucide-react';
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useAppStore } from '../store/useAppStore';
 import { useProductStore } from '../store/useProductStore';
+import { useEstoqueStore } from '../store/useEstoqueStore';
+import { useFuncionarioStore } from '../store/useFuncionarioStore';
 import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useThemeStore } from '../store/useThemeStore';
 
@@ -60,6 +65,89 @@ export default function PainelDono() {
   const [categoriaCardapio, setCategoriaCardapio] = useState<string>('todos');
   const [buscaItem, setBuscaItem] = useState<string>('');
   const [paginaPedidos, setPaginaPedidos] = useState<number>(1);
+  const [onboardingAberto, setOnboardingAberto] = useState(true);
+
+  const { getCategoriasPorTenant } = useProductStore();
+  const { getItensPorTenant, getFichasPorTenant } = useEstoqueStore();
+  const { funcionarios } = useFuncionarioStore();
+  const { usuarios } = useAuthStore();
+
+  const categoriasLoja = currentTenantId ? getCategoriasPorTenant(currentTenantId) : [];
+  const insumosLoja = currentTenantId ? getItensPorTenant(currentTenantId) : [];
+  const fichasLoja = currentTenantId ? getFichasPorTenant(currentTenantId) : [];
+
+  const passosOnboarding = useMemo(() => {
+    const passo1 = !!(tenantAtual?.nomeFantasia && tenantAtual?.documento);
+    const passo2 = categoriasLoja.length > 0;
+    const passo3 = produtos.length > 0;
+    const passo4 = insumosLoja.length > 0;
+    const passo5 = fichasLoja.length > 0 || produtos.some((p) => p.fichaTecnica && p.fichaTecnica.length > 0);
+    const passo6 = (funcionarios || []).length > 0 || (usuarios || []).some((u) => u.tenantId === currentTenantId && u.cargo !== 'super_admin');
+    const passo7 = (todasVendas || []).some((v) => v.tenantId === currentTenantId && v.status === 'concluida');
+
+    const lista = [
+      {
+        id: 1,
+        titulo: 'Dados do restaurante cadastrados',
+        descricao: 'Nome fantasia, CNPJ/CPF e dados de contato',
+        concluido: passo1,
+        rota: '/admin/configuracoes',
+      },
+      {
+        id: 2,
+        titulo: 'Categorias criadas',
+        descricao: 'Organização dos pratos, bebidas e sobremesas',
+        concluido: passo2,
+        rota: '/admin/cardapio',
+      },
+      {
+        id: 3,
+        titulo: 'Produtos adicionados',
+        descricao: 'Itens do cardápio com preços e fotos',
+        concluido: passo3,
+        rota: '/admin/cardapio',
+      },
+      {
+        id: 4,
+        titulo: 'Ingredientes cadastrados',
+        descricao: 'Insumos e matérias-primas no estoque',
+        concluido: passo4,
+        rota: '/admin/estoque',
+      },
+      {
+        id: 5,
+        titulo: 'Ficha técnica configurada',
+        descricao: 'Receita com insumos para baixa automática e CMV',
+        concluido: passo5,
+        rota: '/admin/ficha-tecnica',
+      },
+      {
+        id: 6,
+        titulo: 'Funcionários adicionados',
+        descricao: 'Operadores de caixa, garçons e cozinheiros',
+        concluido: passo6,
+        rota: '/admin/funcionarios',
+      },
+      {
+        id: 7,
+        titulo: 'Primeira venda realizada',
+        descricao: 'Pedido faturado no PDV, Mesas ou Delivery',
+        concluido: passo7,
+        rota: '/pdv',
+      },
+    ];
+
+    const totalConcluidos = lista.filter((p) => p.concluido).length;
+    const percentual = Math.round((totalConcluidos / lista.length) * 100);
+
+    return {
+      lista,
+      totalConcluidos,
+      totalPassos: lista.length,
+      percentual,
+      tudoConcluido: totalConcluidos === lista.length,
+    };
+  }, [tenantAtual, categoriasLoja, produtos, insumosLoja, fichasLoja, funcionarios, usuarios, todasVendas, currentTenantId]);
 
   // Edição rápida de preço
   const [editandoPrecoId, setEditandoPrecoId] = useState<string | null>(null);
@@ -374,6 +462,114 @@ export default function PainelDono() {
             <span className="hidden sm:inline">{tema === 'light' ? 'Tema Claro' : 'White Color'}</span>
           </button>
         </div>
+      </div>
+
+      {/* BANNER DE ONBOARDING: PROGRESSO DE CONFIGURAÇÃO (Problema 13) */}
+      <div className={`rounded-2xl border transition-all ${
+        isWhite
+          ? 'bg-slate-50 border-slate-200'
+          : 'bg-[#141416] border-slate-800'
+      }`}>
+        <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/60">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-black uppercase tracking-wider text-orange-500">
+                Guia de Início Rápido
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                passosOnboarding.tudoConcluido
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+              }`}>
+                {passosOnboarding.totalConcluidos} de {passosOnboarding.totalPassos} passos concluídos ({passosOnboarding.percentual}%)
+              </span>
+            </div>
+            <h2 className={`text-base font-extrabold ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+              {passosOnboarding.tudoConcluido
+                ? '🎉 Parabéns! Seu restaurante está 100% configurado para operar!'
+                : 'Configure seu restaurante para começar a vender'}
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setOnboardingAberto(!onboardingAberto)}
+            className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer self-start sm:self-center"
+          >
+            <span>{onboardingAberto ? 'Recolher Checklist' : 'Expandir Checklist'}</span>
+            {onboardingAberto ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Barra de Progresso Visual */}
+        <div className="w-full bg-slate-900 h-1.5 overflow-hidden">
+          <div
+            className={`h-full transition-all duration-500 ${
+              passosOnboarding.tudoConcluido ? 'bg-emerald-500' : 'bg-orange-500'
+            }`}
+            style={{ width: `${passosOnboarding.percentual}%` }}
+          />
+        </div>
+
+        {/* Lista de Passos Interativos */}
+        {onboardingAberto && (
+          <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-in fade-in duration-200">
+            {passosOnboarding.lista.map((passo) => (
+              <Link
+                key={passo.id}
+                to={passo.rota}
+                className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between group ${
+                  passo.concluido
+                    ? isWhite
+                      ? 'bg-emerald-50/60 border-emerald-200 hover:bg-emerald-50'
+                      : 'bg-emerald-950/20 border-emerald-900/40 hover:bg-emerald-950/30'
+                    : isWhite
+                    ? 'bg-white border-slate-200 hover:border-orange-400 hover:shadow-md'
+                    : 'bg-slate-900/80 border-slate-800 hover:border-orange-500/60 hover:shadow-lg'
+                }`}
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                    <span className="text-[10px] font-mono font-bold text-slate-500">
+                      PASSO {passo.id}
+                    </span>
+                    {passo.concluido ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded-md">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Pronto</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-orange-400 bg-orange-950/60 border border-orange-500/30 px-1.5 py-0.5 rounded-md">
+                        Pendente
+                      </span>
+                    )}
+                  </div>
+                  <h3 className={`text-xs font-bold transition-colors ${
+                    passo.concluido
+                      ? 'text-slate-300'
+                      : isWhite
+                      ? 'text-slate-900 group-hover:text-orange-600'
+                      : 'text-white group-hover:text-orange-400'
+                  }`}>
+                    {passo.titulo}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 line-clamp-2">
+                    {passo.descricao}
+                  </p>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
+                  <span className={`font-semibold ${passo.concluido ? 'text-slate-500' : 'text-orange-400 group-hover:underline'}`}>
+                    {passo.concluido ? 'Revisar' : 'Configurar agora'}
+                  </span>
+                  <ArrowRight className={`w-3.5 h-3.5 transition-transform group-hover:translate-x-1 ${
+                    passo.concluido ? 'text-slate-500' : 'text-orange-400'
+                  }`} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 1. OS 4 CARDS DE MÉTRICAS (Estilo Exato do Print 1) */}

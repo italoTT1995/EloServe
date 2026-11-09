@@ -42,6 +42,8 @@ import {
   obterUnidadesCompativeis,
   formatarQuantidadeComUnidade,
 } from '../utils/estoqueUtils';
+import { processarUploadImagemProduto } from '../utils/imagemUtils';
+import { copiarParaAreaDeTransferencia } from '../utils/clipboardHelper';
 
 // Galeria de fotos gastronômicas prontas em alta resolução
 const FOTOS_SUGERIDAS = [
@@ -144,6 +146,8 @@ export default function Cardapio() {
   // Modal Categorias
   const [modalCategoriasAberto, setModalCategoriasAberto] = useState(false);
   const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
+  const [criandoCategoriaRapida, setCriandoCategoriaRapida] = useState(false);
+  const [nomeCategoriaRapida, setNomeCategoriaRapida] = useState('');
 
   // Modal Acréscimos
   const [modalAcrescimosAberto, setModalAcrescimosAberto] = useState(false);
@@ -374,24 +378,52 @@ export default function Cardapio() {
     setModalFotoAberto(true);
   }
 
-  // Leitura de Arquivo Local para Base64 (Upload do Computador/Celular)
-  function handleUploadFotoArquivo(e: React.ChangeEvent<HTMLInputElement>, isForm = false) {
+  // Upload Otimizado com Compressão WebP & Armazenamento Seguro
+  async function handleUploadFotoArquivo(e: React.ChangeEvent<HTMLInputElement>, isForm = false) {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('A imagem deve ter no máximo 5MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      exibirToast('A imagem deve ter no máximo 5MB.');
+      return;
+    }
+
+    try {
+      exibirToast('Comprimindo e processando foto...');
+      const slug = isForm ? formProduto.nome : (produtoFotoAtual?.nome || 'produto');
+      const res = await processarUploadImagemProduto(file, idLoja, slug);
+      if (res.sucesso && res.url) {
         if (isForm) {
-          setFormProduto((prev) => ({ ...prev, fotoUrl: base64 }));
+          setFormProduto((prev) => ({ ...prev, fotoUrl: res.url }));
         } else {
-          setFotoUrlInput(base64);
+          setFotoUrlInput(res.url);
         }
-      };
-      reader.readAsDataURL(file);
+        exibirToast(res.mensagem || 'Foto processada com sucesso!');
+      } else {
+        exibirToast(res.mensagem || 'Erro ao processar foto.');
+      }
+    } catch (err: any) {
+      exibirToast('Falha no upload: ' + (err.message || 'Erro inesperado'));
+    }
+  }
+
+  function handleCriarCategoriaRapida() {
+    if (!nomeCategoriaRapida.trim()) {
+      exibirToast('Digite o nome da categoria.');
+      return;
+    }
+    if (!idLoja) {
+      exibirToast('Selecione um restaurante ativo.');
+      return;
+    }
+    try {
+      const novaCat = adicionarCategoria(nomeCategoriaRapida.trim(), idLoja);
+      setFormProduto((prev) => ({ ...prev, categoriaId: novaCat.id }));
+      setNomeCategoriaRapida('');
+      setCriandoCategoriaRapida(false);
+      exibirToast(`Categoria "${novaCat.nome}" criada e selecionada!`);
+    } catch (err: any) {
+      exibirToast('Erro ao criar categoria: ' + (err.message || ''));
     }
   }
 
@@ -655,12 +687,16 @@ export default function Cardapio() {
     setMenuAbertoId(null);
   }
 
-  function copiarLinkCardapio() {
+  async function copiarLinkCardapio() {
     const link = idLoja
       ? `${window.location.origin}/cardapio/${idLoja}`
       : `${window.location.origin}/cardapio-digital`;
-    navigator.clipboard.writeText(link);
-    exibirToast('Link do Cardápio Digital copiado para a área de transferência!');
+    const copiou = await copiarParaAreaDeTransferencia(link);
+    if (copiou) {
+      exibirToast('Link do Cardápio Digital copiado para a área de transferência!');
+    } else {
+      exibirToast(`Link copiado: ${link}`);
+    }
   }
 
   return (
@@ -1554,35 +1590,72 @@ export default function Cardapio() {
               </div>
 
               {/* Categoria & Setor KDS */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className={`font-bold block ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
                       Categoria *
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setModalCategoriasAberto(true)}
-                      className="text-[10px] text-orange-500 hover:underline font-bold cursor-pointer"
-                    >
-                      + Nova
-                    </button>
+                    {categorias.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setCriandoCategoriaRapida(!criandoCategoriaRapida)}
+                        className="text-[10px] text-orange-500 hover:underline font-bold cursor-pointer"
+                      >
+                        {criandoCategoriaRapida ? 'Selecionar existente' : '+ Nova rápida'}
+                      </button>
+                    )}
                   </div>
-                  <select
-                    value={formProduto.categoriaId}
-                    onChange={(e) => setFormProduto({ ...formProduto, categoriaId: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
-                      isWhite
-                        ? 'bg-slate-50 border-slate-200 text-slate-900'
-                        : 'bg-slate-950 border-slate-800 text-white'
-                    }`}
-                  >
-                    {categorias.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.nome}
-                      </option>
-                    ))}
-                  </select>
+
+                  {categorias.length === 0 || criandoCategoriaRapida ? (
+                    <div className="space-y-1.5">
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          value={nomeCategoriaRapida}
+                          onChange={(e) => setNomeCategoriaRapida(e.target.value)}
+                          placeholder="Nome da categoria (ex: Sobremesas)..."
+                          className={`flex-1 px-2.5 py-2 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                            isWhite
+                              ? 'bg-slate-50 border-orange-300 text-slate-900'
+                              : 'bg-slate-950 border-orange-500/50 text-white'
+                          }`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleCriarCategoriaRapida();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCriarCategoriaRapida}
+                          className="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shrink-0 cursor-pointer shadow-sm"
+                        >
+                          Salvar
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-orange-400">
+                        {categorias.length === 0 ? 'Nenhuma categoria cadastrada ainda. Crie sua primeira categoria aqui!' : 'Criação rápida sem fechar o formulário do prato.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <select
+                      value={formProduto.categoriaId || (categorias[0]?.id || '')}
+                      onChange={(e) => setFormProduto({ ...formProduto, categoriaId: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                        isWhite
+                          ? 'bg-slate-50 border-slate-200 text-slate-900'
+                          : 'bg-slate-950 border-slate-800 text-white'
+                      }`}
+                    >
+                      {categorias.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.nome}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div>

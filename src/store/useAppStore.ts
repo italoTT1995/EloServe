@@ -6,6 +6,10 @@ import { supabaseService } from '../services/supabaseService';
 import { tocarSinoPratoPronto } from '../utils/audioAlert';
 import { MESAS_POR_TENANT } from './initialMesas';
 import { NOTAS_FISCAIS_INICIAIS } from './initialNotasFiscais';
+import { useAuthStore } from './useAuthStore';
+
+let tentativasFalhasPin = 0;
+let bloqueioAteTimestamp = 0;
 
 interface AppState {
   caixaAtual: SessaoCaixa;
@@ -70,9 +74,11 @@ interface AppState {
   ticarTodosItensKDS: (pedidoId: string) => void;
   arquivarPedidoKDS: (pedidoId: string) => void;
   recuperarUltimoPedidoKDS: () => PedidoKDS | null;
+  retornarStatusAnteriorKDS: (pedidoId: string) => { sucesso: boolean; novoStatus?: string };
+  restaurarPedidoHistoricoKDS: (pedidoId: string) => { sucesso: boolean; pedido?: PedidoKDS };
   historicoKDS: PedidoKDS[];
   alternarPerfil: (perfil: 'admin' | 'caixa' | 'garcom') => void;
-  validarPinAdmin: (pin: string) => boolean;
+  validarPinAdmin: (pin: string, tenantId?: string) => boolean;
   cancelarItemComandaMesa: (
     numeroMesa: number,
     itemId: string,
@@ -1410,11 +1416,63 @@ export const useAppStore = create<AppState>()(
         const historico = state.historicoKDS || [];
         if (historico.length === 0) return null;
         const [recuperado, ...resto] = historico;
+        const pedidoRestaurado: PedidoKDS = {
+          ...recuperado,
+          status: 'em_preparo',
+          itens: recuperado.itens.map((it) => ({ ...it, concluido: false })),
+        };
         set({
-          pedidosKDS: [recuperado, ...state.pedidosKDS],
+          pedidosKDS: [pedidoRestaurado, ...state.pedidosKDS],
           historicoKDS: resto,
         });
-        return recuperado;
+        return pedidoRestaurado;
+      },
+
+      retornarStatusAnteriorKDS: (pedidoId) => {
+        let novoStatus = '';
+        set((state) => ({
+          pedidosKDS: state.pedidosKDS.map((p) => {
+            if (p.id !== pedidoId) return p;
+            if (p.status === 'pronto') {
+              novoStatus = 'em_preparo';
+              return {
+                ...p,
+                status: 'em_preparo',
+                itens: p.itens.map((it) => ({ ...it, concluido: false })),
+              };
+            }
+            if (p.status === 'em_preparo') {
+              novoStatus = 'novo';
+              return {
+                ...p,
+                status: 'novo',
+                itens: p.itens.map((it) => ({ ...it, concluido: false })),
+              };
+            }
+            return p;
+          }),
+        }));
+        return { sucesso: !!novoStatus, novoStatus };
+      },
+
+      restaurarPedidoHistoricoKDS: (pedidoId) => {
+        const state = get();
+        const historico = state.historicoKDS || [];
+        const pedido = historico.find((p) => p.id === pedidoId);
+        if (!pedido) return { sucesso: false };
+
+        const pedidoRestaurado: PedidoKDS = {
+          ...pedido,
+          status: 'em_preparo',
+          itens: pedido.itens.map((it) => ({ ...it, concluido: false })),
+        };
+
+        set({
+          pedidosKDS: [pedidoRestaurado, ...state.pedidosKDS],
+          historicoKDS: historico.filter((p) => p.id !== pedidoId),
+        });
+
+        return { sucesso: true, pedido: pedidoRestaurado };
       },
 
       alternarPerfil: (perfil) =>
@@ -1422,14 +1480,71 @@ export const useAppStore = create<AppState>()(
           perfilAtivo: perfil,
           operadorAtivo:
             perfil === 'admin'
-              ? 'Italo Lemos (Administrador)'
+              ? 'Administrador (Gerente)'
               : perfil === 'caixa'
               ? 'Operador 01 (Caixa)'
               : 'Garçom Marcos (Salão)',
         }),
 
-      validarPinAdmin: (pin) => {
-        return pin === get().pinAdmin || pin === '8899' || pin === '1234';
+      validarPinAdmin: (pin, tenantId) => {
+        const agora = Date.now();
+        if (bloqueioAteTimestamp > agora) {
+          const restante = Math.ceil((bloqueioAteTimestamp - agora) / 1000);
+          console.warn(`[Segurança EloServe] Entrada de PIN temporariamente bloqueada por tentativas repetidas (${restante}s restantes)`);
+          return false;
+        }
+
+        const pinLimpo = (pin || '').trim();
+        if (!pinLimpo || pinLimpo.length < 4) {
+          return false;
+        }
+
+        // Validação contra os usuários cadastrados e logados
+        const authStore = useAuthStore.getState();
+        const usuarioLogado = authStore.usuarioLogado;
+        const usuarios = authStore.usuarios || [];
+
+        // 1. Se o usuário logado for admin/dono e o PIN coincidir com o dele
+        if (
+          usuarioLogado &&
+          (usuarioLogado.cargo === 'admin_restaurante' || usuarioLogado.cargo === 'super_admin') &&
+          usuarioLogado.pin === pinLimpo
+        ) {
+          tentativasFalhasPin = 0;
+          return true;
+        }
+
+        // 2. Se o PIN pertence a algum administrador da loja específica
+        const idLojaAlvo = tenantId || (usuarioLogado?.tenantId && usuarioLogado.tenantId !== 'global' ? usuarioLogado.tenantId : '');
+        const adminLoja = usuarios.find(
+          (u) =>
+            u.ativo &&
+            (u.cargo === 'admin_restaurante' || u.cargo === 'super_admin') &&
+            (!idLojaAlvo || u.tenantId === idLojaAlvo || u.cargo === 'super_admin') &&
+            u.pin === pinLimpo
+        );
+
+        if (adminLoja) {
+          tentativasFalhasPin = 0;
+          return true;
+        }
+
+        // 3. Fallback de PIN cadastrado pelo proprietário na loja
+        const pinConfigLoja = get().pinAdmin;
+        if (pinConfigLoja && pinLimpo === pinConfigLoja) {
+          tentativasFalhasPin = 0;
+          return true;
+        }
+
+        // Falha na autenticação: contabiliza tentativa e aplica cooldown se necessário
+        tentativasFalhasPin++;
+        if (tentativasFalhasPin >= 3) {
+          bloqueioAteTimestamp = Date.now() + 30000;
+          tentativasFalhasPin = 0;
+          console.warn('[Segurança EloServe] 3 tentativas incorretas. Bloqueio ativado por 30s.');
+        }
+
+        return false;
       },
     }),
     {

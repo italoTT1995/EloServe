@@ -1,32 +1,64 @@
 /**
- * Serviço de Impressão Térmica (Desativado)
- * O sistema EloServe agora é 100% digital (sem papel e sem impressoras físicas).
- * Todos os setores (Cozinha KDS, Barman KDS, Garçom Mobile, PDV e Caixa) operam em tempo real nas telas.
+ * Serviço de Gerenciamento de Impressão Térmica do EloServe PDV
+ * Suporta bobinas de 58 mm e 80 mm para comandas, cozinha, delivery e comprovantes de caixa.
  */
+
+export interface ConfiguracaoImpressaoTermica {
+  habilitada: boolean;
+  larguraPadrao: '58mm' | '80mm';
+  imprimirAutomaticoAoFinalizar: boolean;
+  viasCozinha: number;
+  viasEntrega: number;
+  viasCliente: number;
+  incluirQrCodePix: boolean;
+}
+
+const CONFIG_PADRAO: ConfiguracaoImpressaoTermica = {
+  habilitada: true,
+  larguraPadrao: '80mm',
+  imprimirAutomaticoAoFinalizar: false,
+  viasCozinha: 1,
+  viasEntrega: 1,
+  viasCliente: 1,
+  incluirQrCodePix: true,
+};
+
+const STORAGE_KEY = 'eloserve_config_impressao_termica';
+
 class ImpressaoTermicaService {
-  public carregarConfiguracao() {
-    return {};
+  private config: ConfiguracaoImpressaoTermica = { ...CONFIG_PADRAO };
+
+  constructor() {
+    this.carregarConfiguracao();
   }
-  public salvarConfiguracao() {
-    return {};
+
+  public carregarConfiguracao(): ConfiguracaoImpressaoTermica {
+    if (typeof window === 'undefined') return this.config;
+    try {
+      const salvo = localStorage.getItem(STORAGE_KEY);
+      if (salvo) {
+        this.config = { ...CONFIG_PADRAO, ...JSON.parse(salvo) };
+      }
+    } catch {
+      this.config = { ...CONFIG_PADRAO };
+    }
+    return this.config;
   }
-  public getConfig() {
-    return {};
+
+  public salvarConfiguracao(novaConfig: Partial<ConfiguracaoImpressaoTermica>): ConfiguracaoImpressaoTermica {
+    this.config = { ...this.config, ...novaConfig };
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.config));
+      } catch (err) {
+        console.error('Erro ao persistir configurações de impressão:', err);
+      }
+    }
+    return this.config;
   }
-  public imprimirTicketSetor(..._args: any[]) {
-    // 100% digital - nada a imprimir
-  }
-  public imprimirTicketCozinhaEBar(..._args: any[]) {
-    // 100% digital - pedidos fluem diretamente via KDS e WebSocket/Store
-  }
-  public imprimirConferenciaMesa(..._args: any[]) {
-    // 100% digital - conferência visual em tela ou WhatsApp
-  }
-  public imprimirReciboComissao(..._args: any[]) {
-    // 100% digital - controle em tela e DRE financeiro
-  }
-  public testarImpressora(..._args: any[]) {
-    // 100% digital
+
+  public getConfig(): ConfiguracaoImpressaoTermica {
+    return { ...this.config };
   }
 }
 

@@ -28,10 +28,13 @@ export interface ConfiguracaoChatbotTenant {
   provedorIA: ProvedorIA;
   apiKeyIA?: string;
   nomeRobo: string;
-  statusConexao: 'desconectado' | 'gerando_qr' | 'conectado';
+  statusConexao: 'nao_configurado' | 'desconectado' | 'gerando_qr' | 'conectado';
   numeroConectado?: string;
   qrCodeBase64?: string;
   bateriaCelular?: number;
+  apiUrlWhatsApp?: string;
+  apiTokenWhatsApp?: string;
+  instanciaWhatsAppNome?: string;
 
   // Mensagens Customizadas (Anota AI Style)
   mensagemBoasVindas: string;
@@ -63,9 +66,12 @@ const CONFIG_PADRAO: Omit<ConfiguracaoChatbotTenant, 'tenantId'> = {
   provedorIA: 'gemini',
   apiKeyIA: '',
   nomeRobo: 'EloBot Atendente',
-  statusConexao: 'desconectado',
+  statusConexao: 'nao_configurado',
   numeroConectado: undefined,
   bateriaCelular: undefined,
+  apiUrlWhatsApp: '',
+  apiTokenWhatsApp: '',
+  instanciaWhatsAppNome: '',
   mensagemBoasVindas:
     'Olá! Seja muito bem-vindo! 🍔\nEu sou o atendente virtual inteligente. Como posso te ajudar hoje?\n\nVocê pode pedir diretamente pelo nosso cardápio digital ou me dizer por aqui mesmo o que você gostaria de comer!',
   mensagemForaHorario:

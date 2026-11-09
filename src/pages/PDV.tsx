@@ -27,6 +27,8 @@ import {
   MapPin,
   Phone,
   Pencil,
+  Printer,
+  Layers,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
@@ -39,13 +41,20 @@ import { useDeliveryStore } from '../store/useDeliveryStore';
 import { useWindowFocus } from '../hooks/useWindowFocus';
 import { audio } from '../lib/audio';
 import { VendaRealizada } from '../types';
+import { verificarDisponibilidadeProduto } from '../utils/estoqueUtils';
+import { ModalCupomTermico, DadosCupomImpressao } from '../components/impressao/CupomTermico';
 
 export default function PDV() {
   const [categoriaAtiva, setCategoriaAtiva] = useState('todas');
   const [busca, setBusca] = useState('');
   const [modalPagamentoAberto, setModalPagamentoAberto] = useState(false);
   const [comandaMobileAberta, setComandaMobileAberta] = useState(false);
-  const [formaSelecionada, setFormaSelecionada] = useState<'dinheiro' | 'pix' | 'debito' | 'credito'>('pix');
+  const [formaSelecionada, setFormaSelecionada] = useState<'dinheiro' | 'pix' | 'debito' | 'credito' | 'multiplo'>('pix');
+  const [pagamentosMultiplos, setPagamentosMultiplos] = useState<Array<{ forma: 'dinheiro' | 'pix' | 'debito' | 'credito'; valor: number }>>([]);
+  const [formaParcial, setFormaParcial] = useState<'dinheiro' | 'pix' | 'debito' | 'credito'>('pix');
+  const [valorParcial, setValorParcial] = useState<string>('');
+  const [modalCupomAberto, setModalCupomAberto] = useState(false);
+  const [dadosCupomAtual, setDadosCupomAtual] = useState<DadosCupomImpressao | null>(null);
   const [valorRecebido, setValorRecebido] = useState<string>('');
   const [vendaSucesso, setVendaSucesso] = useState(false);
   const [toastNotificacao, setToastNotificacao] = useState<string | null>(null);
@@ -81,7 +90,8 @@ export default function PDV() {
   const { getProdutosPorTenant, getCategoriasPorTenant } = useProductStore();
   const produtos = getProdutosPorTenant(idLoja);
   const categorias = getCategoriasPorTenant(idLoja);
-  const { processarBaixaVenda } = useEstoqueStore();
+  const { processarBaixaVenda, getItensPorTenant } = useEstoqueStore();
+  const itensEstoque = getItensPorTenant(idLoja);
 
   // Integração com Módulo de Delivery & Taxas
   const { calcularTaxaPorDistancia, adicionarPedidoDelivery, clientes: clientesCadastrados } = useDeliveryStore();
@@ -184,8 +194,42 @@ export default function PDV() {
   const valorRecebidoNum = parseFloat(valorRecebido) || 0;
   const troco = Math.max(0, valorRecebidoNum - totalComEntrega);
 
-  // Adicionar produto ao carrinho com feedback sonoro e visual
+  // Cálculos de Pagamentos Múltiplos
+  const totalMultiploPago = pagamentosMultiplos.reduce((acc, p) => acc + p.valor, 0);
+  const saldoMultiploRestante = Math.max(0, Number((totalComEntrega - totalMultiploPago).toFixed(2)));
+
+  function handleAdicionarPagamentoParcial() {
+    const val = parseFloat(valorParcial.replace(',', '.'));
+    if (!val || val <= 0) {
+      exibirToast('Informe um valor válido para adicionar.');
+      return;
+    }
+    if (val > saldoMultiploRestante + 0.001) {
+      exibirToast(`O valor não pode ultrapassar o saldo restante de R$ ${saldoMultiploRestante.toFixed(2)}.`);
+      return;
+    }
+    setPagamentosMultiplos((prev) => [...prev, { forma: formaParcial, valor: Number(val.toFixed(2)) }]);
+    setValorParcial('');
+  }
+
+  function handleRemoverPagamentoParcial(index: number) {
+    setPagamentosMultiplos((prev) => prev.filter((_, idx) => idx !== index));
+  }
+
+  // Adicionar produto ao carrinho com validação rigorosa de estoque e feedback sonoro e visual
   function handleAdicionarItem(prod: typeof produtos[0]) {
+    const disp = verificarDisponibilidadeProduto(prod, itensEstoque);
+    if (!disp.disponivel) {
+      exibirToast(`Indisponível: ${disp.motivo || 'Falta de insumos no estoque'}`);
+      return;
+    }
+    const itemExistente = itens.find((i) => i.produto.id === prod.id);
+    const qtdAtual = itemExistente ? itemExistente.quantidade : 0;
+    if (disp.porcoesDisponiveis !== null && qtdAtual + 1 > disp.porcoesDisponiveis) {
+      exibirToast(`Limite atingido! Apenas ${disp.porcoesDisponiveis} porção(ões) disponível(is).`);
+      return;
+    }
+
     adicionarItem(prod);
     audio.tocarBipItem();
     exibirToast(`+1 ${prod.nome}`);
@@ -195,11 +239,32 @@ export default function PDV() {
     setToastNotificacao(msg);
     setTimeout(() => {
       setToastNotificacao((current) => (current === msg ? null : current));
-    }, 1800);
+    }, 2500);
   }
 
   function finalizarVenda() {
     if (itens.length === 0) return;
+
+    // 1. Revalidação de segurança de estoque para todos os pratos do pedido
+    for (const it of itens) {
+      const disp = verificarDisponibilidadeProduto(it.produto, itensEstoque);
+      if (!disp.disponivel || (disp.porcoesDisponiveis !== null && disp.porcoesDisponiveis < it.quantidade)) {
+        exibirToast(`Estoque insuficiente para ${it.produto.nome}! ${disp.motivo || ''}`);
+        return;
+      }
+    }
+
+    // 2. Validação de pagamento múltiplo / dividido
+    if (formaSelecionada === 'multiplo') {
+      if (saldoMultiploRestante > 0.01) {
+        exibirToast(`Ainda resta quitar R$ ${saldoMultiploRestante.toFixed(2)} para concluir a venda.`);
+        return;
+      }
+      if (pagamentosMultiplos.length === 0) {
+        exibirToast('Adicione ao menos uma parcela de pagamento.');
+        return;
+      }
+    }
 
     const vendaId = `VD-${Date.now().toString().slice(-6)}`;
     const agoraDataHora =
@@ -219,6 +284,7 @@ export default function PDV() {
       desconto: descontoReais,
       taxaEntrega: tipoPedido === 'delivery' ? taxaEntregaCalculada : undefined,
       formaPagamento: formaSelecionada,
+      pagamentosMultiplos: formaSelecionada === 'multiplo' ? pagamentosMultiplos : undefined,
       itens: itens.map((it) => ({
         produtoId: it.produto.id,
         nome: it.produto.nome,
@@ -275,16 +341,48 @@ export default function PDV() {
       });
     }
 
+    // Preparar dados do Cupom Térmico
+    const dadosImpressao: DadosCupomImpressao = {
+      tipo: tipoPedido === 'delivery' ? 'delivery' : 'venda',
+      identificador: vendaId,
+      restauranteNome: tenantAtual?.nomeFantasia || 'EloServe Restaurante',
+      restauranteDocumento: tenantAtual?.documento || undefined,
+      restauranteTelefone: tenantAtual?.telefoneWhatsApp || undefined,
+      restauranteEndereco: tenantAtual?.cidadeUf || undefined,
+      dataHora: agoraDataHora,
+      operador: operadorAtivo || 'Operador Caixa',
+      clienteNome: tipoPedido === 'delivery' ? dadosEntrega.clienteNome : undefined,
+      clienteTelefone: tipoPedido === 'delivery' ? dadosEntrega.clienteTelefone : undefined,
+      enderecoEntrega: tipoPedido === 'delivery' ? `${dadosEntrega.rua}, ${dadosEntrega.numero} - ${dadosEntrega.bairro}, ${dadosEntrega.cidade}` : undefined,
+      itens: itens.map((it) => ({
+        nome: it.produto.nome,
+        quantidade: it.quantidade,
+        precoUnitario: it.produto.precoVenda,
+        subtotal: it.subtotal,
+        observacoes: it.produto.descricao,
+      })),
+      subtotal: totalBruto,
+      taxaEntrega: tipoPedido === 'delivery' ? taxaEntregaCalculada : undefined,
+      desconto: descontoReais > 0 ? descontoReais : undefined,
+      total: totalComEntrega,
+      formaPagamento: formaSelecionada === 'multiplo' ? 'Múltiplas Formas' : formaSelecionada.toUpperCase(),
+      detalhesPagamento: formaSelecionada === 'multiplo' ? pagamentosMultiplos.map((p) => ({ forma: p.forma.toUpperCase(), valor: p.valor })) : undefined,
+      valorRecebido: formaSelecionada === 'dinheiro' && valorRecebidoNum > 0 ? valorRecebidoNum : undefined,
+      troco: formaSelecionada === 'dinheiro' && troco > 0 ? troco : undefined,
+    };
+    setDadosCupomAtual(dadosImpressao);
+
+    limparCarrinho();
     audio.tocarSucessoVenda();
     setVendaSucesso(true);
+  }
 
-    setTimeout(() => {
-      setVendaSucesso(false);
-      setModalPagamentoAberto(false);
-      setComandaMobileAberta(false);
-      limparCarrinho();
-      setValorRecebido('');
-    }, 1500);
+  function handleFecharSucessoVenda() {
+    setVendaSucesso(false);
+    setModalPagamentoAberto(false);
+    setComandaMobileAberta(false);
+    setValorRecebido('');
+    setPagamentosMultiplos([]);
   }
 
   function handleConfirmarEstorno() {
@@ -725,46 +823,82 @@ export default function PDV() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-              {produtosFiltrados.map((prod) => (
-                <div
-                  key={prod.id}
-                  onClick={() => handleAdicionarItem(prod)}
-                  className="group bg-slate-900/90 border border-slate-800 hover:border-emerald-500/60 rounded-2xl p-3 sm:p-4 flex flex-col justify-between cursor-pointer transition-all duration-150 hover:shadow-xl hover:shadow-emerald-950/30 hover:-translate-y-0.5 active:scale-[0.98]"
-                >
-                  <div>
-                    {prod.fotoUrl && (
-                      <div className="w-full h-24 mb-2.5 rounded-xl overflow-hidden bg-slate-800">
-                        <img src={prod.fotoUrl} alt={prod.nome} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
-                      </div>
-                    )}
-                    <div className="flex items-start justify-between gap-1.5 mb-1.5 sm:mb-2">
-                      <span className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 uppercase tracking-wider">
-                        {prod.setorPreparo}
-                      </span>
-                      {prod.destaque && (
-                        <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                          Top
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-xs sm:text-sm font-bold text-slate-100 group-hover:text-emerald-300 transition-colors line-clamp-1">
-                      {prod.nome}
-                    </h3>
-                    <p className="text-[10px] sm:text-[11px] text-slate-400 line-clamp-2 mt-1 leading-relaxed">
-                      {prod.descricao || 'Item padrão do cardápio'}
-                    </p>
-                  </div>
+              {produtosFiltrados.map((prod) => {
+                const disp = verificarDisponibilidadeProduto(prod, itensEstoque);
+                const esgotado = !disp.disponivel;
+                const poucoEstoque = disp.disponivel && disp.porcoesDisponiveis !== null && disp.porcoesDisponiveis <= 5;
 
-                  <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-800/80 flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-extrabold text-emerald-400 font-mono">
-                      R$ {prod.precoVenda.toFixed(2)}
-                    </span>
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-slate-800 group-hover:bg-emerald-500 text-slate-300 group-hover:text-white flex items-center justify-center transition-all shadow-sm">
-                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                return (
+                  <div
+                    key={prod.id}
+                    onClick={() => handleAdicionarItem(prod)}
+                    className={`group bg-slate-900/90 border rounded-2xl p-3 sm:p-4 flex flex-col justify-between transition-all duration-150 ${
+                      esgotado
+                        ? 'border-rose-900/40 opacity-60 cursor-not-allowed bg-slate-950/60'
+                        : 'border-slate-800 hover:border-emerald-500/60 cursor-pointer hover:shadow-xl hover:shadow-emerald-950/30 hover:-translate-y-0.5 active:scale-[0.98]'
+                    }`}
+                  >
+                    <div>
+                      {prod.fotoUrl && (
+                        <div className="w-full h-24 mb-2.5 rounded-xl overflow-hidden bg-slate-800 relative">
+                          <img
+                            src={prod.fotoUrl}
+                            alt={prod.nome}
+                            className={`w-full h-full object-cover transition-transform duration-200 ${esgotado ? 'grayscale' : 'group-hover:scale-105'}`}
+                          />
+                          {esgotado && (
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex items-center justify-center p-1 text-center">
+                              <span className="text-[10px] font-black uppercase text-rose-300 tracking-wider bg-rose-950/90 px-2 py-0.5 rounded-md border border-rose-500/40">
+                                Esgotado
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className="flex items-start justify-between gap-1.5 mb-1.5 sm:mb-2 flex-wrap">
+                        <span className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 uppercase tracking-wider">
+                          {prod.setorPreparo}
+                        </span>
+                        {esgotado ? (
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                            title={disp.motivo}
+                          >
+                            Sem Estoque
+                          </span>
+                        ) : poucoEstoque ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            Resta {disp.porcoesDisponiveis}
+                          </span>
+                        ) : prod.destaque ? (
+                          <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            Top
+                          </span>
+                        ) : null}
+                      </div>
+                      <h3 className={`text-xs sm:text-sm font-bold transition-colors line-clamp-1 ${esgotado ? 'text-slate-400 line-through' : 'text-slate-100 group-hover:text-emerald-300'}`}>
+                        {prod.nome}
+                      </h3>
+                      <p className="text-[10px] sm:text-[11px] text-slate-400 line-clamp-2 mt-1 leading-relaxed">
+                        {prod.descricao || 'Item padrão do cardápio'}
+                      </p>
+                    </div>
+
+                    <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                      <span className="text-xs sm:text-sm font-extrabold text-emerald-400 font-mono">
+                        R$ {prod.precoVenda.toFixed(2)}
+                      </span>
+                      <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-all shadow-sm ${
+                        esgotado
+                          ? 'bg-slate-800 text-slate-600'
+                          : 'bg-slate-800 group-hover:bg-emerald-500 text-slate-300 group-hover:text-white'
+                      }`}>
+                        <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -855,60 +989,93 @@ export default function PDV() {
 
             {/* Sucesso state */}
             {vendaSucesso ? (
-              <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
+              <div className="py-8 flex flex-col items-center justify-center text-center space-y-4">
                 <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-bounce">
                   <CheckCircle2 className="w-10 h-10" />
                 </div>
-                <h4 className="text-lg font-bold text-white">Venda Concluída com Sucesso!</h4>
-                <p className="text-xs text-slate-400">Venda registrada digitalmente e enviada ao KDS e Caixa.</p>
+                <div>
+                  <h4 className="text-lg font-bold text-white">Venda Concluída com Sucesso!</h4>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Venda registrada no caixa e insumos baixados com precisão conforme ficha técnica.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2.5 pt-2 w-full max-w-sm">
+                  <button
+                    type="button"
+                    onClick={() => setModalCupomAberto(true)}
+                    className="flex-1 py-3 px-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 transition-all cursor-pointer active:scale-95"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Imprimir Cupom Térmico</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFecharSucessoVenda}
+                    className="flex-1 py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Nova Venda (F9)
+                  </button>
+                </div>
               </div>
             ) : (
               <>
                 {/* Seletor de Formas de Pagamento */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   <button
                     onClick={() => setFormaSelecionada('pix')}
-                    className={`p-3 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                       formaSelecionada === 'pix'
-                        ? 'border-emerald-500 bg-emerald-950/40 text-emerald-300 font-bold'
+                        ? 'border-emerald-500 bg-emerald-950/40 text-emerald-300 font-bold shadow-md shadow-emerald-950/30'
                         : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    <QrCode className="w-5 h-5" />
-                    <span className="text-xs">PIX</span>
+                    <QrCode className="w-4 h-4" />
+                    <span className="text-[11px]">PIX</span>
                   </button>
                   <button
                     onClick={() => setFormaSelecionada('dinheiro')}
-                    className={`p-3 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                       formaSelecionada === 'dinheiro'
-                        ? 'border-emerald-500 bg-emerald-950/40 text-emerald-300 font-bold'
+                        ? 'border-emerald-500 bg-emerald-950/40 text-emerald-300 font-bold shadow-md shadow-emerald-950/30'
                         : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    <Banknote className="w-5 h-5" />
-                    <span className="text-xs">Dinheiro</span>
+                    <Banknote className="w-4 h-4" />
+                    <span className="text-[11px]">Dinheiro</span>
                   </button>
                   <button
                     onClick={() => setFormaSelecionada('debito')}
-                    className={`p-3 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                       formaSelecionada === 'debito'
-                        ? 'border-emerald-500 bg-emerald-950/40 text-emerald-300 font-bold'
+                        ? 'border-emerald-500 bg-emerald-950/40 text-emerald-300 font-bold shadow-md shadow-emerald-950/30'
                         : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    <CreditCard className="w-5 h-5" />
-                    <span className="text-xs">Débito</span>
+                    <CreditCard className="w-4 h-4" />
+                    <span className="text-[11px]">Débito</span>
                   </button>
                   <button
                     onClick={() => setFormaSelecionada('credito')}
-                    className={`p-3 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                       formaSelecionada === 'credito'
-                        ? 'border-emerald-500 bg-emerald-950/40 text-emerald-300 font-bold'
+                        ? 'border-emerald-500 bg-emerald-950/40 text-emerald-300 font-bold shadow-md shadow-emerald-950/30'
                         : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    <CreditCard className="w-5 h-5" />
-                    <span className="text-xs">Crédito</span>
+                    <CreditCard className="w-4 h-4" />
+                    <span className="text-[11px]">Crédito</span>
+                  </button>
+                  <button
+                    onClick={() => setFormaSelecionada('multiplo')}
+                    className={`p-2.5 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer col-span-2 sm:col-span-1 ${
+                      formaSelecionada === 'multiplo'
+                        ? 'border-orange-500 bg-orange-950/40 text-orange-300 font-bold shadow-md shadow-orange-950/30'
+                        : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Layers className="w-4 h-4" />
+                    <span className="text-[11px]">Dividir</span>
                   </button>
                 </div>
 
@@ -976,6 +1143,113 @@ export default function PDV() {
                       <p className="text-xs font-bold text-slate-200">Aguardando confirmação do PIX...</p>
                       <p className="text-[11px] text-slate-500 mt-0.5">O cliente pode escanear o QR Code acima pelo app do banco.</p>
                     </div>
+                  </div>
+                )}
+
+                {/* Módulo de Pagamento Múltiplo / Dividir Conta */}
+                {formaSelecionada === 'multiplo' && (
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3.5">
+                    <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Total</span>
+                        <span className="text-xs font-bold font-mono text-white">R$ {totalComEntrega.toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Pago</span>
+                        <span className="text-xs font-bold font-mono text-emerald-400">R$ {totalMultiploPago.toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Restante</span>
+                        <span className={`text-xs font-black font-mono ${saldoMultiploRestante === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          R$ {saldoMultiploRestante.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Lista de parcelas já registradas */}
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                      {pagamentosMultiplos.length === 0 ? (
+                        <p className="text-center text-[11px] text-slate-500 py-2">
+                          Nenhuma forma parcial adicionada ainda.
+                        </p>
+                      ) : (
+                        pagamentosMultiplos.map((pag, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800/80 text-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-bold uppercase text-[10px]">
+                                {pag.forma}
+                              </span>
+                              <span className="font-mono font-semibold text-white">
+                                R$ {pag.valor.toFixed(2)}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoverPagamentoParcial(idx)}
+                              className="text-slate-500 hover:text-rose-400 p-1 transition-colors cursor-pointer"
+                              title="Remover parcela"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Inserção de Nova Parcela */}
+                    {saldoMultiploRestante > 0 ? (
+                      <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                        <label className="text-[11px] font-bold text-slate-300 block">
+                          Adicionar Parcela de Pagamento:
+                        </label>
+                        <div className="flex gap-2">
+                          <select
+                            value={formaParcial}
+                            onChange={(e) => setFormaParcial(e.target.value as any)}
+                            className="w-1/3 px-2 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                          >
+                            <option value="pix">PIX</option>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="debito">Débito</option>
+                            <option value="credito">Crédito</option>
+                          </select>
+                          <div className="relative flex-1">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono text-slate-500">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder={saldoMultiploRestante.toFixed(2)}
+                              value={valorParcial}
+                              onChange={(e) => setValorParcial(e.target.value)}
+                              className="w-full pl-8 pr-2 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-orange-500"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setValorParcial(saldoMultiploRestante.toFixed(2))}
+                            className="px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold cursor-pointer shrink-0"
+                            title="Preencher saldo total restante"
+                          >
+                            Tudo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAdicionarPagamentoParcial}
+                            className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold cursor-pointer shrink-0"
+                          >
+                            + Adicionar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold text-center flex items-center justify-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Valor total coberto pelas parcelas!</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1139,18 +1413,54 @@ export default function PDV() {
                           <span className="text-sm font-black font-mono text-emerald-400 block">
                             R$ {v.total.toFixed(2)}
                           </span>
-                          {!isCancelada && (
+                          <div className="flex items-center gap-1.5 justify-end">
                             <button
                               type="button"
                               onClick={() => {
-                                setVendaParaEstorno(v);
-                                setMotivoEstorno('Desistência do cliente');
+                                const dadosImpressao: DadosCupomImpressao = {
+                                  tipo: v.tipoOrigem === 'delivery' ? 'delivery' : 'venda',
+                                  identificador: v.id,
+                                  restauranteNome: tenantAtual?.nomeFantasia || 'EloServe Restaurante',
+                                  restauranteDocumento: tenantAtual?.documento || undefined,
+                                  restauranteTelefone: tenantAtual?.telefoneWhatsApp || undefined,
+                                  restauranteEndereco: tenantAtual?.cidadeUf || undefined,
+                                  dataHora: v.dataHora,
+                                  operador: v.operador || 'Operador Caixa',
+                                  itens: v.itens.map((it) => ({
+                                    nome: it.nome,
+                                    quantidade: it.quantidade,
+                                    precoUnitario: it.precoUnitario,
+                                    subtotal: it.subtotal,
+                                  })),
+                                  subtotal: v.subtotalBruto || v.total,
+                                  taxaEntrega: v.taxaEntrega,
+                                  desconto: v.desconto,
+                                  total: v.total,
+                                  formaPagamento: v.formaPagamento === 'multiplo' ? 'Múltiplas Formas' : v.formaPagamento.toUpperCase(),
+                                  detalhesPagamento: v.pagamentosMultiplos?.map((p) => ({ forma: p.forma.toUpperCase(), valor: p.valor })),
+                                };
+                                setDadosCupomAtual(dadosImpressao);
+                                setModalCupomAberto(true);
                               }}
-                              className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-rose-400 text-[10px] font-bold cursor-pointer transition-colors"
+                              className="px-2 py-1 rounded-lg bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 text-orange-400 text-[10px] font-bold cursor-pointer transition-colors flex items-center gap-1"
+                              title="Reimprimir cupom térmico desta venda"
                             >
-                              Estornar Pedido
+                              <Printer className="w-3 h-3" />
+                              <span>Cupom</span>
                             </button>
-                          )}
+                            {!isCancelada && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setVendaParaEstorno(v);
+                                  setMotivoEstorno('Desistência do cliente');
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-rose-400 text-[10px] font-bold cursor-pointer transition-colors"
+                              >
+                                Estornar Pedido
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1450,6 +1760,15 @@ export default function PDV() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Impressão de Cupom Térmico */}
+      {modalCupomAberto && dadosCupomAtual && (
+        <ModalCupomTermico
+          aberto={modalCupomAberto}
+          onClose={() => setModalCupomAberto(false)}
+          dados={dadosCupomAtual}
+        />
       )}
     </div>
   );

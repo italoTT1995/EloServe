@@ -7,6 +7,7 @@ interface AdminAuthModalProps {
   onClose: () => void;
   onSuccess: () => void;
   actionTitle?: string;
+  tenantId?: string;
 }
 
 export function AdminAuthModal({
@@ -14,6 +15,7 @@ export function AdminAuthModal({
   onClose,
   onSuccess,
   actionTitle = 'Esta ação exige privilégios de Administrador',
+  tenantId,
 }: AdminAuthModalProps) {
   const [pin, setPin] = useState('');
   const [erro, setErro] = useState(false);
@@ -23,7 +25,7 @@ export function AdminAuthModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validarPinAdmin(pin)) {
+    if (validarPinAdmin(pin, tenantId)) {
       setErro(false);
       setPin('');
       onSuccess();
@@ -71,7 +73,7 @@ export function AdminAuthModal({
                   setPin(e.target.value);
                   setErro(false);
                 }}
-                placeholder="PIN (padrão: 1234)"
+                placeholder="PIN de 4 dígitos"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-center text-lg tracking-widest font-mono text-white focus:outline-none focus:border-emerald-500"
               />
             </div>

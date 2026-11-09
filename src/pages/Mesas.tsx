@@ -44,7 +44,9 @@ import {
   Cake,
   MessageSquare,
   Phone,
+  Printer,
 } from 'lucide-react';
+import { ModalCupomTermico, DadosCupomImpressao } from '../components/impressao/CupomTermico';
 import { AdminAuthModal } from '../components/common/AdminAuthModal';
 import { useAppStore } from '../store/useAppStore';
 import { useReservaStore } from '../store/useReservaStore';
@@ -538,6 +540,8 @@ export default function Mesas() {
     itens: ItemComandaMesa[];
   } | null>(null);
   const [formaPagamentoComanda, setFormaPagamentoComanda] = useState<FormaPagamento>('pix');
+  const [modalCupomMesaAberto, setModalCupomMesaAberto] = useState(false);
+  const [dadosCupomMesa, setDadosCupomMesa] = useState<DadosCupomImpressao | null>(null);
   const [tipoDivisaoConta, setTipoDivisaoConta] = useState<'por_pessoa' | 'igualitaria'>('por_pessoa');
 
   // Estados para Autorização de Gerente e Ações Restritas (10%, Desconto e Cancelamento)
@@ -2557,7 +2561,7 @@ export default function Mesas() {
                 <label className="block text-xs font-bold text-slate-300 mb-1.5">
                   Capacidade de Pessoas (Lugares):
                 </label>
-                <div className="grid grid-cols-4 gap-2 mb-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
                   {[2, 4, 6, 8].map((lugares) => (
                     <button
                       key={lugares}
@@ -4668,33 +4672,73 @@ export default function Mesas() {
                 </div>
               </div>
 
-              {/* Botão de Envio de Extrato Digital via WhatsApp */}
-              <button
-                type="button"
-                onClick={() => {
-                  setReciboWhatsAppDados({
-                    nomeRestaurante: tenantAtual?.nomeFantasia || 'Restaurante EloServe',
-                    mesaNumero: modalPagamentoComanda.mesa.numero,
-                    clienteNome: modalPagamentoComanda.nomePessoa,
-                    garcomNome: modalPagamentoComanda.mesa.garcomResponsavel,
-                    itens: totPagamento.itens.map((it) => ({
-                      nome: it.nome,
-                      quantidade: it.quantidade,
-                      subtotal: it.subtotal,
-                    })),
-                    subtotal: totPagamento.subtotal,
-                    taxaServico: totPagamento.taxaAtiva ? totPagamento.taxaServico : 0,
-                    couvertArtistico: totPagamento.couvertTotal,
-                    desconto: totPagamento.desconto,
-                    total: totPagamento.total,
-                    formaPagamento: formaPagamentoComanda,
-                  });
-                }}
-                className="w-full py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>📱 Enviar Extrato deste Pagamento via WhatsApp</span>
-              </button>
+              {/* Botões de Comprovante: WhatsApp & Cupom Térmico */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReciboWhatsAppDados({
+                      nomeRestaurante: tenantAtual?.nomeFantasia || 'Restaurante EloServe',
+                      mesaNumero: modalPagamentoComanda.mesa.numero,
+                      clienteNome: modalPagamentoComanda.nomePessoa,
+                      garcomNome: modalPagamentoComanda.mesa.garcomResponsavel,
+                      itens: totPagamento.itens.map((it) => ({
+                        nome: it.nome,
+                        quantidade: it.quantidade,
+                        subtotal: it.subtotal,
+                      })),
+                      subtotal: totPagamento.subtotal,
+                      taxaServico: totPagamento.taxaAtiva ? totPagamento.taxaServico : 0,
+                      couvertArtistico: totPagamento.couvertTotal,
+                      desconto: totPagamento.desconto,
+                      total: totPagamento.total,
+                      formaPagamento: formaPagamentoComanda,
+                    });
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <MessageSquare className="w-4 h-4 shrink-0" />
+                  <span className="truncate">Extrato WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const agoraDataHora =
+                      new Date().toLocaleDateString('pt-BR') +
+                      ' ' +
+                      new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    setDadosCupomMesa({
+                      tipo: 'comanda_mesa',
+                      identificador: `Mesa #${modalPagamentoComanda.mesa.numero}${modalPagamentoComanda.nomePessoa !== 'todos' ? ` - ${modalPagamentoComanda.nomePessoa}` : ''}`,
+                      restauranteNome: tenantAtual?.nomeFantasia || 'EloServe Restaurante',
+                      restauranteDocumento: tenantAtual?.documento || undefined,
+                      restauranteTelefone: tenantAtual?.telefoneWhatsApp || undefined,
+                      restauranteEndereco: tenantAtual?.cidadeUf || undefined,
+                      dataHora: agoraDataHora,
+                      operador: modalPagamentoComanda.mesa.garcomResponsavel || 'Garçom / Caixa',
+                      clienteNome: modalPagamentoComanda.nomePessoa !== 'todos' ? modalPagamentoComanda.nomePessoa : undefined,
+                      itens: totPagamento.itens.map((it) => ({
+                        nome: it.nome,
+                        quantidade: it.quantidade,
+                        precoUnitario: it.quantidade > 0 ? it.subtotal / it.quantidade : it.subtotal,
+                        subtotal: it.subtotal,
+                      })),
+                      subtotal: totPagamento.subtotal,
+                      taxaServico: totPagamento.taxaAtiva ? totPagamento.taxaServico : 0,
+                      couvertArtistico: totPagamento.couvertTotal,
+                      desconto: totPagamento.desconto,
+                      total: totPagamento.total,
+                      formaPagamento: formaPagamentoComanda.toUpperCase(),
+                    });
+                    setModalCupomMesaAberto(true);
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-400 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Printer className="w-4 h-4 shrink-0" />
+                  <span className="truncate">Cupom Térmico</span>
+                </button>
+              </div>
 
               {/* Ações */}
               <div className="flex gap-2 pt-1">
@@ -5682,6 +5726,15 @@ export default function Mesas() {
         <ModalReciboWhatsApp
           dados={reciboWhatsAppDados}
           onClose={() => setReciboWhatsAppDados(null)}
+        />
+      )}
+
+      {/* Modal de Impressão de Cupom Térmico da Mesa */}
+      {modalCupomMesaAberto && dadosCupomMesa && (
+        <ModalCupomTermico
+          aberto={modalCupomMesaAberto}
+          onClose={() => setModalCupomMesaAberto(false)}
+          dados={dadosCupomMesa}
         />
       )}
     </div>

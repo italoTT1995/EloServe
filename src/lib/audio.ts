@@ -16,6 +16,30 @@ class AudioManager {
     return this.ctx;
   }
 
+  /**
+   * Verifica se o contexto de áudio já foi desbloqueado por interação do usuário.
+   */
+  isAudioUnlocked(): boolean {
+    return !!(this.ctx && this.ctx.state === 'running');
+  }
+
+  /**
+   * Desbloqueia o contexto de áudio após clique explícito do usuário.
+   */
+  async unlockAudio(): Promise<boolean> {
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return false;
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+      this.tocarBipItem();
+      return ctx.state === 'running';
+    } catch {
+      return false;
+    }
+  }
+
   // Beep agradável ao bipar/adicionar item no PDV
   tocarBipItem() {
     try {

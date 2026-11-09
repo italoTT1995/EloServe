@@ -190,12 +190,13 @@ export interface ModificadorRapido {
   categoriaAlvo: 'carnes' | 'cozinha' | 'bar' | 'geral';
 }
 
-export type FormaPagamento = 'dinheiro' | 'pix' | 'credito' | 'debito' | 'voucher';
+export type FormaPagamento = 'dinheiro' | 'pix' | 'credito' | 'debito' | 'voucher' | 'multiplo';
 
 export interface MovimentoCaixa {
   id: string;
   tipo: 'venda' | 'sangria' | 'suprimento';
   formaPagamento: FormaPagamento;
+  pagamentosMultiplos?: Array<{ forma: FormaPagamento; valor: number }>;
   valor: number;
   motivo?: string;
   horario: string;
@@ -408,6 +409,7 @@ export interface VendaRealizada {
   couvertArtistico?: number;
   quantidadeCouvert?: number;
   formaPagamento: FormaPagamento;
+  pagamentosMultiplos?: Array<{ forma: FormaPagamento; valor: number }>;
   itens: ItemVendaRealizada[];
   operador: string;
   status: 'concluida' | 'cancelada';

@@ -529,7 +529,7 @@ export default function Funcionarios() {
           tenantId={currentTenantId}
           isWhite={isWhite}
           usuarioNome={usuarioLogado?.nome || 'Gerente'}
-          nomeRestaurante={tenantAtual?.nomeFantasia || 'EloGastrô'}
+          nomeRestaurante={tenantAtual?.nomeFantasia || 'EloServe PDV'}
         />
       )}
 
