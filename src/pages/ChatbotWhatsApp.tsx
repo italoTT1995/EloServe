@@ -23,6 +23,7 @@ import {
   Power,
   Trash2,
   HelpCircle,
+  Check,
   CheckCheck,
   Flame,
 } from 'lucide-react';
@@ -112,6 +113,15 @@ export default function ChatbotWhatsApp() {
   }, [mensagensSimulador, estaDigitandoSimulador]);
 
   const linkCardapio = `${window.location.origin}/cardapio/${tenantId}`;
+  const [copiadoTextoSaudacao, setCopiadoTextoSaudacao] = useState(false);
+
+  const textoSaudacaoPronto = `Olá! Seja muito bem-vindo ao *${tenantAtual?.nomeFantasia || 'nosso restaurante'}*! 🍔🍕\n\nPara conferir nosso cardápio completo com fotos, preços e fazer seu pedido rápido, acesse o link abaixo:\n👉 ${linkCardapio}\n\nSe preferir falar com um atendente, basta responder esta mensagem!`;
+
+  function handleCopiarTextoSaudacao() {
+    navigator.clipboard.writeText(textoSaudacaoPronto);
+    setCopiadoTextoSaudacao(true);
+    setTimeout(() => setCopiadoTextoSaudacao(false), 2500);
+  }
 
   function handleCopiarLink() {
     navigator.clipboard.writeText(linkCardapio);
@@ -579,11 +589,61 @@ export default function ChatbotWhatsApp() {
               <div className="space-y-4">
                 <div>
                   <h3 className={`text-sm font-bold mb-1 ${isWhite ? 'text-slate-900' : 'text-white'}`}>
-                    Estratégia Anota AI: Cardápio Digital Interativo
+                    Cardápio Digital & Resposta Automática no WhatsApp
                   </h3>
                   <p className={`text-xs ${isWhite ? 'text-slate-500' : 'text-slate-400'}`}>
-                    O robô envia o link direto para o cliente navegar pelos pratos com fotos e montar o pedido no WhatsApp.
+                    O método mais simples e eficiente: quando o cliente manda mensagem, recebe o link com as fotos dos pratos.
                   </p>
+                </div>
+
+                {/* Card de Mensagem de Saudação Pronta para WhatsApp Business */}
+                <div className={`p-4 sm:p-5 rounded-2xl border space-y-3.5 ${
+                  isWhite ? 'bg-emerald-50/80 border-emerald-200' : 'bg-emerald-950/20 border-emerald-500/30'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                      <Zap className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className={`text-xs font-black uppercase tracking-wider ${isWhite ? 'text-emerald-900' : 'text-emerald-300'}`}>
+                        Mensagem de Saudação Oficial (WhatsApp Business • Zero Custo)
+                      </h4>
+                      <p className={`text-[11px] ${isWhite ? 'text-slate-600' : 'text-slate-300'}`}>
+                        Cole este texto na <strong>Mensagem de Saudação</strong> do WhatsApp Business do restaurante.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={`p-3.5 rounded-xl border font-mono text-xs whitespace-pre-wrap ${
+                    isWhite ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-950 border-slate-800 text-slate-200'
+                  }`}>
+                    {textoSaudacaoPronto}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                      <HelpCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Qualquer cliente que mandar mensagem recebe o cardápio na hora!</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleCopiarTextoSaudacao}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 active:scale-95 transition-all cursor-pointer shrink-0"
+                    >
+                      {copiadoTextoSaudacao ? (
+                        <>
+                          <Check className="w-4 h-4 text-white" />
+                          <span>Copiado com Sucesso!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4 text-white" />
+                          <span>Copiar Mensagem Pronta</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Box do Link Oficial */}
