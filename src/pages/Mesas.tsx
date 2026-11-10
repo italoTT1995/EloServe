@@ -67,6 +67,7 @@ import {
   gerarQrCodeMesaDataUrl,
   getUrlMesaCliente,
   baixarQrCodeMesaPng,
+  imprimirDisplayMesaIndividual,
 } from '../utils/qrCodeHelper';
 import { useThemeStore } from '../store/useThemeStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -2463,8 +2464,8 @@ export default function Mesas() {
               </div>
             </div>
 
-            {/* Download do QR Code */}
-            <div>
+            {/* Download e Impressão do Display de Mesa */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -2476,7 +2477,26 @@ export default function Mesas() {
                 className="w-full py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-orange-600/20 transition-colors"
               >
                 <Download className="w-4 h-4 text-white" />
-                <span>Baixar Imagem PNG do QR Code</span>
+                <span>Baixar PNG</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  imprimirDisplayMesaIndividual({
+                    numero: mesaModalQR.numero,
+                    setor: mesaModalQR.setor,
+                    capacidade: mesaModalQR.capacidade,
+                    nomeRestaurante: tenantAtual?.nomeFantasia,
+                    qrDataUrl: modalQrDataUrl,
+                    tenantId: idLoja,
+                  });
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-2 border border-slate-700 transition-colors"
+                title="Imprimir Totem/Display acrílico para colocar na mesa"
+              >
+                <Printer className="w-4 h-4 text-orange-400" />
+                <span>Imprimir Display</span>
               </button>
             </div>
 
