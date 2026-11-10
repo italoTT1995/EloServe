@@ -271,6 +271,13 @@ export default function App() {
                     }
                   />
 
+                  {/* Alias & Atalhos de Navegação */}
+                  <Route path="/admin/cardapio" element={<Navigate to="/cardapio" replace />} />
+                  <Route path="/admin/estoque" element={<Navigate to="/estoque" replace />} />
+                  <Route path="/admin/ficha-tecnica" element={<Navigate to="/estoque?aba=fichas" replace />} />
+                  <Route path="/admin/funcionarios" element={<Navigate to="/funcionarios" replace />} />
+                  <Route path="/admin/configuracoes" element={<Navigate to="/painel-dono" replace />} />
+
                   {/* Fallback */}
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

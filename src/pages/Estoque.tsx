@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Package,
   AlertTriangle,
@@ -67,7 +68,19 @@ export default function Estoque() {
   const fornecedores = getFornecedoresPorTenant(idLoja);
   const movimentacoes = getMovimentacoesPorTenant(idLoja);
 
-  const [abaAtiva, setAbaAtiva] = useState<'estoque' | 'compras' | 'fichas' | 'fornecedores' | 'movimentacoes'>('estoque');
+  const [searchParams] = useSearchParams();
+  const abaParam = searchParams.get('aba');
+  const [abaAtiva, setAbaAtiva] = useState<'estoque' | 'compras' | 'fichas' | 'fornecedores' | 'movimentacoes'>(
+    abaParam && ['estoque', 'compras', 'fichas', 'fornecedores', 'movimentacoes'].includes(abaParam)
+      ? (abaParam as any)
+      : 'estoque'
+  );
+
+  useEffect(() => {
+    if (abaParam && ['estoque', 'compras', 'fichas', 'fornecedores', 'movimentacoes'].includes(abaParam)) {
+      setAbaAtiva(abaParam as any);
+    }
+  }, [abaParam]);
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>('todas');
   const [filtroTipoMov, setFiltroTipoMov] = useState<string>('todos');
   const [busca, setBusca] = useState('');

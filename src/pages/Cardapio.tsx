@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   Plus,
@@ -143,11 +144,19 @@ export default function Cardapio() {
   const [produtoAjustePreco, setProdutoAjustePreco] = useState<Produto | null>(null);
   const [novoPrecoInput, setNovoPrecoInput] = useState('');
 
+  const [searchParams] = useSearchParams();
+
   // Modal Categorias
   const [modalCategoriasAberto, setModalCategoriasAberto] = useState(false);
   const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
   const [criandoCategoriaRapida, setCriandoCategoriaRapida] = useState(false);
   const [nomeCategoriaRapida, setNomeCategoriaRapida] = useState('');
+
+  useEffect(() => {
+    if (searchParams.get('modal') === 'categorias') {
+      setModalCategoriasAberto(true);
+    }
+  }, [searchParams]);
 
   // Modal Acréscimos
   const [modalAcrescimosAberto, setModalAcrescimosAberto] = useState(false);

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DollarSign,
@@ -27,6 +27,8 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowRight,
+  Building2,
+  Save,
 } from 'lucide-react';
 import { useSaaSStore } from '../store/useSaaSStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -67,6 +69,52 @@ export default function PainelDono() {
   const [paginaPedidos, setPaginaPedidos] = useState<number>(1);
   const [onboardingAberto, setOnboardingAberto] = useState(true);
 
+  // Modal e Formulário de Dados do Restaurante (Passo 1 do Onboarding)
+  const [modalEditarRestaurante, setModalEditarRestaurante] = useState(false);
+  const [formRestaurante, setFormRestaurante] = useState({
+    nomeFantasia: tenantAtual?.nomeFantasia || '',
+    razaoSocial: tenantAtual?.razaoSocial || '',
+    documento: tenantAtual?.documento || '',
+    responsavelNome: tenantAtual?.responsavelNome || '',
+    telefoneWhatsApp: tenantAtual?.telefoneWhatsApp || '',
+    email: tenantAtual?.email || '',
+    cidadeUf: tenantAtual?.cidadeUf || '',
+  });
+
+  useEffect(() => {
+    if (tenantAtual) {
+      setFormRestaurante({
+        nomeFantasia: tenantAtual.nomeFantasia || '',
+        razaoSocial: tenantAtual.razaoSocial || '',
+        documento: tenantAtual.documento || '',
+        responsavelNome: tenantAtual.responsavelNome || '',
+        telefoneWhatsApp: tenantAtual.telefoneWhatsApp || '',
+        email: tenantAtual.email || '',
+        cidadeUf: tenantAtual.cidadeUf || '',
+      });
+    }
+  }, [tenantAtual]);
+
+  function handleSalvarRestaurante(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formRestaurante.nomeFantasia.trim()) {
+      alert('Informe o Nome Fantasia do restaurante.');
+      return;
+    }
+    atualizarDadosTenant(currentTenantId, {
+      nomeFantasia: formRestaurante.nomeFantasia.trim(),
+      razaoSocial: formRestaurante.razaoSocial.trim(),
+      documento: formRestaurante.documento.trim(),
+      responsavelNome: formRestaurante.responsavelNome.trim(),
+      telefoneWhatsApp: formRestaurante.telefoneWhatsApp.trim(),
+      email: formRestaurante.email.trim(),
+      cidadeUf: formRestaurante.cidadeUf.trim(),
+    });
+    setToastMensagem('Dados do restaurante salvos com sucesso!');
+    setTimeout(() => setToastMensagem(null), 3000);
+    setModalEditarRestaurante(false);
+  }
+
   const { getCategoriasPorTenant } = useProductStore();
   const { getItensPorTenant, getFichasPorTenant } = useEstoqueStore();
   const { funcionarios } = useFuncionarioStore();
@@ -91,42 +139,42 @@ export default function PainelDono() {
         titulo: 'Dados do restaurante cadastrados',
         descricao: 'Nome fantasia, CNPJ/CPF e dados de contato',
         concluido: passo1,
-        rota: '/admin/configuracoes',
+        rota: '#dados-restaurante',
       },
       {
         id: 2,
         titulo: 'Categorias criadas',
         descricao: 'Organização dos pratos, bebidas e sobremesas',
         concluido: passo2,
-        rota: '/admin/cardapio',
+        rota: '/cardapio?modal=categorias',
       },
       {
         id: 3,
         titulo: 'Produtos adicionados',
         descricao: 'Itens do cardápio com preços e fotos',
         concluido: passo3,
-        rota: '/admin/cardapio',
+        rota: '/cardapio',
       },
       {
         id: 4,
         titulo: 'Ingredientes cadastrados',
         descricao: 'Insumos e matérias-primas no estoque',
         concluido: passo4,
-        rota: '/admin/estoque',
+        rota: '/estoque',
       },
       {
         id: 5,
         titulo: 'Ficha técnica configurada',
         descricao: 'Receita com insumos para baixa automática e CMV',
         concluido: passo5,
-        rota: '/admin/ficha-tecnica',
+        rota: '/estoque?aba=fichas',
       },
       {
         id: 6,
         titulo: 'Funcionários adicionados',
         descricao: 'Operadores de caixa, garçons e cozinheiros',
         concluido: passo6,
-        rota: '/admin/funcionarios',
+        rota: '/funcionarios',
       },
       {
         id: 7,
@@ -514,60 +562,85 @@ export default function PainelDono() {
         {/* Lista de Passos Interativos */}
         {onboardingAberto && (
           <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 animate-in fade-in duration-200">
-            {passosOnboarding.lista.map((passo) => (
-              <Link
-                key={passo.id}
-                to={passo.rota}
-                className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between group ${
-                  passo.concluido
-                    ? isWhite
-                      ? 'bg-emerald-50/60 border-emerald-200 hover:bg-emerald-50'
-                      : 'bg-emerald-950/20 border-emerald-900/40 hover:bg-emerald-950/30'
-                    : isWhite
-                    ? 'bg-white border-slate-200 hover:border-orange-400 hover:shadow-md'
-                    : 'bg-slate-900/80 border-slate-800 hover:border-orange-500/60 hover:shadow-lg'
-                }`}
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                    <span className="text-[10px] font-mono font-bold text-slate-500">
-                      PASSO {passo.id}
-                    </span>
-                    {passo.concluido ? (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded-md">
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>Pronto</span>
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold text-orange-400 bg-orange-950/60 border border-orange-500/30 px-1.5 py-0.5 rounded-md">
-                        Pendente
-                      </span>
-                    )}
-                  </div>
-                  <h3 className={`text-xs font-bold transition-colors ${
-                    passo.concluido
-                      ? 'text-slate-300'
-                      : isWhite
-                      ? 'text-slate-900 group-hover:text-orange-600'
-                      : 'text-white group-hover:text-orange-400'
-                  }`}>
-                    {passo.titulo}
-                  </h3>
-                  <p className="text-[10px] text-slate-400 line-clamp-2">
-                    {passo.descricao}
-                  </p>
-                </div>
+            {passosOnboarding.lista.map((passo) => {
+              const isPasso1 = passo.id === 1;
 
-                <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
-                  <span className={`font-semibold ${passo.concluido ? 'text-slate-500' : 'text-orange-400 group-hover:underline'}`}>
-                    {passo.concluido ? 'Revisar' : 'Configurar agora'}
-                  </span>
-                  <ArrowRight className={`w-3.5 h-3.5 transition-transform group-hover:translate-x-1 ${
-                    passo.concluido ? 'text-slate-500' : 'text-orange-400'
-                  }`} />
-                </div>
-              </Link>
-            ))}
+              const cardContent = (
+                <>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                      <span className="text-[10px] font-mono font-bold text-slate-500">
+                        PASSO {passo.id}
+                      </span>
+                      {passo.concluido ? (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded-md">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Pronto</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-orange-400 bg-orange-950/60 border border-orange-500/30 px-1.5 py-0.5 rounded-md">
+                          Pendente
+                        </span>
+                      )}
+                    </div>
+                    <h3 className={`text-xs font-bold transition-colors ${
+                      passo.concluido
+                        ? 'text-slate-300'
+                        : isWhite
+                        ? 'text-slate-900 group-hover:text-orange-600'
+                        : 'text-white group-hover:text-orange-400'
+                    }`}>
+                      {passo.titulo}
+                    </h3>
+                    <p className="text-[10px] text-slate-400 line-clamp-2">
+                      {passo.descricao}
+                    </p>
+                  </div>
+
+                  <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
+                    <span className={`font-semibold ${passo.concluido ? 'text-slate-500' : 'text-orange-400 group-hover:underline'}`}>
+                      {passo.concluido ? 'Revisar' : 'Configurar agora'}
+                    </span>
+                    <ArrowRight className={`w-3.5 h-3.5 transition-transform group-hover:translate-x-1 ${
+                      passo.concluido ? 'text-slate-500' : 'text-orange-400'
+                    }`} />
+                  </div>
+                </>
+              );
+
+              const cardClasses = `p-3.5 rounded-xl border transition-all flex flex-col justify-between group cursor-pointer text-left w-full ${
+                passo.concluido
+                  ? isWhite
+                    ? 'bg-emerald-50/60 border-emerald-200 hover:bg-emerald-50'
+                    : 'bg-emerald-950/20 border-emerald-900/40 hover:bg-emerald-950/30'
+                  : isWhite
+                  ? 'bg-white border-slate-200 hover:border-orange-400 hover:shadow-md'
+                  : 'bg-slate-900/80 border-slate-800 hover:border-orange-500/60 hover:shadow-lg'
+              }`;
+
+              if (isPasso1) {
+                return (
+                  <button
+                    key={passo.id}
+                    type="button"
+                    onClick={() => setModalEditarRestaurante(true)}
+                    className={cardClasses}
+                  >
+                    {cardContent}
+                  </button>
+                );
+              }
+
+              return (
+                <Link
+                  key={passo.id}
+                  to={passo.rota}
+                  className={cardClasses}
+                >
+                  {cardContent}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1245,6 +1318,172 @@ export default function PainelDono() {
           </div>
         )}
       </div>
+
+      {/* MODAL CONFIGURAÇÃO DOS DADOS DO RESTAURANTE (PASSO 1) */}
+      {modalEditarRestaurante && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className={`w-full max-w-lg rounded-3xl border shadow-2xl overflow-hidden ${
+            isWhite ? 'bg-white border-slate-200' : 'bg-[#141416] border-slate-800'
+          }`}>
+            <div className="p-5 border-b border-slate-800/80 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className={`text-sm font-extrabold ${isWhite ? 'text-slate-900' : 'text-white'}`}>
+                    Dados do Restaurante
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Informações cadastrais para identificação, notas e comprovantes.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEditarRestaurante(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarRestaurante} className="p-5 space-y-4">
+              <div>
+                <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                  Nome Fantasia (Como os clientes conhecem): *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formRestaurante.nomeFantasia}
+                  onChange={(e) => setFormRestaurante({ ...formRestaurante, nomeFantasia: e.target.value })}
+                  placeholder="Ex: Restaurante & Bar Sabor Brasil"
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                    isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-800 text-white'
+                  }`}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                    CNPJ ou CPF: *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formRestaurante.documento}
+                    onChange={(e) => setFormRestaurante({ ...formRestaurante, documento: e.target.value })}
+                    placeholder="00.000.000/0001-00"
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-800 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                    Razão Social (Opcional):
+                  </label>
+                  <input
+                    type="text"
+                    value={formRestaurante.razaoSocial}
+                    onChange={(e) => setFormRestaurante({ ...formRestaurante, razaoSocial: e.target.value })}
+                    placeholder="Ex: Sabor Brasil Gastronomia ME"
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-800 text-white'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                    WhatsApp / Telefone de Contato:
+                  </label>
+                  <input
+                    type="text"
+                    value={formRestaurante.telefoneWhatsApp}
+                    onChange={(e) => setFormRestaurante({ ...formRestaurante, telefoneWhatsApp: e.target.value })}
+                    placeholder="(11) 99999-8888"
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-800 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                    Cidade / UF:
+                  </label>
+                  <input
+                    type="text"
+                    value={formRestaurante.cidadeUf}
+                    onChange={(e) => setFormRestaurante({ ...formRestaurante, cidadeUf: e.target.value })}
+                    placeholder="Ex: São Paulo / SP"
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-800 text-white'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                    Nome do Responsável:
+                  </label>
+                  <input
+                    type="text"
+                    value={formRestaurante.responsavelNome}
+                    onChange={(e) => setFormRestaurante({ ...formRestaurante, responsavelNome: e.target.value })}
+                    placeholder="Ex: Carlos Oliveira"
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-800 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`text-[11px] font-bold block mb-1 ${isWhite ? 'text-slate-700' : 'text-slate-300'}`}>
+                    E-mail de Contato:
+                  </label>
+                  <input
+                    type="email"
+                    value={formRestaurante.email}
+                    onChange={(e) => setFormRestaurante({ ...formRestaurante, email: e.target.value })}
+                    placeholder="contato@restaurante.com.br"
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none focus:border-orange-500 ${
+                      isWhite ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-900 border-slate-800 text-white'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalEditarRestaurante(false)}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-colors ${
+                    isWhite ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  }`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Salvar Dados do Restaurante</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
